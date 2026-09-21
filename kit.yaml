@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/dam-agents/dam-starter-kits/main/kit.schema.json
+# The starter kit this definition is offered as. It lives here, beside the
+# definition it describes, so a change to the agent and a change to the kit
+# offering it are the same commit.
+schemaVersion: v1
+id: software-developer
+name: Software Developer
+description: >-
+  Picks up an issue labelled for implementation, writes the change, runs the
+  repository's own checks and tests against a cluster in its own sandbox,
+  opens a pull request and drives it through review until it is approved.
+category: software
+icon: code
+docsUrl: https://github.com/dam-agents/software-developer
+harnesses: [claude-code]
+
+# The verification it runs brings up a cluster in the sandbox, which a pod
+# cannot host. An install without virtualization leaves this kit out of the
+# catalog entirely rather than offering something it cannot run.
+backend: vm
+
+# `self` is this repository, at the commit the kit was resolved at, so an
+# agent always runs the definition this file shipped with. Into $HOME, because
+# the repository the agent works on belongs in work/.
+seed:
+  self: true
+  into: home
+
+install:
+  command: $HOME/scripts/bootstrap.sh
+
+resources:
+  cpu: "12"
+  memory: 16Gi
+  storage: 100Gi
+  note: >-
+    The sandbox is the cluster node as well as the build host. Sized below the
+    reference dev VM (10 CPU / 20GiB / 200GiB) on the assumption that one
+    container runtime and one image store need less than two. Disk is fixed at
+    create — raise it here before installing if that assumption turns out to be
+    wrong.
+
+# The cluster and the container runtime are processes in the sandbox: they stop
+# when it does. This agent stays up so its cluster does.
+hibernationTimeoutMin: 0
+
+env:
+  # Tells a repository's cluster tooling it is already inside a VM, so it drives
+  # the local k3s instead of looking for a VM manager to create one.
+  - name: IS_SANDBOX
+    value: "1"
+
+connections:
+  - accepts: [github, github-enterprise]
+    required: true
+    note: Clones the repository, pushes branches and opens pull requests.
+
+schedules:
+  # One schedule, and `continuous` on purpose: fires on a continuous schedule
+  # serialize, and there is one cluster. Two fresh fires could run two builds
+  # against it at once.
+  - name: developer-tick
+    rrule: FREQ=HOURLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=8,9,10,11,12,13,14,15,16,17;BYMINUTE=0
+    timezone: Europe/Prague
+    sessionMode: continuous
+    task: Run the developer tick — CLAUDE.md → "Every scheduled run".
