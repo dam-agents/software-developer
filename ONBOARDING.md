@@ -56,6 +56,22 @@ Record every answer in `work/CONFIG.md`. That file is runtime state, not
 definition: it is the only place these answers live, and every later run reads
 it before doing anything.
 
+`scripts/precheck.sh` reads it too, before any model is woken, so these keys
+must be exactly `- key: value`, one per line. Write prose around them freely —
+only these lines are parsed:
+
+```markdown
+- repo: dam-agents/dam
+- label_handoff: agent/implement
+- label_claimed: agent/in-progress
+- label_failed: agent/failed
+- label_review: code-guardian-review
+```
+
+Get `repo`, `label_handoff` and `label_claimed` right in particular: the
+precheck decides whether the agent wakes at all, and a wrong label there means
+either waking for nothing or never waking.
+
 ## 4. Finish
 
 Touch `$HOME/.software-developer-onboarded`, then call

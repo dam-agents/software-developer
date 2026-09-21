@@ -63,4 +63,5 @@ schedules:
     rrule: FREQ=HOURLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=8,9,10,11,12,13,14,15,16,17;BYMINUTE=0
     timezone: Europe/Prague
     sessionMode: continuous
+    precheck: $HOME/scripts/precheck.sh
     task: Run the developer tick — CLAUDE.md → "Every scheduled run".

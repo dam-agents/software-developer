@@ -12,7 +12,13 @@ before anything else. It is the only place those answers live.
 
 ## Every scheduled run
 
-In this order. Stop when there is nothing left to do.
+A scheduled run only starts because `scripts/precheck.sh` already found work,
+and **the prompt carries what it found**. Read that list rather than running the
+precheck again — it is two GitHub queries you have already paid for. A run
+started any other way (you were asked directly, or the precheck broke and the
+run happened anyway) has no list, so gather it yourself.
+
+Then, in this order. Stop when there is nothing left to do.
 
 1. **Your own open pull requests, oldest first.** For each one carrying review
    comments you have not answered: resolve them, push, and re-apply the
