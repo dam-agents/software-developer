@@ -32,13 +32,15 @@ install:
 resources:
   cpu: "12"
   memory: 16Gi
-  storage: 100Gi
+  storage: 80Gi
   note: >-
     The sandbox is the cluster node as well as the build host. Sized below the
     reference dev VM (10 CPU / 20GiB / 200GiB) on the assumption that one
-    container runtime and one image store need less than two. Disk is fixed at
-    create — raise it here before installing if that assumption turns out to be
-    wrong.
+    container runtime and one image store need less than two. The disk is
+    deliberately under the 100Gi a vm runner claims per owner by default, so
+    the image cache it shares that claim with still has room. Disk is fixed at
+    create — raise it here before installing if either assumption turns out to
+    be wrong, and raise the runner claim with it.
 
 # The cluster and the container runtime are processes in the sandbox: they stop
 # when it does. This agent stays up so its cluster does.
