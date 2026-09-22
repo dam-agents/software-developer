@@ -11,7 +11,10 @@ the pull request through review.
 - [`ONBOARDING.md`](ONBOARDING.md) — the first conversation, which asks the user
   what only they can answer.
 - [`scripts/precheck.sh`](scripts/precheck.sh) — decides whether a run is worth
-  waking the agent for, before any model is involved.
+  waking the agent for, before any model is involved, and holds an occurrence
+  back while the run before it is still working.
+- [`scripts/session-link.sh`](scripts/session-link.sh) — the link back to the
+  run that wrote a change, which every pull request carries.
 
 **Nothing here names a repository.** Which one to work on, which labels mean
 what, and how to build and test it are asked during onboarding and recorded in
