@@ -33,9 +33,30 @@ fi
 HANDOFF="$(cfg label_handoff)"; HANDOFF="${HANDOFF:-agent/implement}"
 CLAIMED="$(cfg label_claimed)"; CLAIMED="${CLAIMED:-agent/in-progress}"
 
-PRS="$(gh pr list -R "$REPO" --author "@me" --state open --limit 50 \
-  --json number,title,url,reviewDecision,latestReviews 2>/dev/null)" || {
-  echo "gh could not list pull requests on $REPO" >&2
+# The login onboarding recorded, else whoever the token belongs to. `@me` is
+# the last resort: resolving it costs a call, and a token without user scope
+# cannot answer it at all.
+AUTHOR="$(cfg author)"
+if [ -z "$AUTHOR" ]; then
+  AUTHOR="$(gh api user --jq .login 2>/dev/null)" || true
+fi
+AUTHOR="${AUTHOR:-@me}"
+
+ERR="$(mktemp)"
+trap 'rm -f "$ERR"' EXIT
+
+# One retry: this runs every ten minutes, and a blip that fails open costs a
+# whole turn that begins by wondering why.
+gh_json() {
+  gh "$@" 2>"$ERR" && return 0
+  sleep 3
+  gh "$@" 2>"$ERR"
+}
+
+PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" --state open --limit 50 \
+  --json number,title,url,reviewDecision,latestReviews)" || {
+  echo "gh could not list pull requests on $REPO as author '$AUTHOR', twice:" >&2
+  cat "$ERR" >&2
   exit 2
 }
 
@@ -49,9 +70,10 @@ PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" '
   | "- #\(.number) \(.title) — \(if .reviewDecision == "APPROVED" then "approved; release its issue and move on" else "changes requested; resolve and re-request review" end)\n  \(.url)"
 ')" || exit 2
 
-ISSUES="$(gh issue list -R "$REPO" --label "$HANDOFF" --state open --limit 50 \
-  --json number,title,url,labels 2>/dev/null)" || {
-  echo "gh could not list issues on $REPO" >&2
+ISSUES="$(gh_json issue list -R "$REPO" --label "$HANDOFF" --state open --limit 50 \
+  --json number,title,url,labels)" || {
+  echo "gh could not list issues on $REPO with label '$HANDOFF', twice:" >&2
+  cat "$ERR" >&2
   exit 2
 }
 

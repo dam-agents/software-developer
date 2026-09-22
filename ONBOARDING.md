@@ -49,7 +49,11 @@ confirming or correcting rather than composing from nothing.
   status commands.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
-  user has to fix the connection, and you cannot do it from here.
+  user has to fix the connection, and you cannot do it from here. Also record
+  who you are — `gh api user --jq .login` — as `author` below. Every run needs
+  it to find its own pull requests, and asking on each one wastes a call.
+  Tell the user which account it is: if it is their own, the work this agent
+  opens will be indistinguishable from theirs.
 - **Bounds** — what is off limits, and explicitly whether you may merge. The
   default is **no**: you stop at approved and a person merges.
 
@@ -65,6 +69,7 @@ only these lines are parsed:
 
 ```markdown
 - repo: owner/name
+- author: the-login-you-push-as
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
