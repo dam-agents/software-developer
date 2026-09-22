@@ -21,30 +21,60 @@ knew which repository to clone.
 
 A scheduled run only starts because `scripts/precheck.sh` already found work,
 and **the prompt carries what it found**. Read that list rather than running the
-precheck again — it is two GitHub queries you have already paid for. A run
+precheck again — it is three GitHub queries you have already paid for. A run
 started any other way (you were asked directly, or the precheck broke and the
 run happened anyway) has no list, so gather it yourself.
+
+**Every run is its own session.** You remember nothing of the last one, and
+nothing you work out in this one survives it. What is true is what the
+repository says — the branches, the labels, the pull requests and their
+comments — so read it rather than assuming where you left off.
 
 Then, in this order. Stop when there is nothing left to do.
 
 1. **Your own open pull requests, oldest first.** For each one carrying review
-   comments you have not answered: resolve them, push, and re-apply the
-   review-request label so the reviewer looks again. A pull request that is
-   approved is finished — drop the claimed label from its issue, comment the
-   issue with the pull request link, and move on. You do not merge.
-2. **Then at most one new item.** Take the oldest issue carrying the hand-off
+   comments you have not answered: resolve them, push, comment with this run's
+   session link so the reviewer can see what the round changed, and re-apply the
+   review-request label so they look again. A pull request that is approved is
+   finished — drop the claimed label from its issue, comment the issue with the
+   pull request link, and move on. You do not merge.
+2. **Then anything an earlier run left claimed.** An issue carrying the claimed
+   label with no pull request of yours is work that stopped halfway, and the
+   precheck lists it as such. Find out how far it got — the branch may be
+   pushed, half-written or missing — and finish it. If it cannot be picked up,
+   swap the claim for the failed label and comment why. Never leave it claimed
+   and untouched: no run after this one will see it either.
+3. **Then at most one new item.** Take the oldest issue carrying the hand-off
    label and no claim. Swap the hand-off label for the claimed label *before*
    your first commit. Branch, implement, run the verification from
    `work/CONFIG.md`, push, open the pull request, apply the review-request
    label.
-3. **Nothing to do is a normal outcome.** Say so and end the turn.
+4. **Nothing to do is a normal outcome.** Say so and end the turn.
 
 ## Rules
 
 - **One build at a time.** Several pull requests may be open and waiting on
   review; that costs nothing and you should keep picking up new work while they
   wait. But only one branch may be building or running tests at any moment,
-  because there is one cluster and it serves one branch.
+  because there is one cluster and it serves one branch. Nothing holds the fires
+  back for you — what keeps them apart is the precheck skipping an occurrence
+  while your sandbox is still working. So **never leave work running behind
+  you**: a build detached from your turn with `nohup`, `setsid` or a bare `&`
+  leaves the sandbox looking idle, and the next tick starts a second build on
+  top of it.
+- **Every pull request names its issue.** `Fixes #<n>`, on its own line in the
+  body. It is not decoration: the precheck pairs a claimed issue with its pull
+  request through that line, so an issue whose pull request never names it reads
+  as abandoned work to every later run — and stays claimed for good.
+- **Every pull request says where it came from.** Run
+  `bash "$HOME/scripts/session-link.sh"` and end the body with
+  `Written by this agent — <link>`. It opens the session this run is happening
+  in: the reasoning, the commands and the test output behind the change, none of
+  which the diff carries. Use the same link in the comment you leave when you
+  push an answer to a review — that round happened in a different session from
+  the one that opened the pull request. If the script says it has no link, open
+  the pull request anyway and say that `app_url` is missing from
+  `work/CONFIG.md`.
 - **Claim before you work.** Starting without the claimed label is a bug — a
   second run would pick up the same issue. If you give up, swap the claim for
   the failed label *and* comment why. Never leave an issue claimed by a run that

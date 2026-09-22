@@ -55,15 +55,19 @@ connections:
     note: Clones the repository, pushes branches and opens pull requests.
 
 schedules:
-  # One schedule, and `continuous` on purpose: fires on a continuous schedule
-  # serialize, and there is one cluster. Two fresh fires could run two builds
-  # against it at once.
+  # Every ten minutes, around the clock. A cron holds UTC, and at this cadence
+  # the hour it lands in is nothing the agent reasons about.
   #
-  # Every ten minutes of a working day, which the precheck makes cheap: an
-  # occurrence with nothing to do is two GitHub queries and no model at all.
+  # `fresh`, and the precheck is what keeps the runs apart. Fires on a
+  # continuous schedule queue behind one another, which used to be the whole
+  # answer to "there is one cluster" — at the cost of carrying every run's
+  # context into the next one forever. A fresh fire opens its own session, so
+  # the gate moved into the precheck: it asks the runtime whether the sandbox
+  # is still working and steps aside when it is. What a run needs to know about
+  # the one before it is in the branches, the labels and the pull requests,
+  # which survive a session and a rebuilt sandbox alike.
   - name: developer-tick
-    rrule: FREQ=HOURLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=8,9,10,11,12,13,14,15,16,17;BYMINUTE=0,10,20,30,40,50
-    timezone: Europe/Prague
-    sessionMode: continuous
+    cron: "*/10 * * * *"
+    sessionMode: fresh
     precheck: $HOME/scripts/precheck.sh
     task: Run the developer tick — CLAUDE.md → "Every scheduled run".

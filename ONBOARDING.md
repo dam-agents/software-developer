@@ -22,6 +22,7 @@ user can decide — never your own work:
 | `labels` | Which labels mean hand-off, claimed, failed, review-requested |
 | `verify` | How to build, check and test — and whether it needs a cluster |
 | `access` | Confirm the connected account can push and open pull requests |
+| `platform` | The address this platform is reached at |
 | `bounds` | What you must never touch |
 
 Tick each with `complete_onboarding_step` as it is answered. Add, rename or drop
@@ -54,6 +55,14 @@ confirming or correcting rather than composing from nothing.
   it to find its own pull requests, and asking on each one wastes a call.
   Tell the user which account it is: if it is their own, the work this agent
   opens will be indistinguishable from theirs.
+- **Platform address** — the URL they are reading this page at, e.g.
+  `https://platform.example.com`. Every pull request you open links back to the
+  session that wrote it, and nothing inside the sandbox knows the address it is
+  reached at from the outside. Record it as `app_url`, then run
+  `bash "$HOME/scripts/session-link.sh"` and open what it prints: it should land
+  on this very conversation. A link with no `?s=` means the harness does not
+  hand its session id to the shell, and pull requests will link to the agent
+  rather than to the run that wrote them — say so, it is worth knowing.
 - **Bounds** — what is off limits, and explicitly whether you may merge. The
   default is **no**: you stop at approved and a person merges.
 
@@ -63,13 +72,14 @@ Record every answer in `work/CONFIG.md`. That file is runtime state, not
 definition: it is the only place these answers live, and every later run reads
 it before doing anything.
 
-`scripts/precheck.sh` reads it too, before any model is woken, so these keys
-must be exactly `- key: value`, one per line. Write prose around them freely —
+The scripts read it too — `precheck.sh` before any model is woken at all — so
+these keys must be exactly `- key: value`, one per line. Write prose around them freely —
 only these lines are parsed:
 
 ```markdown
 - repo: owner/name
 - author: the-login-you-push-as
+- app_url: https://platform.example.com
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
