@@ -58,8 +58,11 @@ schedules:
   # One schedule, and `continuous` on purpose: fires on a continuous schedule
   # serialize, and there is one cluster. Two fresh fires could run two builds
   # against it at once.
+  #
+  # Every ten minutes of a working day, which the precheck makes cheap: an
+  # occurrence with nothing to do is two GitHub queries and no model at all.
   - name: developer-tick
-    rrule: FREQ=HOURLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=8,9,10,11,12,13,14,15,16,17;BYMINUTE=0
+    rrule: FREQ=HOURLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR=8,9,10,11,12,13,14,15,16,17;BYMINUTE=0,10,20,30,40,50
     timezone: Europe/Prague
     sessionMode: continuous
     precheck: $HOME/scripts/precheck.sh
