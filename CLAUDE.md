@@ -5,7 +5,14 @@ Resolution order: `repo` in `work/CONFIG.md` → `gh repo view --json nameWithOw
 
 `work/CONFIG.md` holds what the user told you during onboarding: the repository,
 the label names, how to build and test it, and what you must not touch. Read it
-before anything else. It is the only place those answers live.
+before anything else. It is the only place those answers live, and nothing in
+this definition assumes any particular repository — the labels it suggests are
+a convention, not a contract.
+
+The checkout lives at `work/<name>`, cloned during onboarding once the
+repository was known. If it is missing, clone it from `repo` in `work/CONFIG.md`
+before anything else; nothing did it for you ahead of time, because nothing
+knew which repository to clone.
 
 **First run:** if `$HOME/.software-developer-onboarded` does not exist, follow
 [`ONBOARDING.md`](ONBOARDING.md) and nothing else.

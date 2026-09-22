@@ -29,21 +29,24 @@ steps if the conversation calls for it — steps you keep stay ticked.
 
 ## 2. Ask
 
-One question at a time. Offer the defaults so a user who wants them can agree
-once instead of answering five times.
+One question at a time. Suggest an answer with each question so the user is
+confirming or correcting rather than composing from nothing.
 
-- **Repository** — default `dam-agents/dam`.
-- **Labels** — defaults: hand-off `agent/implement`, claimed
+- **Repository** — `owner/name`. Ask; do not assume. If they are setting this
+  up for the platform's own development the answer is `dam-agents/dam`, but
+  that is one answer among many and nothing here is built around it.
+- **Labels** — suggest hand-off `agent/implement`, claimed
   `agent/in-progress`, failed `agent/failed`, review-requested
-  `code-guardian-review`.
-- **Verification** — for `dam-agents/dam`: `mise run check`, `mise run test`,
-  and `mise run e2e` for the suite that needs a cluster. Always the
-  repository's own task runner, never the underlying tool. Ask whether a
-  cluster is needed at all — many repositories need none, and then you never
-  start one.
-- **Cluster** — if one is needed, the create, recreate and status commands. For
-  `dam-agents/dam`: `mise run cluster:install`, `mise run cluster:uninstall`,
-  `mise run cluster:status`.
+  `code-guardian-review`, and say these are only a convention. Whatever they
+  choose, check it exists: `gh label list -R <slug>`. A label you invent is a
+  label nothing ever applies.
+- **Verification** — the commands that build, check and test. Always through
+  the repository's own task runner if it has one, never the underlying tool;
+  read its README or contributing guide first and propose what you find, so
+  the user is correcting you rather than dictating. Ask whether any of it
+  needs a cluster — most repositories need none, and then you never start one.
+- **Cluster** — only if the answer above was yes: the create, recreate and
+  status commands.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here.
@@ -61,7 +64,7 @@ must be exactly `- key: value`, one per line. Write prose around them freely —
 only these lines are parsed:
 
 ```markdown
-- repo: dam-agents/dam
+- repo: owner/name
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
@@ -72,7 +75,20 @@ Get `repo`, `label_handoff` and `label_claimed` right in particular: the
 precheck decides whether the agent wakes at all, and a wrong label there means
 either waking for nothing or never waking.
 
-## 4. Finish
+## 4. Clone it
+
+Only now, with the repository known:
+
+```sh
+git clone --filter=blob:none https://github.com/<slug> "$HOME/work/<name>"
+```
+
+Then trust its task-runner config if it has one (`mise trust`, or the
+equivalent), so the first run is not stopped by a prompt nobody is there to
+answer. Do not build, install dependencies or start a cluster — the first
+scheduled run does that, where it is visible and can be retried.
+
+## 5. Finish
 
 Touch `$HOME/.software-developer-onboarded`, then call
 `mark_onboarding_complete` — and only then. If the user left anything

@@ -26,9 +26,6 @@ seed:
   self: true
   into: home
 
-install:
-  command: $HOME/scripts/bootstrap.sh
-
 resources:
   cpu: "12"
   memory: 16Gi
