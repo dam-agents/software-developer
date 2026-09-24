@@ -110,7 +110,7 @@ elif [ "$IDLE" = false ] || [ "$HELD" = running ]; then
   echo "Background work the runtime is holding the sandbox for:"
   echo "${BG:-none reported}"
   echo
-  echo "Find out what is holding it and report — CLAUDE.md → \"The diagnostic run\"."
+  echo "Find out what is holding it and report — docs/diagnostic-run.md."
   exit 0
 else
   NOTE="The runtime did not say whether the sandbox is busy, so another run may still be in flight. Check before you build: one cluster, one build."
