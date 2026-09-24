@@ -16,5 +16,6 @@
 !/CHANGELOG.md
 !/docs/
 !/scripts/
+!/.github/
 
 .DS_Store
