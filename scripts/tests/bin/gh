@@ -1,13 +1,27 @@
 #!/usr/bin/env bash
-# Stub gh: canned JSON from the STUB_* variables, and a trace of every call.
+# Stub gh: canned answers from the STUB_* variables, and a trace of every call.
 echo "$*" >> "$STUB_DIR/gh.calls"
+answer() { [ -n "$1" ] || exit 1; printf '%s\n' "$1"; }
 case "$1 $2" in
-  "pr list") printf '%s' "${STUB_PRS:-[]}" ;;
+  "pr list") [ -z "${STUB_PR_FAIL:-}" ] || exit 1; printf '%s' "${STUB_PRS:-[]}" ;;
   "issue list")
     label=""; prev=""
     for a in "$@"; do [ "$prev" = "--label" ] && label="$a"; prev="$a"; done
     if [ "$label" = "${STUB_HANDOFF_LABEL:-agent/implement}" ]; then printf '%s' "${STUB_HANDOFF:-[]}"
     else printf '%s' "${STUB_CLAIMED:-[]}"; fi ;;
-  "api user") printf 'dev-bot' ;;
+  "label list")
+    answer "${STUB_LABELS-$(printf 'agent/implement\nagent/in-progress\nagent/failed\ncode-guardian-review')}" ;;
+  "api "*)
+    shift; path=""; skip=""
+    for a in "$@"; do
+      if [ -n "$skip" ]; then skip=""; continue; fi
+      case "$a" in --hostname | --jq | -q | -X) skip=1 ;; -*) ;; *) [ -n "$path" ] || path="$a" ;; esac
+    done
+    case "$path" in
+      user) answer "${STUB_LOGIN-dev-bot}" ;;
+      user/repos*) answer "${STUB_REACH-1}" ;;
+      repos/*) answer "${STUB_PUSH-true}" ;;
+      *) echo "stub gh: unexpected api $path" >&2; exit 9 ;;
+    esac ;;
   *) echo "stub gh: unexpected $*" >&2; exit 9 ;;
 esac

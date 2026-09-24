@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # exit 0 = there is work, stdout goes into the prompt; 1 = skip the occurrence;
 # anything else = broken, the run happens anyway and the reason is recorded.
+#
+# PRECHECK_PROBE=1 answers only "is there work, and can GitHub be read": no
+# sandbox gate and no state written. verify-onboarding.sh and the audit use it
+# to prove the detection end to end without claiming a run nobody will start.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -14,7 +18,8 @@ SINCE="${PLATFORM_LAST_RUN_AT:-}"
 # Every exit that lets a work run through claims work/RUN.md first, so the next
 # occurrence can tell a run that is still working from one that died.
 allow() {
-  "$STATE" claim "${PLATFORM_FIRE_AT:-unknown}" >/dev/null 2>&1 || true
+  [ -n "${PRECHECK_PROBE:-}" ] ||
+    "$STATE" claim "${PLATFORM_FIRE_AT:-unknown}" >/dev/null 2>&1 || true
   exit 0
 }
 
@@ -67,7 +72,9 @@ last_life() {
   echo "$best"
 }
 
-if [ "$IDLE" = true ]; then
+if [ -n "${PRECHECK_PROBE:-}" ]; then
+  :
+elif [ "$IDLE" = true ]; then
   if [ "$HELD" = running ]; then
     claimed="$(epoch "$(kv "$RUN" claimed_at)")" || claimed=0
     # claimed moments ago and not started yet — the session is still opening
@@ -127,9 +134,10 @@ if [ -z "$REPO" ]; then
   done
 fi
 if [ -z "$REPO" ]; then
-  echo "No repository configured: work/CONFIG.md names none and no checkout does either."
-  echo "Tell the user that is why nothing can run, and stop."
-  allow
+  # Nothing to work on — CONFIG.md lost or never written. Letting a run through
+  # to say so would repeat every ten minutes into a chat nobody reads; the
+  # weekly audit's verifier fails the missing key instead.
+  exit 1
 fi
 
 HANDOFF="$(cfg label_handoff)"; HANDOFF="${HANDOFF:-agent/implement}"

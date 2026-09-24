@@ -74,7 +74,7 @@ is "$(field RUN.md session)" sess-a "the record is left alone"
 done_
 
 CASE="stuck_after_min is read from CONFIG.md"; sandbox
-echo "- stuck_after_min: 300" >> "$HOME/work/CONFIG.md"
+sed -i.bak 's/^- stuck_after_min: .*/- stuck_after_min: 300/' "$HOME/work/CONFIG.md"
 record run_state=running session=sess-a "claimed_at=$(ago 200)" phase=building "phase_at=$(ago 190)"
 STUB_STATUS="$BUSY" precheck
 is "$RC" 1 "190 quiet minutes is under 300"
@@ -120,6 +120,25 @@ is "$RC" 0 "exit"
 has "$OUT" "#4 Four" "#4 is not named by '#45'"
 lacks "$OUT" "#7 Seven" "#7 has its pull request"
 lacks "$OUT" "#45 Forty-five" "#45 has its pull request"
+done_
+
+CASE="a probe skips the gate and writes nothing"; sandbox
+record run_state=running session=sess-a "claimed_at=$(ago 20)" phase=building "phase_at=$(ago 5)"
+before="$(cat "$HOME/work/RUN.md")"
+PRECHECK_PROBE=1 STUB_STATUS="$BUSY" STUB_HANDOFF="$ISSUE7" precheck
+is "$RC" 0 "reports the work despite the busy sandbox"
+has "$OUT" "#7 Add a flag" "worklist"
+is "$(cat "$HOME/work/RUN.md")" "$before" "RUN.md untouched"
+[ ! -f "$HOME/work/GATE.md" ] || fail "wrote gate bookkeeping"
+PRECHECK_PROBE=1 STUB_STATUS="$IDLE" precheck
+is "$RC" 1 "nothing to do still declines"
+done_
+
+CASE="no repository configured declines rather than waking a run to say so"; sandbox
+rm "$HOME/work/CONFIG.md"
+STUB_STATUS="$IDLE" STUB_HANDOFF="$ISSUE7" precheck
+is "$RC" 1 "exit"
+[ ! -f "$HOME/work/RUN.md" ] || fail "claimed a run"
 done_
 
 exit "$FAILED"

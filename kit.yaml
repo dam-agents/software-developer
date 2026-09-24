@@ -70,4 +70,11 @@ schedules:
     cron: "*/10 * * * *"
     sessionMode: fresh
     precheck: $HOME/scripts/precheck.sh
-    task: Run the developer tick — CLAUDE.md → "Every scheduled run".
+    task: Run the developer tick — CLAUDE.md → "The tick".
+
+  # Every Friday, and ungated: the report is the point even in a quiet week. It
+  # checks the instance nobody is watching and repairs nothing.
+  - name: software-developer-audit-weekly
+    cron: "0 6 * * 5"
+    sessionMode: fresh
+    task: Run the weekly audit — docs/audit.md.

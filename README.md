@@ -20,8 +20,14 @@ the pull request through review.
   from one that died.
 - [`scripts/session-link.sh`](scripts/session-link.sh) — the link back to the
   run that wrote a change, which every pull request carries.
+- [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an
+  instance has the shape onboarding promises; every failure names its fix.
+- [`scripts/audit.sh`](scripts/audit.sh) — the deterministic half of the
+  weekly audit.
 - [`scripts/tests/`](scripts/tests/) — offline tests for all of the above:
-  `bash scripts/tests/run.sh`.
+  `bash scripts/tests/run.sh`. CI runs them, and
+  [`scripts/validate-definition.sh`](scripts/validate-definition.sh), on every
+  pull request.
 
 **Nothing here names a repository.** Which one to work on, which labels mean
 what, and how to build and test it are asked during onboarding and recorded in
@@ -48,6 +54,12 @@ All under `work/`, none of it tracked here:
 | File | Written by | Holds |
 | --- | --- | --- |
 | `CONFIG.md` | onboarding | the repository, labels, commands and bounds |
+| `AGENTS.md`, `VERSION` | onboarding | a pointer to `CLAUDE.md`; the definition version this instance adopted |
 | `RUN.md` | `scripts/run-state.sh` | the run in flight: its session, phase and since when |
 | `GATE.md` | the precheck, via `run-state.sh` | how long the sandbox has read busy, and the last diagnostic run |
 | `TICK.log` | `scripts/run-state.sh` | one line per closed run, append-only |
+| `AUDIT.log` | the weekly audit | one line per audit: ok, warn and fail counts |
+
+None of it is backed up: everything but `CONFIG.md` is rebuilt from GitHub or
+from nothing, and a lost `CONFIG.md` costs one onboarding conversation —
+[`docs/persistence.md`](docs/persistence.md).
