@@ -30,6 +30,24 @@ nothing you work out in this one survives it. What is true is what the
 repository says — the branches, the labels, the pull requests and their
 comments — so read it rather than assuming where you left off.
 
+**Every run announces itself in `work/RUN.md`**, through `scripts/run-state.sh`
+and never by hand. It is how the next tick tells a run still working from one
+that died, which the labels cannot: they say what happened to the work, not
+whether the run doing it is over.
+
+- **First:** `bash "$HOME/scripts/run-state.sh" start` — it stamps this session
+  on the claim the precheck left. If it refuses, another run holds the sandbox:
+  do not build; answer what you were asked, if anything, and end the turn.
+- **Before each long step** — a build, the test suite, a cluster install:
+  `run-state.sh phase "<what>" [issue]`. Busy with nothing moving for longer
+  than `stuck_after_min` reads as stuck, so a single step that can outlast it is
+  a reason to raise the key, never to skip the stamp.
+- **Last, on every way out** — done, nothing to do, gave up, blocked:
+  `run-state.sh finish <outcome> [pr]`, the outcome one of `nothing`,
+  `pr-opened`, `pr-updated`, `released`, `blocked`. A run that ends without it
+  is found by the next tick, marked abandoned, and its issue handed to the run
+  after it as half-done work.
+
 Then, in this order. Stop when there is nothing left to do.
 
 1. **Your own open pull requests, oldest first.** For each one carrying review
@@ -50,6 +68,23 @@ Then, in this order. Stop when there is nothing left to do.
    `work/CONFIG.md`, push, open the pull request, apply the review-request
    label.
 4. **Nothing to do is a normal outcome.** Say so and end the turn.
+
+## The diagnostic run
+
+A prompt that opens with **DIAGNOSTIC RUN** is not a work run. The sandbox has
+read busy with nothing moving for longer than `stuck_after_min`, and every tick
+has stepped aside since. Do not build, do not claim, do not call
+`run-state.sh start`.
+
+Find what is holding it — the session and phase the prompt names, whether a
+build it started is still a live process, the background work the runtime
+listed — and report plainly what is stuck, since when, and what would free it.
+The report is the whole job; freeing the sandbox is the operator's call.
+
+One exception: when the run named in `work/RUN.md` is provably gone — no
+process of its own left, a transcript that stopped, nothing it started still
+running — close its record with `run-state.sh abandon "<what you found>"`, so
+the next tick can resume its issue.
 
 ## Rules
 

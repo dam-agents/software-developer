@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Stub curl: the runtime's /api/status answer, or a failed connection.
+[ -n "${STUB_STATUS:-}" ] || exit 7
+printf '%s' "$STUB_STATUS"

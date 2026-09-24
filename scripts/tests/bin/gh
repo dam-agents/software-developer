@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Stub gh: canned JSON from the STUB_* variables, and a trace of every call.
+echo "$*" >> "$STUB_DIR/gh.calls"
+case "$1 $2" in
+  "pr list") printf '%s' "${STUB_PRS:-[]}" ;;
+  "issue list")
+    label=""; prev=""
+    for a in "$@"; do [ "$prev" = "--label" ] && label="$a"; prev="$a"; done
+    if [ "$label" = "${STUB_HANDOFF_LABEL:-agent/implement}" ]; then printf '%s' "${STUB_HANDOFF:-[]}"
+    else printf '%s' "${STUB_CLAIMED:-[]}"; fi ;;
+  "api user") printf 'dev-bot' ;;
+  *) echo "stub gh: unexpected $*" >&2; exit 9 ;;
+esac

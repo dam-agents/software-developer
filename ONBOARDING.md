@@ -84,11 +84,14 @@ only these lines are parsed:
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
 - label_review: code-guardian-review
+- stuck_after_min: 120
 ```
 
-Get `repo`, `label_handoff` and `label_claimed` right in particular: the
-precheck decides whether the agent wakes at all, and a wrong label there means
-either waking for nothing or never waking.
+`stuck_after_min` is not a question for the user: write the default, and raise
+it later if one build step can run longer than two hours. Get `repo`,
+`label_handoff` and `label_claimed` right in particular: the precheck decides
+whether the agent wakes at all, and a wrong label there means either waking for
+nothing or never waking.
 
 ## 4. Clone it
 
