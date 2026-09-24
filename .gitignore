@@ -1,1 +1,20 @@
-work/
+# This repository is checked out at the agent's $HOME (/home/agent), beside
+# secrets and runtime state: .ssh, .claude, .config, work/. So it ignores
+# everything at the top level and re-includes only the definition files it
+# tracks — a `git add -A` in $HOME can then never capture a secret or a state
+# file. work/ is never tracked; onboarding writes it.
+
+/*
+
+!/.gitignore
+!/AGENTS.md
+!/CLAUDE.md
+!/ONBOARDING.md
+!/README.md
+!/kit.yaml
+!/VERSION
+!/CHANGELOG.md
+!/docs/
+!/scripts/
+
+.DS_Store
