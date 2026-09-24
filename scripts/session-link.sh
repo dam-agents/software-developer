@@ -8,10 +8,9 @@
 # link, to the agent rather than to the run.
 set -uo pipefail
 
-APP="$(grep -m1 -iE '^[-*]?[[:space:]]*app_url[[:space:]]*:' "$HOME/work/CONFIG.md" 2>/dev/null |
-  sed -E 's/^[-*]?[[:space:]]*[^:]+:[[:space:]]*//' |
-  tr -d '`' |
-  sed -E 's#[[:space:]]+$##; s#/+$##')"
+. "$(cd "$(dirname "$0")" && pwd)/lib/config.sh"
+
+APP="$(cfg app_url | sed -E 's#/+$##')"
 
 if [ -z "$APP" ] || [ -z "${PLATFORM_AGENT_ID:-}" ]; then
   echo "no link: work/CONFIG.md names no app_url" >&2

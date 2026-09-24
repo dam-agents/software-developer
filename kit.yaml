@@ -66,8 +66,15 @@ schedules:
   # is still working and steps aside when it is. What a run needs to know about
   # the one before it is in the branches, the labels and the pull requests,
   # which survive a session and a rebuilt sandbox alike.
-  - name: developer-tick
+  - name: software-developer-tick-10m
     cron: "*/10 * * * *"
     sessionMode: fresh
     precheck: $HOME/scripts/precheck.sh
-    task: Run the developer tick — CLAUDE.md → "Every scheduled run".
+    task: Run the developer tick — CLAUDE.md → "The tick".
+
+  # Every Friday, and ungated: the report is the point even in a quiet week. It
+  # checks the instance nobody is watching and repairs nothing.
+  - name: software-developer-audit-weekly
+    cron: "0 6 * * 5"
+    sessionMode: fresh
+    task: Run the weekly audit — docs/audit.md.
