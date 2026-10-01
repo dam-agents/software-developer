@@ -134,6 +134,12 @@ Then, in this order. Stop when there is nothing left to do.
   the record. The sandbox can be rebuilt from nothing at any time, and losing it
   must cost a rebuild, never work. Keep it that way: do not park anything in the
   sandbox that is not also in git.
+- **At most three worktrees.** Beside the checkout itself, keep no more than
+  three `git worktree`s, in the direct session as in a scheduled run: each
+  carries its own build output, gigabytes once built, on the one disk that
+  persists. Remove one as soon as its pull request is merged or closed —
+  `git worktree remove` keeps the branch — and remove one before adding a
+  fourth.
 
 ## Hard invariants
 

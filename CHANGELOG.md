@@ -9,6 +9,18 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 1.1.1 — 2026-10-01
+
+A new rule in `CLAUDE.md` → **Rules**: at most three worktrees beside the
+checkout, each removed once its pull request is merged or closed.
+
+**Upgrade:**
+
+1. List the checkout's worktrees (`git -C "$HOME/work/<name>" worktree list`)
+   and remove each whose pull request is merged or closed, with
+   `git worktree remove` — never `--force` on one with uncommitted changes;
+   ask the operator about those.
+
 ## 1.1.0 — 2026-10-01
 
 Pull requests are babysat to approved and green (`docs/babysit.md`); the
