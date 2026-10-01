@@ -41,11 +41,11 @@ has "$OUT" "warn issues.orphaned — claimed, no pull request: #5" "orphaned cla
 has "$OUT" "ok   definition.version" "up to date"
 done_
 
-CASE="a failed read is not measured, never none"; sandbox; onboarded; origin "1.1.0"
+CASE="a failed read is not measured, never none"; sandbox; onboarded; origin "99.0.0"
 STUB_PR_FAIL=1 audit
 has "$OUT" "warn prs.waiting — not measured" "pull requests"
 has "$OUT" "warn issues.orphaned — not measured" "claims"
-has "$OUT" "warn definition.version — checked out 1.0.0, latest 1.1.0" "version drift"
+has "$OUT" "warn definition.version — checked out $(head -1 "$SCRIPTS/../VERSION"), latest 99.0.0" "version drift"
 has "$OUT" "runs: none closed this week" "an empty log"
 done_
 

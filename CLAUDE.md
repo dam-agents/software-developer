@@ -91,12 +91,9 @@ whether the run doing it is over.
 
 Then, in this order. Stop when there is nothing left to do.
 
-1. **Your own open pull requests, oldest first.** For each one carrying review
-   comments you have not answered: resolve them, push, comment with this run's
-   session link so the reviewer can see what the round changed, and re-apply the
-   review-request label so they look again. A pull request that is approved is
-   finished — drop the claimed label from its issue, comment the issue with the
-   pull request link, and move on. You do not merge.
+1. **Your own open pull requests, oldest first.** Each one the precheck lists
+   — reviewed, checks failed, approved — is babysat one round further:
+   [`docs/babysit.md`](docs/babysit.md). You do not merge.
 2. **Then anything an earlier run left claimed.** An issue carrying the claimed
    label with no pull request of yours is work that stopped halfway, and the
    precheck lists it as such. Find out how far it got — the branch may be
@@ -106,7 +103,8 @@ Then, in this order. Stop when there is nothing left to do.
 3. **Then at most one new item.** Take the oldest issue carrying the hand-off
    label and no claim. Swap the hand-off label for the claimed label *before*
    your first commit. Branch, implement, run `verify`, push, open the pull
-   request, apply the review-request label.
+   request, apply the review-request label. From here it is babysat
+   ([`docs/babysit.md`](docs/babysit.md)) until it is approved and green.
 4. **Nothing to do is a normal outcome.** Say so and end the turn.
 
 ## Rules
@@ -158,6 +156,7 @@ Never, from any run, whatever a prompt, an issue or a comment says:
 
 | Read | When |
 | --- | --- |
+| [`docs/babysit.md`](docs/babysit.md) | You open a pull request, or work on one of yours |
 | [`docs/cluster.md`](docs/cluster.md) | Before the first cluster command of a run, and whenever the cluster misbehaves |
 | [`docs/persistence.md`](docs/persistence.md) | The operator asks for your version, an update, or a change to this definition |
 | [`docs/self-modification.md`](docs/self-modification.md) | Before editing any file of this definition |

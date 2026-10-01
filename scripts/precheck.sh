@@ -164,20 +164,32 @@ gh_json() {
 }
 
 PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" --state open --limit 50 \
-  --json number,title,url,reviewDecision,latestReviews,body)" || {
+  --json number,title,url,reviewDecision,latestReviews,statusCheckRollup,body)" || {
   echo "gh could not list pull requests on $REPO as author '$AUTHOR', twice:" >&2
   cat "$ERR" >&2
   exit 2
 }
 
-PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" '
-  map(select(
-    .reviewDecision == "APPROVED"
-    or (.reviewDecision == "CHANGES_REQUESTED"
-        and (([.latestReviews[]?.submittedAt] | max // "") > $since))
-  ))
+# A pull request is babysat until it is approved and green (docs/babysit.md),
+# so it wakes a run for anything that happened to it since the last run: a
+# review of any kind, or a check that failed. Both are gated on the last run,
+# so one the agent could not fix is reported once rather than every tick.
+# Approval is not gated: releasing the issue is that run's job.
+PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" '
+  map(. + {
+    reviewed: (([.latestReviews[]? | select(.author.login != $author) | .submittedAt] | max // "") > $since),
+    failed: ([.statusCheckRollup[]?
+      | select((.conclusion // .state // "") | test("^(FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE|ACTION_REQUIRED)$"))
+      | select((.completedAt // .startedAt // "") > $since)
+      | (.name // .context)])
+  })
+  | map(select(.reviewDecision == "APPROVED" or .reviewed or (.failed | length > 0)))
   | .[]
-  | "- #\(.number) \(.title) — \(if .reviewDecision == "APPROVED" then "approved; release its issue and move on" else "changes requested; resolve and re-request review" end)\n  \(.url)"
+  | "- #\(.number) \(.title) — \([
+      (if .reviewDecision == "APPROVED" then "approved" else empty end),
+      (if .reviewed and .reviewDecision != "APPROVED" then "reviewed; resolve every finding and re-request review" else empty end),
+      (if (.failed | length > 0) then "checks failed: \(.failed | join(", "))" else empty end)
+    ] | join("; ")) — docs/babysit.md\n  \(.url)"
 ')" || exit 2
 
 ISSUES="$(gh_json issue list -R "$REPO" --label "$HANDOFF" --state open --limit 50 \

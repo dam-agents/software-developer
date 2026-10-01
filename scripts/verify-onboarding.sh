@@ -79,7 +79,13 @@ else
       for k in cluster_install cluster_uninstall cluster_delete; do
         [ -n "$(cfg "$k")" ] ||
           fail "config.$k" "missing, and cluster is required" "ask for it — ONBOARDING.md → 2. Ask"
-      done ;;
+      done
+      # The sandbox kernel cannot run a mesh dataplane (docs/cluster.md).
+      I="$(cfg cluster_install)"
+      case "$I" in '' | *--no-mesh*) ;; *)
+        fail config.cluster_install "'$I' would install a service mesh this sandbox cannot run" \
+          "append the repository's mesh-less flag, e.g. '$I -- --no-mesh' — docs/cluster.md" ;;
+      esac ;;
     *) fail config.cluster "'$(cfg cluster)' is neither none nor required" "write one of the two" ;;
   esac
   S="$(cfg stuck_after_min)"
