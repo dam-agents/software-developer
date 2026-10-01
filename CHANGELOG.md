@@ -9,6 +9,22 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 1.2.0 — 2026-10-01
+
+The kit sets `DAM_SANDBOX=1`, so a repository's own tooling can tell it runs in
+a DAM sandbox and adapt (e.g. install its cluster without a mesh); the
+definition no longer asks for a mesh-less `cluster_install`. The kit also
+creates the agent with the `all` egress preset (`egressPreset` in `kit.yaml`).
+
+**Upgrade:**
+
+1. **Operator only:** add the environment variable `DAM_SANDBOX=1` to this
+   agent's settings, and apply the *Allow all* egress preset. `kit.yaml` is
+   read only at create, so an existing agent does not get either otherwise.
+2. Once the agent's environment has `DAM_SANDBOX=1` and the repository's
+   tooling honors it, drop any mesh-less flag (e.g. ` -- --no-mesh`) from
+   `cluster_install` in `work/CONFIG.md` — confirm with the operator first.
+
 ## 1.1.1 — 2026-10-01
 
 A new rule in `CLAUDE.md` → **Rules**: at most three worktrees beside the
@@ -25,20 +41,16 @@ checkout, each removed once its pull request is merged or closed.
 
 Pull requests are babysat to approved and green (`docs/babysit.md`); the
 precheck now also wakes a run for any new review and for newly failed checks.
-Cluster installs run mesh-less (`docs/cluster.md`). The kit requires addressed
-credential injection (`requireConnectionAddress` in `kit.yaml`).
+The kit requires addressed credential injection (`requireConnectionAddress` in
+`kit.yaml`).
 
 **Upgrade:**
 
-1. If `work/CONFIG.md` has `cluster: required` and its `cluster_install` lacks
-   the repository's mesh-less flag, append it (e.g. ` -- --no-mesh`) — confirm
-   the flag with the operator first; a repository without such a mode cannot
-   verify against a cluster here.
-2. **Operator only:** turn on *Inject only into addressed requests* in this
+1. **Operator only:** turn on *Inject only into addressed requests* in this
    agent's settings (needs a platform that has it). `kit.yaml` is read only at
    create, so an existing agent does not get it otherwise. Saving restarts the
    agent's gateway.
-3. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every fix.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every fix.
 
 ## 1.0.0 — 2026-09-24
 

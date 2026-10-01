@@ -52,9 +52,6 @@ confirming or correcting rather than composing from nothing.
   when there is none), uninstall it again, and delete the cluster outright, as
   `cluster_install`, `cluster_uninstall` and `cluster_delete` —
   [`docs/cluster.md`](docs/cluster.md) is what each is used for.
-  `cluster_install` must use the repository's mesh-less local mode
-  (`--no-mesh`): this sandbox cannot run a mesh dataplane, `docs/cluster.md`
-  says why.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here. Also record
@@ -107,7 +104,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - label_review: code-guardian-review
 - verify: mise run check
 - cluster: none
-- cluster_install: mise run cluster:install -- --no-mesh
+- cluster_install: mise run cluster:install
 - cluster_uninstall: mise run cluster:uninstall
 - cluster_delete: mise run cluster:delete
 - stuck_after_min: 120
