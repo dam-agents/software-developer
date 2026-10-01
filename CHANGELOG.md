@@ -11,15 +11,15 @@ direct session.
 
 ## 1.2.0 — 2026-10-01
 
-The kit sets `PLATFORM_SANDBOX=1`, so a repository's own tooling can tell it runs in
-a DAM sandbox and adapt (e.g. install its cluster without a mesh); the
+The kit sets `PLATFORM_SANDBOX=1`, so a repository's own tooling can tell it
+runs in a DAM sandbox and adapt (e.g. install its cluster without a mesh); the
 definition no longer asks for a mesh-less `cluster_install`. The kit also
 creates the agent with the `all` egress preset (`egressPreset` in `kit.yaml`).
 
 **Upgrade:**
 
-1. **Operator only:** add the environment variable `PLATFORM_SANDBOX=1` to this
-   agent's settings, and apply the *Allow all* egress preset. `kit.yaml` is
+1. **Operator only:** add the environment variable `PLATFORM_SANDBOX=1` to
+   this agent's settings, and apply the *Allow all* egress preset. `kit.yaml` is
    read only at create, so an existing agent does not get either otherwise.
 2. Once the agent's environment has `PLATFORM_SANDBOX=1` and the repository's
    tooling honors it, drop any mesh-less flag (e.g. ` -- --no-mesh`) from

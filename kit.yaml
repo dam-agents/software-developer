@@ -55,8 +55,9 @@ env:
   # the local k3s instead of looking for a VM manager to create one.
   - name: IS_SANDBOX
     value: "1"
-  # Tells a repository's tooling it runs in a DAM sandbox (`PLATFORM_*`, the platform's own prefix), so it can work
-  # around what this sandbox cannot do on its own.
+  # Tells a repository's tooling it runs in a DAM sandbox, so it can work
+  # around what this sandbox cannot do on its own. `PLATFORM_` is the
+  # platform's own prefix for the variables it sets.
   - name: PLATFORM_SANDBOX
     value: "1"
 
