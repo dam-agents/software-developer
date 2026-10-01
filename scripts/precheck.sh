@@ -177,11 +177,11 @@ PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" --state open --limit 50 \
 # Approval is not gated: releasing the issue is that run's job.
 PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" '
   map(. + {
-    reviewed: ([.latestReviews[]? | select(.author.login != $author) | .submittedAt] | max // "") > $since,
-    failed: [.statusCheckRollup[]?
+    reviewed: (([.latestReviews[]? | select(.author.login != $author) | .submittedAt] | max // "") > $since),
+    failed: ([.statusCheckRollup[]?
       | select((.conclusion // .state // "") | test("^(FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE|ACTION_REQUIRED)$"))
       | select((.completedAt // .startedAt // "") > $since)
-      | (.name // .context)]
+      | (.name // .context)])
   })
   | map(select(.reviewDecision == "APPROVED" or .reviewed or (.failed | length > 0)))
   | .[]
