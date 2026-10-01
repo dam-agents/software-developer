@@ -43,6 +43,13 @@ resources:
 # when it does. This agent stays up so its cluster does.
 hibernationTimeoutMin: 0
 
+# Required. The agent's tools — containers, the cluster, a platform installed on
+# it — call the same services with credentials of their own, or none. Its
+# gateway injects a connection's credential only into requests that name the
+# connection, and sends the rest as they are; egress policy still applies to
+# all of them. A platform that predates the field ignores it.
+requireConnectionAddress: true
+
 env:
   # Tells a repository's cluster tooling it is already inside a VM, so it drives
   # the local k3s instead of looking for a VM manager to create one.

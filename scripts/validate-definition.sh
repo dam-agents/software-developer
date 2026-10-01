@@ -69,6 +69,10 @@ else
     pass ".gitignore re-includes kit.yaml"
   fi
 
+  grep -qE '^requireConnectionAddress:[[:space:]]*true[[:space:]]*$' kit.yaml \
+    && pass "kit.yaml requires addressed credential injection" \
+    || fail "kit.yaml must set 'requireConnectionAddress: true' — the gateway would overwrite the credentials its own tools send"
+
   if grep -qE '^onboarding:' kit.yaml; then
     fail "kit.yaml declares 'onboarding:' — leave it out, or the agent is stamped onboarded at create and loses the gate, the checklist tools and the hold on its schedules"
   else
