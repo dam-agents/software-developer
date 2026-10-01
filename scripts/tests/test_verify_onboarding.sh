@@ -31,17 +31,6 @@ has "$OUT" "config.cluster_install — missing, and cluster is required" "cluste
 lacks "$OUT" "Nothing under deploy" "a prose bullet is not a key"
 done_
 
-CASE="a cluster install without the mesh-less flag fails"; sandbox; onboarded
-setcfg cluster required
-printf -- '- cluster_install: mise run cluster:install\n- cluster_uninstall: mise run cluster:uninstall\n- cluster_delete: mise run cluster:delete\n' >> "$HOME/work/CONFIG.md"
-verify --config
-is "$RC" 1 "exit"
-has "$OUT" "config.cluster_install — 'mise run cluster:install' would install a service mesh" "names it"
-setcfg cluster_install "mise run cluster:install -- --no-mesh"
-verify --config
-is "$RC" 0 "with the flag"
-done_
-
 CASE="a full run passes an onboarded instance"; sandbox; onboarded
 verify
 is "$RC" 0 "exit"

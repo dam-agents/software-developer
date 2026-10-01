@@ -55,6 +55,15 @@ env:
   # the local k3s instead of looking for a VM manager to create one.
   - name: IS_SANDBOX
     value: "1"
+  # Tells a repository's tooling it runs in a DAM sandbox, so it can work
+  # around what this sandbox cannot do on its own. `PLATFORM_` is the
+  # platform's own prefix for the variables it sets.
+  - name: PLATFORM_SANDBOX
+    value: "1"
+
+# The builds and the cluster pull from registries, mirrors and package hosts no
+# list can enumerate ahead of time. The owner can narrow it after create.
+egressPreset: all
 
 connections:
   - accepts: [github, github-enterprise]
