@@ -122,6 +122,24 @@ lacks "$OUT" "#7 Seven" "#7 has its pull request"
 lacks "$OUT" "#45 Forty-five" "#45 has its pull request"
 done_
 
+CASE="a pull request wakes a run for a new review or a newly failed check, once"; sandbox
+PR='[{"number":30,"title":"Thirty","url":"https://gh/pr/30","reviewDecision":"REVIEW_REQUIRED","body":"Fixes #3",
+  "latestReviews":[{"author":{"login":"guardian"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}],
+  "statusCheckRollup":[{"name":"test","conclusion":"FAILURE","completedAt":"2026-09-24T10:06:00Z"},
+                       {"name":"lint","conclusion":"SUCCESS","completedAt":"2026-09-24T10:06:00Z"},
+                       {"context":"ci/legacy","state":"ERROR","startedAt":"2026-09-24T09:00:00Z"}]}]'
+STUB_STATUS="$IDLE" STUB_PRS="$PR" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 0 "exit"
+has "$OUT" "#30 Thirty — reviewed; resolve every finding" "a comment-only review wakes it"
+has "$OUT" "checks failed: test —" "names the newly failed check alone"
+STUB_STATUS="$IDLE" STUB_PRS="$PR" PLATFORM_LAST_RUN_AT=2026-09-24T10:10:00Z precheck
+is "$RC" 1 "both already seen by the last run"
+OWN='[{"number":31,"title":"Own","url":"https://gh/pr/31","reviewDecision":null,"body":"",
+  "latestReviews":[{"author":{"login":"dev-bot"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
+STUB_STATUS="$IDLE" STUB_PRS="$OWN" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 1 "the agent's own comment is not a review"
+done_
+
 CASE="a probe skips the gate and writes nothing"; sandbox
 record run_state=running session=sess-a "claimed_at=$(ago 20)" phase=building "phase_at=$(ago 5)"
 before="$(cat "$HOME/work/RUN.md")"

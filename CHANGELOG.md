@@ -9,6 +9,20 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 1.1.0 — 2026-10-01
+
+Pull requests are babysat to approved and green (`docs/babysit.md`); the
+precheck now also wakes a run for any new review and for newly failed checks.
+Cluster installs run mesh-less (`docs/cluster.md`).
+
+**Upgrade:**
+
+1. If `work/CONFIG.md` has `cluster: required` and its `cluster_install` lacks
+   the repository's mesh-less flag, append it (e.g. ` -- --no-mesh`) — confirm
+   the flag with the operator first; a repository without such a mode cannot
+   verify against a cluster here.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every fix.
+
 ## 1.0.0 — 2026-09-24
 
 The first versioned release. An instance created before it has no version of

@@ -21,6 +21,16 @@ Three different things can be wrong, and they have different fixes.
   `cluster_delete`, then `cluster_install`, which builds it back. You lose
   every cached image with it, so try the pair first.
 
+**No service mesh.** This sandbox's kernel has no conntrack mark or zone
+support, so a mesh dataplane that needs it — Istio ambient's — cannot join any
+pod; the install gets past the mesh and every workload then fails to start.
+`cluster_install` must therefore run the repository's local mesh-less mode,
+e.g. `mise run cluster:install -- --no-mesh`, and a repository without one
+cannot be verified here: report the run `blocked`, never install the mesh.
+Nothing enforces authorization policies on such a cluster, so a result from it
+says nothing about isolation. The defect is the sandbox kernel's, reported to
+the platform; drop the flag when its kernel gains the support.
+
 **Switching branches means rebuilding.** You may have several pull requests
 open, but the cluster serves the branch you are verifying right now.
 
