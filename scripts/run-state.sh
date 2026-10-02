@@ -20,8 +20,9 @@
 #   phase <text>              before each long step: what, and since when
 #   cluster                   take the cluster lock, or record waiting for it
 #   cluster-done              give the cluster back
-#   finish <outcome> [pr]     the run's last act, on every way out; then backs
-#                             work/ up (work-backup.sh persist)
+#   finish <outcome> [pr]     the run's last act, on every way out: refused
+#                             until the work is pushed and reported on GitHub
+#                             (below); then backs work/ up
 #   sweep                     free the locks of dead holders (the precheck)
 #   held                      the items live runs hold, one per line
 #   live                      how many slots are held
@@ -139,6 +140,12 @@ log_line() {   # log_line <outcome> <session> <item> <slot> <pr> <since> [extra]
 need_session() {
   [ -n "$ME" ] || { say "no \$CLAUDE_CODE_SESSION_ID — the runtime cannot tell this run is alive, so it may not hold anything"; exit 2; }
 }
+
+REPO="$(cfg repo)"
+case "$REPO" in */*/*) HOST="${REPO%%/*}"; SLUG="${REPO#*/}" ;; *) HOST=github.com; SLUG="$REPO" ;; esac
+CLAIMED="$(cfg label_claimed)"; CLAIMED="${CLAIMED:-agent/in-progress}"
+NEEDS_INFO="$(cfg label_needs_info)"; NEEDS_INFO="${NEEDS_INFO:-agent/needs-info}"
+FAILED_LABEL="$(cfg label_failed)"; FAILED_LABEL="${FAILED_LABEL:-agent/failed}"
 
 # ------------------------------------------------------------------- slots
 CO=""
@@ -285,8 +292,61 @@ cmd_cluster() {
 
 cmd_cluster_done() { if [ -d "$LOCKS/cluster" ] && mine "$LOCKS/cluster"; then drop cluster; fi; return 0; }
 
+# ---------------------------------------------------------------- reports
+# Nobody watches a run: what it did is known only from what it left on GitHub.
+# So an item is given back only once the run has reported there — read here,
+# never written (scripts detect, the agent acts). A report is a comment on the
+# issue or its pull request, by `author`, written or edited since the run
+# started, that carries this session's id — the session link does — or, for
+# pr-opened, the pull request's own body. The labels must say the outcome.
+#
+# reported <item> <outcome> <pr> <since> — 0 reported · 1 missing, printed ·
+# 2 GitHub could not be read
+gh_get() { gh api --hostname "$HOST" "$@" 2>/dev/null; }
+reported() {
+  local item="$1" outcome="$2" pr="$3" since="$4" n="" author t got json labels missing=""
+  author="$(cfg author)"
+  case "$item" in pr*) pr="${pr:-${item#pr}}" ;; *) n="$item" ;; esac
+  if [ "$outcome" = pr-opened ]; then
+    [ -n "$pr" ] || { echo "pr-opened names no pull request: finish pr-opened <pr>"; return 1; }
+    json="$(gh_get "repos/$SLUG/pulls/$pr")" || return 2
+    got="$(printf '%s' "$json" | jq -r --arg me "$ME" --arg n "$n" --arg a "$author" '
+      [ (if .state == "open" then empty else "is not open" end),
+        (if ($a == "" or .user.login == $a) then empty else "was not opened by \($a)" end),
+        (if (.body // "") | contains($me) then empty else "carries no session link" end),
+        (if $n == "" or ((.body // "") | test("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #\($n)(\\D|$)")) then empty
+         else "does not say Fixes #\($n)" end)
+      ] | join(", ")' 2>/dev/null)" || return 2
+    [ -z "$got" ] || missing="pull request #$pr $got"
+  else
+    got=""
+    for t in $n $pr; do
+      json="$(gh_get "repos/$SLUG/issues/$t/comments?since=$since&per_page=100")" || return 2
+      if printf '%s' "$json" | jq -e --arg me "$ME" --arg a "$author" \
+          'any(.[]; ($a == "" or .user.login == $a) and ((.body // "") | contains($me)))' >/dev/null 2>&1; then
+        got=1; break
+      fi
+    done
+    [ -n "$got" ] || missing="no comment from this run on #${n:-$pr}${pr:+${n:+ or its pull request #$pr}} — say what you did, and what happens next, with this run's session link"
+  fi
+  if [ -n "$n" ]; then
+    case "$outcome" in
+      needs-info | blocked | released)
+        json="$(gh_get "repos/$SLUG/issues/$n")" || return 2
+        labels=" $(printf '%s' "$json" | jq -r '[.labels[]?.name] | join(" ")' 2>/dev/null) "
+        case "$labels" in *" $CLAIMED "*) missing="${missing:+$missing; }#$n still carries $CLAIMED" ;; esac
+        case "$outcome" in
+          needs-info) case "$labels" in *" $NEEDS_INFO "*) ;; *) missing="${missing:+$missing; }#$n does not carry $NEEDS_INFO" ;; esac ;;
+          blocked) case "$labels" in *" $FAILED_LABEL "*) ;; *) missing="${missing:+$missing; }#$n does not carry $FAILED_LABEL" ;; esac ;;
+        esac ;;
+    esac
+  fi
+  [ -z "$missing" ] && return 0
+  echo "$missing"; return 1
+}
+
 cmd_finish() {
-  local outcome="${1:?outcome}" pr="${2:-}" item slot since f state
+  local outcome="${1:?outcome}" pr="${2:-}" item slot since f state why rc report=""
   case "$outcome" in
     nothing | pr-opened | pr-updated | released | blocked | waiting-cluster | needs-info) ;;
     *) say "unknown outcome '$outcome'"; exit 2 ;;
@@ -296,6 +356,24 @@ cmd_finish() {
   since=""
   [ -n "$slot" ] && since="$(kv "$LOCKS/slot-$slot/owner" since)"
   [ -z "$since" ] && [ -n "$item" ] && since="$(kv "$LOCKS/item-$item/owner" since)"
+  if [ -n "$slot" ]; then
+    why="$(unsaved "$SLOTDIR/$slot")"
+    if [ -n "$why" ]; then
+      say "slot $slot has $why: push it to its branch first — only what is pushed survives this run."
+      exit 1
+    fi
+  fi
+  if [ -n "$item" ]; then
+    [ -n "$pr" ] || pr="$(kv "$(item_file "$item")" pr)"
+    why="$(reported "$item" "$outcome" "$pr" "$since")"; rc=$?
+    case "$rc" in
+      0) ;;
+      2) report=" report=unverified"; say "GitHub could not be read, so the report is unverified — the run is closed anyway, and the log says so." ;;
+      *) say "not reported yet: $why."
+         say "Nobody watches this run: GitHub is the only place its outcome is seen. Report there, then finish again."
+         exit 1 ;;
+    esac
+  fi
   cmd_cluster_done
   if [ -n "$item" ]; then
     f="$(item_file "$item")"
@@ -312,7 +390,7 @@ cmd_finish() {
   fi
   [ -n "$item" ] && drop "item-$item"
   [ -n "$slot" ] && drop "slot-$slot"
-  log_line "$outcome" "$ME" "$item" "$slot" "$pr" "$since"
+  log_line "$outcome" "$ME" "$item" "$slot" "$pr" "$since" "${report# }"
   # last, so the backup carries this run's TICK.log line
   bash "$HERE/work-backup.sh" persist >&2
   return 0

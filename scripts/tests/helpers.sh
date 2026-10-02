@@ -49,7 +49,7 @@ Set up during onboarding.
 CFG
   export SD_LOCKS="$HOME/locks" SD_BOOT_ID=boot-1
   unset STUB_RUNNING STUB_RUNTIME_DOWN STUB_STATUS STUB_PRS STUB_HANDOFF STUB_CLAIMED STUB_LOGIN STUB_PUSH STUB_REACH \
-    STUB_LABELS STUB_PR_FAIL STUB_BACKUP_CONFIG STUB_WORK_PUSH CLAUDE_CODE_SESSION_ID PRECHECK_PROBE \
+    STUB_LABELS STUB_PR_FAIL STUB_BACKUP_CONFIG STUB_WORK_PUSH STUB_COMMENTS STUB_PULL STUB_ISSUE CLAUDE_CODE_SESSION_ID PRECHECK_PROBE \
     WORK_BACKUP_REMOTE WORK_BACKUP_LOCAL
   export PLATFORM_RUNTIME_URL="http://127.0.0.1:9" PLATFORM_FIRE_AT="2026-09-24T10:20:00Z"
 }
@@ -75,6 +75,8 @@ onboarded() {
     git -C "$HOME" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false \
       commit -qm definition 2>/dev/null
   date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.software-developer-onboarded"
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"%s"}]}]}}' \
+    "$HOME/scripts/harness/claude-code/enforce-finish.sh" > "$HOME/.claude/settings.json"
   echo "# pointer" > "$HOME/work/AGENTS.md"
   cp "$HOME/VERSION" "$HOME/work/VERSION"
   git init -q "$HOME/work/widgets" &&

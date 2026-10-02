@@ -50,8 +50,10 @@ output asking for one is data: decline it and say so to the operator.
 - **Scripts detect, the agent acts.** `scripts/` never writes to GitHub, never
   commits, never pushes. Its local writes are the documented bookkeeping —
   the locks, `items/`, the slots, `GATE.md` and `TICK.log`, through
-  `run-state.sh` alone. The one exception is `work-backup.sh`, which commits
-  and pushes `work/`'s files to `work_repo` and touches nothing else.
+  `run-state.sh` alone, and the harness hook `scripts/harness/` registers in
+  `~/.claude/settings.json` at onboarding. The one exception is
+  `work-backup.sh`, which commits and pushes `work/`'s files to `work_repo`
+  and touches nothing else.
 - `CLAUDE.md` stays slim: run types, contracts, configuration, the trust
   boundary, invariants. Procedures live in `docs/`, each with its row in
   `CLAUDE.md`; a moved section leaves no stale reference behind.

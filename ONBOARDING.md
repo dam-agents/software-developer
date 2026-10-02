@@ -176,6 +176,14 @@ scheduled run does that, where it is visible and can be retried.
 
 ## 5. Finish
 
+Register the harness hook that keeps a run from ending mid-work
+([`docs/runs.md`](docs/runs.md) → **Reports**); it takes effect from the next
+session:
+
+```sh
+bash "$HOME/scripts/harness/claude-code/install.sh"
+```
+
 Only once every step above succeeded. Record the version this instance adopts,
 then the sentinel — before the verification, so a failure in it never re-runs
 the whole intake. A restored `work/VERSION` is kept: migrate from it instead

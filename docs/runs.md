@@ -75,6 +75,35 @@ end-to-end suite, an uninstall — changes what every other branch would see. So
   finish `waiting-cluster`. Do not wait in the turn: a later run picks the item
   up as soon as the cluster is free.
 
+## Reports
+
+Nobody reads a scheduled run's turn, so every run ends with its outcome on
+GitHub, and `finish` checks that it is there before it gives the item back.
+It reads, never writes:
+
+- **Every outcome:** nothing unpushed in the slot.
+- **`pr-opened`:** the pull request is open, opened by `author`, says
+  `Fixes #<n>`, and carries this run's session link.
+- **Every other outcome:** a comment by `author` on the issue or its pull
+  request, written or edited since this run started, carrying this run's
+  session id — the link from `session-link.sh` does; without `app_url`, write
+  `Session <id>`.
+- **`needs-info`, `blocked`, `released`:** the claimed label is off the issue;
+  `needs-info` carries `label_needs_info`, `blocked` the failed label.
+
+Refused, it says what is missing: post it, then `finish` again. GitHub that
+cannot be read does not keep the run open: it closes, and its `TICK.log` line
+says `report=unverified`.
+
+**A report says what a person needs, in a few lines:** what this run did, where
+the item stands, what happens next and who acts — the agent on its next run, a
+reviewer, the issue's author. A pull request's own round comment
+([babysit.md](babysit.md)) is that report. For outcomes that have nothing else
+to post — `waiting-cluster`, `nothing`, a resumed run's progress — keep one
+status comment per issue and edit it in place rather than adding a new one:
+its first line `<!-- software-developer:status -->`, then the state and this
+run's link.
+
 ## A dead run
 
 The precheck names the item a dead run left, and lists it again. Its slot keeps

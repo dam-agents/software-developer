@@ -41,6 +41,7 @@ done_
 CASE="a full run fails a drifted instance"; sandbox; onboarded
 mkdir "$HOME/work/.git"
 echo "local edit" >> "$HOME/kit.yaml"
+echo '{}' > "$HOME/.claude/settings.json"
 echo "0.9.0" > "$HOME/work/VERSION"
 rm -rf "$HOME/work/widgets"
 echo "not a run-state line" >> "$HOME/work/TICK.log"
@@ -51,6 +52,7 @@ printf -- '- item: 3\n- mood: odd\n' > "$HOME/work/items/3.md"
 verify
 is "$RC" 1 "exit"
 has "$OUT" "FAIL work — missing, or a git repository" "work/.git"
+has "$OUT" "FAIL harness.stop — no Stop hook" "the Stop hook"
 has "$OUT" "FAIL definition.clean — edited in place" "dirty definition"
 has "$OUT" "FAIL work.VERSION — adopted '0.9.0'" "version drift"
 has "$OUT" "FAIL checkout — no clone of acme/widgets" "missing clone"

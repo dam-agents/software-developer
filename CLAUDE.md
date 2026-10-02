@@ -84,11 +84,17 @@ below goes through `scripts/run-state.sh`, never by hand:
 - **Before each long step:** `run-state.sh phase "<what>"`.
 - **The cluster** is one, shared by every slot: only ever under
   `run-state.sh cluster` ([`docs/cluster.md`](docs/cluster.md)).
-- **Last, on every way out:** commit and push everything, then
+- **Last, on every way out:** push everything, report on GitHub, then
   `run-state.sh finish <outcome> [pr]` — `nothing`, `pr-opened`, `pr-updated`,
-  `released`, `blocked`, `waiting-cluster` or `needs-info`. It frees the item
-  and the slot, and backs `work/` up. A run that ends without it is found dead
-  by the next precheck, and its item handed on as half-done.
+  `released`, `blocked`, `waiting-cluster` or `needs-info`. It refuses until
+  the slot is pushed and this run's report is on the issue or its pull request
+  ([`docs/runs.md`](docs/runs.md) → **Reports**); then it frees the item and
+  the slot, and backs `work/` up. A `Stop` hook keeps the turn from ending
+  before it. A run that ends without it anyway is found dead by the next
+  precheck, and its item handed on as half-done — say so in your report when
+  you resume one.
+- **Resumed after a restart** (a `<turn-interrupted>` notice): the locks are
+  gone with it. `start` your item again, then carry on.
 
 What the item is decides what you do with it:
 
@@ -106,6 +112,11 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
 
 ## Rules
 
+- **Nobody is watching.** A scheduled run is unattended: nothing you write in
+  the turn is read. What happened is what you leave on GitHub. A question for a
+  person goes on the issue, with the needs-info label; a tool you are refused,
+  or a step only a person can take, is reported there and finished `blocked`.
+  Never end a turn asking, summarizing or promising to continue.
 - **Never leave work running behind you.** A build detached from your turn with
   `nohup`, `setsid` or a bare `&` outlives the turn, and a turn that is over
   holds no lock: the next run takes the slot, or the cluster, from under it.

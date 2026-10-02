@@ -3,8 +3,16 @@
 # dead run's locks freed without losing what it wrote.
 . "$(dirname "$0")/helpers.sh"
 
-as() { local s="$1"; shift; CLAUDE_CODE_SESSION_ID="$s" STUB_RUNNING="${RUNNING-sess-a sess-b sess-c}" state "$@"; }
+# as <session> <verb> … — run-state.sh as that session, every test session
+# running, and a comment from each on GitHub unless the case says otherwise
+DEFAULT_COMMENTS='[{"user":{"login":"dev-bot"},"body":"Done. sess-a sess-b sess-c"}]'
+as() {
+  local s="$1"; shift
+  CLAUDE_CODE_SESSION_ID="$s" STUB_RUNNING="${RUNNING-sess-a sess-b sess-c}" \
+    STUB_COMMENTS="${STUB_COMMENTS-$DEFAULT_COMMENTS}" state "$@"
+}
 slot() { git -C "$HOME/work/slots/$1" rev-parse --abbrev-ref HEAD 2>/dev/null; }
+
 
 CASE="start takes the item and a slot, on a new branch"; sandbox; origin_checkout
 as sess-a start 7 feat/7-flag
@@ -38,7 +46,8 @@ done_
 CASE="finish gives everything back and logs the run"; sandbox; origin_checkout
 as sess-a start 7 feat/7
 mkdir -p "$HOME/work/slots/1/dist"; echo built > "$HOME/work/slots/1/dist/out"
-as sess-a finish pr-opened 21
+STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"x\n\nFixes #7\n\nWritten by this agent — https://p/a/x?s=sess-a"}' \
+  as sess-a finish pr-opened 21
 is "$RC" 0 "exit"
 [ -z "$(ls "$SD_LOCKS")" ] || fail "locks left: $(ls "$SD_LOCKS")"
 is "$(field items/7.md state)" parked "parked"
@@ -117,6 +126,34 @@ CASE="nothing is held without a session id"; sandbox; origin_checkout
 CLAUDE_CODE_SESSION_ID= state start 7 feat/7
 is "$RC" 2 "exit"
 [ ! -d "$SD_LOCKS/item-7" ] || fail "took a lock nobody can prove alive"
+done_
+
+CASE="finish refuses until the work is pushed and reported"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+echo change > "$HOME/work/slots/1/change.txt"
+as sess-a finish pr-updated
+is "$RC" 1 "unpushed"
+has "$(cat "$HOME/err")" "push it to its branch first" "says so"
+rm "$HOME/work/slots/1/change.txt"
+STUB_COMMENTS='[{"user":{"login":"dev-bot"},"body":"another run, sess-b"}]' as sess-a finish pr-updated
+is "$RC" 1 "no comment from this run"
+has "$(cat "$HOME/err")" "no comment from this run on #7" "says where"
+[ -d "$SD_LOCKS/item-7" ] || fail "gave the item back unreported"
+STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"Fixes #8\nhttps://p/a/x?s=sess-a"}' as sess-a finish pr-opened 21
+is "$RC" 1 "the pull request names another issue"
+has "$(cat "$HOME/err")" "does not say Fixes #7" "says what"
+STUB_ISSUE='{"labels":[{"name":"agent/in-progress"}]}' as sess-a finish blocked
+is "$RC" 1 "blocked, but still claimed and not failed"
+has "$(cat "$HOME/err")" "still carries agent/in-progress; #7 does not carry agent/failed" "labels"
+STUB_ISSUE='{"labels":[{"name":"agent/failed"}]}' as sess-a finish blocked
+is "$RC" 0 "reported and labelled"
+done_
+
+CASE="GitHub unreadable: the run closes, logged as unverified"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_COMMENTS= as sess-a finish pr-updated
+is "$RC" 0 "exit"
+has "$(cat "$HOME/work/TICK.log")" "report=unverified" "logged"
 done_
 
 CASE="finish with nothing held still logs the run"; sandbox

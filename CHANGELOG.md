@@ -19,7 +19,9 @@ when the runtime says its session is not running a turn, or the sandbox
 restarted. `work/RUN.md` is gone; `work/items/<n>.md` caches each issue's
 branch, slot and state (`docs/runs.md`). New issues are implemented through
 the bundled `implement-issue` skill; an issue too unclear to implement goes to
-`agent/needs-info`. `work/` can be backed up to a private `work_repo`
+`agent/needs-info`. No run ends unreported: `finish` refuses until the work is
+pushed and reported on the issue or its pull request, and a `Stop` hook keeps
+the turn from ending before that. `work/` can be backed up to a private `work_repo`
 (`docs/persistence.md` → **Backup**), through `scripts/work-backup.sh`.
 
 **Upgrade:**
@@ -43,9 +45,11 @@ the bundled `implement-issue` skill; an issue too unclear to implement goes to
    connection — **operator only**. For a yes, add `- work_repo: <owner/name>`
    to `work/CONFIG.md`, then run `bash "$HOME/scripts/work-backup.sh" persist`
    and check that it says `backed up`.
-6. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every
-   fix: it now checks the slots, the items, the needs-info label, the push to
-   `work_repo`, and that the runtime lists sessions.
+6. Register the `Stop` hook: `bash "$HOME/scripts/harness/claude-code/install.sh"`.
+   It takes effect from the next session.
+7. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every
+   fix: it now checks the slots, the items, the needs-info label, the `Stop`
+   hook, the push to `work_repo`, and that the runtime lists sessions.
 
 ## 1.2.0 — 2026-10-01
 

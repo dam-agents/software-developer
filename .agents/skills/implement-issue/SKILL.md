@@ -33,7 +33,7 @@ is done and how a test will show it. When you cannot — the ask is ambiguous,
 two readings conflict, a decision is a maintainer's to make — do not guess:
 
 1. Comment the issue with the one or two questions that would unblock it, each
-   with the answer you would assume.
+   with the answer you would assume, and this run's session link.
 2. Swap the hand-off label for `label_needs_info` (default `agent/needs-info`).
 3. Finish `needs-info`. A maintainer who answers re-applies the hand-off label.
 
@@ -118,5 +118,7 @@ From here the pull request is babysat ([`docs/babysit.md`](../../../docs/babysit
 - **Bigger than it looked**: open the pull request for the part that stands on
   its own, and say on the issue what is left — or ask (step 1) before building
   half of something nobody agreed to.
-- **Cannot get green**: push what you have, comment the issue — what fails,
-  what you tried — swap the claim for the failed label, finish `blocked`.
+- **Cannot get green**, or a tool or permission you need is refused: push what
+  you have, comment the issue — what fails, what you tried, what a person has
+  to do — with this run's session link, swap the claim for the failed label,
+  finish `blocked`. Nobody reads the turn; that comment is the whole report.

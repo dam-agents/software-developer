@@ -22,6 +22,9 @@ the pull request through review.
   run that wrote a change, which every pull request carries.
 - [`scripts/work-backup.sh`](scripts/work-backup.sh) — backs `work/` up to a
   private repository of its own, and restores it on a fresh volume.
+- [`scripts/harness/claude-code/`](scripts/harness/claude-code/) — the `Stop`
+  hook that keeps a run from ending its turn while it still holds an issue,
+  and its installer.
 - [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an
   instance has the shape onboarding promises; every failure names its fix.
 - [`scripts/audit.sh`](scripts/audit.sh) — the deterministic half of the

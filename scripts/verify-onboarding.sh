@@ -139,6 +139,13 @@ if [ "$STRUCTURE" = 1 ]; then
 
   if [ -d "$WORK" ] && [ ! -e "$WORK/.git" ]; then ok work "a plain directory"
   else fail work "missing, or a git repository — the shared volume corrupts a .git under concurrent runs" "remove work/.git; never git in work/"; fi
+  HOOK="$HOME/scripts/harness/claude-code/enforce-finish.sh"
+  if jq -e --arg h "$HOOK" '[.hooks.Stop[]?.hooks[]?.command] | index($h)' "$HOME/.claude/settings.json" >/dev/null 2>&1; then
+    ok harness.stop "a turn cannot end while it holds an item"
+  else
+    fail harness.stop "no Stop hook in ~/.claude/settings.json — a run can end mid-work, unreported" \
+      "bash \$HOME/scripts/harness/claude-code/install.sh"
+  fi
   [ -f "$WORK/AGENTS.md" ] && ok work.AGENTS "present" ||
     fail work.AGENTS "missing — a harness started in work/ never finds CLAUDE.md" "seed it — $CFG_FIX"
   v="$(head -1 "$WORK/VERSION" 2>/dev/null)"; want="$(head -1 "$HOME/VERSION" 2>/dev/null)"
