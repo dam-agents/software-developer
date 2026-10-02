@@ -114,7 +114,8 @@ PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" --state open --limit 50 \
 
 # What the local cache knows of each item (scripts/run-state.sh): when a run
 # last looked at it, what state it was left in, how often a run died on it.
-# Missing or lost, every item reads as never seen — GitHub stays the truth.
+# Missing or lost, every item reads as never seen: the labels, branches and
+# pull requests on GitHub are the truth, and this cache is never pushed.
 ITEMS_JSON="$(for f in "$ITEMS"/*.md; do
   [ -f "$f" ] || continue
   jq -n --arg item "$(basename "$f" .md)" --arg seen "$(kv "$f" seen_at)" \

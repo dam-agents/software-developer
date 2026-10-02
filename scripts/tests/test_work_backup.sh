@@ -29,6 +29,7 @@ echo "1 line" > "$HOME/work/TICK.log"; echo v > "$HOME/work/VERSION"
 echo "- run_state: idle" > "$HOME/work/RUN.md"; echo "- busy_since: x" > "$HOME/work/GATE.md"
 echo tmp > "$HOME/work/.RUN.md.abc"; mkdir -p "$HOME/work/widgets/.git"; echo x > "$HOME/work/widgets/f"
 echo stray > "$HOME/work/notes.txt"
+mkdir -p "$HOME/work/items"; echo "- item: 7" > "$HOME/work/items/7.md"
 backup persist
 is "$RC" 0 "exit"
 has "$OUT" "backed up" "pushed"

@@ -50,8 +50,10 @@ your slot and build again before believing either result.
 
 `work/items/<n>.md` is a cache the script keeps per issue: its branch, last
 slot, pull request, state, when a run last started on it (`seen_at`), and how
-often a run died on it (`abandoned`). GitHub stays the truth: a missing or
-deleted file costs nothing but a warm slot. The precheck uses it to
+often a run died on it (`abandoned`). It is local to this sandbox and never
+pushed — not to `repo`, not to the backup. What is true lives in the labels,
+branches and pull requests on GitHub; a missing or deleted file costs nothing
+but a warm slot. The precheck uses it to
 
 - wake a pull request only for a review or failed check newer than `seen_at`,
   whichever run looked at it last;
