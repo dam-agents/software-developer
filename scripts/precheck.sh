@@ -10,6 +10,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 . "$HERE/lib/time.sh"
+. "$HERE/lib/github.sh"
 STATE="$HERE/run-state.sh"
 GATE="$HOME/work/GATE.md"
 ITEMS="$HOME/work/items"
@@ -101,20 +102,61 @@ MINE="$(cfg label_mine)"
 ERR="$(mktemp)"
 trap 'rm -f "$ERR"' EXIT
 
-# One retry: this runs every ten minutes, and a blip that fails open costs a
-# whole turn that begins by wondering why.
-gh_json() {
-  gh "$@" 2>"$ERR" && return 0
-  sleep 3
-  gh "$@" 2>"$ERR"
-}
+case "$REPO" in */*/*) HOST="${REPO%%/*}"; SLUG="${REPO#*/}" ;; *) HOST=github.com; SLUG="$REPO" ;; esac
 
-PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" ${MINE:+--label "$MINE"} --state open --limit 50 \
-  --json number,title,url,reviewDecision,latestReviews,statusCheckRollup,body)" || {
-  echo "gh could not list pull requests on $REPO as author '$AUTHOR'${MINE:+ labelled '$MINE'}, twice:" >&2
-  cat "$ERR" >&2
-  exit 2
-}
+# Everything the list needs in one GraphQL request — your open pull requests
+# with their reviews and checks, the hand-off issues, the claimed ones — and
+# only the fields read below: a few points of the hourly budget, where three
+# `gh pr list` / `gh issue list` calls cost a request each and fetch far more.
+# GraphQL refused — its budget, shared with every agent on an app's
+# installation, spent — the same reads go over REST, a budget of their own
+# (lib/github.sh). That is also the retry: a blip that fails open costs a whole
+# turn that begins by wondering why.
+Q='query($q: String!, $owner: String!, $name: String!, $handoff: String!, $claimed: String!) {
+  prs: search(query: $q, type: ISSUE, first: 50) { nodes { ... on PullRequest {
+    number title url body reviewDecision
+    latestReviews(first: 100) { nodes { author { login } state submittedAt } }
+    commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+      ... on StatusContext { context state createdAt }
+      ... on CheckRun { name status conclusion startedAt completedAt } } } } } } } } } }
+  repository(owner: $owner, name: $name) {
+    handoff: issues(labels: [$handoff], states: OPEN, first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { number title url labels(first: 20) { nodes { name } } } }
+    claimed: issues(labels: [$claimed], states: OPEN, first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes { number title url } } } }'
+SEARCH="repo:$SLUG is:pr is:open author:$AUTHOR${MINE:+ label:\"$MINE\"}"
+if DATA="$(gh api --hostname "$HOST" graphql -f query="$Q" -f q="$SEARCH" -f owner="${SLUG%%/*}" \
+    -f name="${SLUG#*/}" -f handoff="$HANDOFF" -f claimed="$CLAIMED" 2>"$ERR")" &&
+  PRS="$(printf '%s' "$DATA" | jq -e '.data.prs.nodes | map({number, title, url, body, reviewDecision,
+    latestReviews: [.latestReviews.nodes[]?],
+    statusCheckRollup: [.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]?
+      | if .context then {context, state, startedAt: .createdAt} else . end]})' 2>>"$ERR")" &&
+  ISSUES="$(printf '%s' "$DATA" | jq -e '.data.repository.handoff.nodes | map(.labels = [.labels.nodes[]?])' 2>>"$ERR")" &&
+  CLAIMED_ISSUES="$(printf '%s' "$DATA" | jq -e '.data.repository.claimed.nodes' 2>>"$ERR")"; then
+  :
+else
+  GQL_ERR="$(head -c 300 "$ERR")"
+  [ "$AUTHOR" != "@me" ] || AUTHOR="$(gh api --hostname "$HOST" user --jq .login 2>/dev/null)" || AUTHOR="@me"
+  if PULLS="$(rest_pulls "$HOST" "$SLUG")" &&
+    ISSUES="$(rest_issues "$HOST" "$SLUG" "$HANDOFF")" &&
+    CLAIMED_ISSUES="$(rest_issues "$HOST" "$SLUG" "$CLAIMED")"; then
+    PRS="$(printf '%s' "$PULLS" | jq -c --arg author "$AUTHOR" --arg mine "$MINE" "$JQ_LOGIN"'
+      .[] | select((.user.login | login) == ($author | login))
+      | select($mine == "" or any(.labels[]?; .name == $mine))')" &&
+    PRS="$(printf '%s\n' "$PRS" | while IFS= read -r pull; do
+      [ -n "$pull" ] || continue
+      rest_pr "$HOST" "$SLUG" "$pull" || exit 2
+    done | jq -s .)" || {
+      echo "gh could not read the pull requests on $REPO over REST either; GraphQL said: $GQL_ERR" >&2
+      exit 2
+    }
+    NOTE="${NOTE:+$NOTE
+}GitHub's GraphQL budget would not answer ($(printf '%s' "$GQL_ERR" | tr '\n' ' ' | head -c 160)), so this list was read over REST. Prefer \`gh api\` (REST) to \`gh pr\` / \`gh issue\` this run."
+  else
+    echo "gh could not read $REPO, over GraphQL ($GQL_ERR) nor REST." >&2
+    exit 2
+  fi
+fi
 
 # What the local cache knows of each item (scripts/run-state.sh): when a run
 # last looked at it, what state it was left in, how often a run died on it.
@@ -163,13 +205,6 @@ if [ "$CLUSTER_FREE" = 1 ]; then
     | sort_by(.value.seen) | .[] | "- #\(.key) on \(.value.branch) — run its cluster step"')" || exit 2
 fi
 
-ISSUES="$(gh_json issue list -R "$REPO" --label "$HANDOFF" --state open --limit 50 \
-  --json number,title,url,labels)" || {
-  echo "gh could not list issues on $REPO with label '$HANDOFF', twice:" >&2
-  cat "$ERR" >&2
-  exit 2
-}
-
 ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info "$NEEDS_INFO" \
     --arg failed "$FAILED_LABEL" --arg held "$HELD" '
   map(select([.labels[].name] | (index($claimed) or index($info) or index($failed)) | not))
@@ -184,13 +219,6 @@ ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info 
 # and pull request is the `Fixes #<n>` line every pull request body carries
 # (CLAUDE.md → "Rules"). How often a run has died on it is said, because the
 # second time it is released rather than tried again.
-CLAIMED_ISSUES="$(gh_json issue list -R "$REPO" --label "$CLAIMED" --state open --limit 50 \
-  --json number,title,url)" || {
-  echo "gh could not list issues on $REPO with label '$CLAIMED', twice:" >&2
-  cat "$ERR" >&2
-  exit 2
-}
-
 RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" --arg held "$HELD" \
     --argjson items "$ITEMS_JSON" '
   map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))

@@ -163,7 +163,39 @@ BOT='[{"number":32,"title":"Bot","url":"https://gh/pr/32","reviewDecision":null,
   "latestReviews":[{"author":{"login":"app/dev-app"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
 STUB_PRS="$BOT" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
 is "$RC" 1 "the bot's own comment, as app/name, is not a review"
-has "$(cat "$HOME/gh.calls")" "pr list -R acme/widgets --author dev-app[bot] --label agent/mine" "lists only labelled pull requests"
+has "$(cat "$HOME/gh.calls")" 'q=repo:acme/widgets is:pr is:open author:dev-app[bot] label:"agent/mine"' "lists only labelled pull requests"
+done_
+
+CASE="the whole list is one GraphQL request"; sandbox
+STUB_HANDOFF="$ISSUE7" STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"}]' precheck
+is "$RC" 0 "exit"
+is "$(grep -c '^api .*graphql' "$HOME/gh.calls")" 1 "one request"
+lacks "$(cat "$HOME/gh.calls")" "pr list" "no gh pr list"
+lacks "$(cat "$HOME/gh.calls")" "issue list" "no gh issue list"
+done_
+
+CASE="GraphQL refused, the same list is read over REST"; sandbox
+sed -i.bak 's/^- author: .*/- author: dev-app[bot]/' "$HOME/work/CONFIG.md"
+echo "- label_mine: agent/mine" >> "$HOME/work/CONFIG.md"
+PULLS='[{"number":30,"title":"Thirty","html_url":"https://gh/pr/30","body":"Fixes #3","state":"open","head":{"sha":"abc"},
+         "user":{"login":"dev-app[bot]"},"labels":[{"name":"agent/mine"}]},
+        {"number":31,"title":"Theirs","html_url":"https://gh/pr/31","body":"Fixes #9","state":"open","head":{"sha":"def"},
+         "user":{"login":"dev-app[bot]"},"labels":[]}]'
+STUB_GRAPHQL_FAIL=1 STUB_REST_PULLS="$PULLS" STUB_HANDOFF="$ISSUE7" \
+STUB_REVIEWS='[{"user":{"login":"guardian"},"state":"CHANGES_REQUESTED","submitted_at":"2026-09-24T10:05:00Z"}]' \
+STUB_CHECKS='{"check_runs":[{"id":1,"name":"test","status":"completed","conclusion":"failure","completed_at":"2026-09-24T10:06:00Z"}]}' \
+PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 0 "exit"
+has "$OUT" "read over REST" "says so"
+has "$OUT" "#3 — PR #30 Thirty — reviewed; resolve every finding and re-request review; checks failed: test" "the pull request, from REST"
+lacks "$OUT" "PR #31" "another agent's, unlabelled"
+has "$OUT" "#7 Add a flag" "the hand-off issue, from REST"
+done_
+
+CASE="neither GraphQL nor REST answers: broken, not idle"; sandbox
+STUB_GRAPHQL_FAIL=1 STUB_REST_FAIL=1 STUB_HANDOFF="$ISSUE7" precheck
+is "$RC" 2 "exit"
+has "$(cat "$HOME/err")" "nor REST" "says why"
 done_
 
 exit "$FAILED"

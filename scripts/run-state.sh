@@ -37,6 +37,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 . "$HERE/lib/time.sh"
+. "$HERE/lib/github.sh"
 
 WORK="$HOME/work"
 ITEMS="$WORK/items"
@@ -279,13 +280,39 @@ cmd_start() {
 # and back to the run the moment there is something to do. What counts as new
 # is what came after the run last came back from a wait (round_at).
 #
-# pr_state <pr> <since> — prints the verdict line; 0 act on it, 3 nothing yet,
-# 2 unreadable
+# Each look reads the pull request, its reviews and its head's checks over REST
+# with the ETags of the look before (lib/github.sh → cget): unchanged is four
+# free 304s. Only a change costs the GraphQL read `gh pr view` makes, whose
+# review decision is the one that counts; its verdict is kept for the next
+# unchanged look. GraphQL refused, the verdict is read off the REST answers,
+# whose decision is approximate, so it never says done.
+#
+# pr_state <pr> <since> <dir> — prints the verdict line, `act …` or `wait …`;
+# 0 read · 2 unreadable
 pr_state() {
-  local json
-  json="$(gh pr view "$1" -R "$REPO" --json state,mergeable,reviewDecision,headRefOid,latestReviews,statusCheckRollup 2>/dev/null)" || return 2
-  printf '%s' "$json" | jq -r --arg since "$2" --arg author "$(cfg author)" '
-    ([.latestReviews[]? | select(.author.login != $author) | select(.submittedAt > $since)]) as $new
+  local json changed=0 sha k verdict
+  if cget "$3" pull "$HOST" "repos/$SLUG/pulls/$1"; then changed=1; else [ $? -eq 1 ] || changed=2; fi
+  sha="$(jq -r '.head.sha // empty' "$3/pull.json" 2>/dev/null)"
+  [ -n "$sha" ] || changed=2
+  if [ "$changed" != 2 ]; then
+    for k in "reviews pulls/$1/reviews?per_page=100" "checks commits/$sha/check-runs?per_page=100" "status commits/$sha/status"; do
+      if cget "$3" "${k%% *}" "$HOST" "repos/$SLUG/${k#* }"; then changed=1; else [ $? -eq 1 ] || { changed=2; break; }; fi
+    done
+  fi
+  if [ "$changed" = 0 ] && [ -s "$3/verdict" ]; then cat "$3/verdict"; return 0; fi
+  rm -f "$3/verdict"
+  if json="$(gh pr view "$1" -R "$REPO" --json state,mergeable,reviewDecision,headRefOid,latestReviews,statusCheckRollup 2>/dev/null)"; then
+    :
+  elif [ "$changed" != 2 ]; then
+    json="$(jq -n --slurpfile pull "$3/pull.json" --slurpfile reviews "$3/reviews.json" \
+      --slurpfile checks "$3/checks.json" --slurpfile status "$3/status.json" \
+      '{pull: $pull[0], reviews: $reviews[0], checks: $checks[0], status: $status[0]}' 2>/dev/null |
+      jq "$JQ_LOGIN$JQ_REST_PR" 2>/dev/null)" || return 2
+  else
+    return 2
+  fi
+  verdict="$(printf '%s' "$json" | jq -r --arg since "$2" --arg author "$(cfg author)" "$JQ_LOGIN"'
+    ([.latestReviews[]? | select((.author.login | login) != ($author | login)) | select(.submittedAt > $since)]) as $new
     | ([.statusCheckRollup[]? | (.conclusion // .state // "")]) as $all
     | ([.statusCheckRollup[]? | select((.conclusion // .state // "") | test("^(FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE|ACTION_REQUIRED|CANCELLED)$"))
         | select((.completedAt // .startedAt // "") > $since) | (.name // .context)]) as $failed
@@ -295,10 +322,13 @@ pr_state() {
       elif ($failed | length) > 0 then "act checks failed: \($failed | join(", "))"
       elif ($new | length) > 0 then "act reviewed by \([$new[].author.login] | unique | join(", ")) (\([$new[].state] | unique | join(", "))): resolve every finding"
       elif .mergeable == "CONFLICTING" then "act conflicts with the base branch: rebase"
+      elif .reviewDecision == "APPROVED" and $green and .approximate then "wait approved by its reviews and green; GitHub'"'"'s review decision is unreadable (GraphQL), so not yet done"
       elif .reviewDecision == "APPROVED" and $green and .mergeable == "MERGEABLE" then "act done — approved, green and mergeable: release the issue"
       elif .reviewDecision == "APPROVED" and $green then "wait approved and green; GitHub is still computing mergeability"
       elif $green then "wait green, waiting for a review"
-      else "wait checks running" end' 2>/dev/null || return 2
+      else "wait checks running" end' 2>/dev/null)" || return 2
+  printf '%s\n' "$verdict"
+  case "$verdict" in wait*) printf '%s' "$json" | jq -e '.approximate' >/dev/null 2>&1 || printf '%s\n' "$verdict" > "$3/verdict" ;; esac
 }
 
 cmd_wait() {
@@ -312,6 +342,8 @@ cmd_wait() {
   [ -n "$(kv "$f" babysit_since)" ] || write "$f" "$f" "$ITEM_KEYS" "babysit_since=$(now)" "round_at=$(kv "$LOCKS/item-$item/owner" since)"
   since="$(kv "$f" round_at)"
   start="$(date -u +%s)"
+  seen="$(mktemp -d)" || exit 2
+  trap 'rm -rf "$seen"' EXIT
   if waited="$(epoch "$(kv "$f" babysit_since)")" && [ $(( (start - waited) / 3600 )) -ge "$MAX_H" ]; then
     write "$f" "$f" "$ITEM_KEYS" babysat_out=yes
     echo "timeout — babysat #$pr for ${MAX_H}h (babysit_max_hours). Report where it stands and who it waits on, then finish pr-updated: a later run takes it over when something lands."
@@ -319,7 +351,7 @@ cmd_wait() {
   fi
   while :; do
     stamp "babysit #$pr: ${last:-looking}"
-    verdict="$(pr_state "$pr" "$since")"; rc=$?
+    verdict="$(pr_state "$pr" "$since" "$seen")"; rc=$?
     if [ "$rc" -eq 0 ]; then
       case "$verdict" in
         act*) write "$f" "$f" "$ITEM_KEYS" "round_at=$(now)" "updated_at=$(now)"
