@@ -24,7 +24,8 @@ the pull request through review.
   private repository of its own, and restores it on a fresh volume.
 - [`scripts/harness/claude-code/`](scripts/harness/claude-code/) — the `Stop`
   hook that keeps a run from ending its turn while it still holds an issue,
-  and its installer.
+  and the installer that registers it and links the skills: the bundled ones,
+  and the repository's own at `work/.claude/skills`.
 - [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an
   instance has the shape onboarding promises; every failure names its fix.
 - [`scripts/audit.sh`](scripts/audit.sh) — the deterministic half of the

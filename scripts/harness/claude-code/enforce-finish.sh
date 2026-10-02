@@ -43,6 +43,9 @@ n=$((n + 1)); echo "$n" > "$lock/stop_blocks" 2>/dev/null || exit 0
   echo "   (bash \"\$HOME/scripts/session-link.sh\"). A question for a person goes"
   echo "   there too, with the needs-info label — never into this turn."
   echo "3. bash \"\$HOME/scripts/run-state.sh\" finish <outcome> [pr]"
+  echo
+  echo "Waiting on a review or a check of your pull request? That is not the end:"
+  echo "bash \"\$HOME/scripts/run-state.sh\" wait <pr>, and again until it is done."
   if [ "$n" -ge "$MAX_BLOCKS" ]; then
     echo
     echo "This is the last block. If the work cannot go on, finish \`blocked\`:"

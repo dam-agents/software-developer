@@ -18,6 +18,9 @@
 #
 #   start <item> [branch]     take the item and a slot, put the slot on branch
 #   phase <text>              before each long step: what, and since when
+#   wait <pr>                 babysit: block up to ~9 minutes until the pull
+#                             request needs the run (exit 0), nothing yet (3),
+#                             or the run has babysat it for babysit_max_hours (4)
 #   cluster                   take the cluster lock, or record waiting for it
 #   cluster-done              give the cluster back
 #   finish <outcome> [pr]     the run's last act, on every way out: refused
@@ -46,9 +49,12 @@ BOOT="${SD_BOOT_ID:-$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo un
 
 N="$(cfg slots)"; case "$N" in '' | *[!0-9]* | 0) N=3 ;; esac
 STUCK_MIN="$(cfg stuck_after_min)"; case "$STUCK_MIN" in '' | *[!0-9]*) STUCK_MIN=120 ;; esac
+MAX_H="$(cfg babysit_max_hours)"; case "$MAX_H" in '' | *[!0-9]*) MAX_H=4 ;; esac
+WAIT_FOR="${SD_WAIT_FOR:-540}"     # seconds a wait blocks: under the 10-minute tool limit
+WAIT_POLL="${SD_WAIT_POLL:-60}"    # seconds between looks at the pull request
 
 OWNER_KEYS="session boot since item slot phase phase_at"
-ITEM_KEYS="item state branch slot pr session seen_at abandoned updated_at"
+ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
 GATE_KEYS="diagnosed_at diagnoses"
 
 say() { echo "run-state: $*" >&2; }
@@ -179,6 +185,11 @@ prepare() {
   mkdir -p "$SLOTDIR"
   git -C "$CO" fetch -q --prune origin 2>/dev/null || { say "git fetch failed in work/${CO##*/}"; return 1; }
   dflt="$(default_branch)"
+  # the checkout itself stays on the default branch, kept current: its skills
+  # are the ones every run loads (scripts/harness/claude-code/install.sh)
+  if [ "$(git -C "$CO" symbolic-ref -q --short HEAD)" = "$dflt" ] && [ -z "$(unsaved "$CO")" ]; then
+    git -C "$CO" merge -q --ff-only "origin/$dflt" 2>/dev/null || true
+  fi
   if [ ! -e "$d/.git" ]; then
     git -C "$CO" worktree add -q --detach "$d" "origin/$dflt" 2>/dev/null ||
       { say "could not create slot $k at $d"; return 1; }
@@ -255,9 +266,76 @@ cmd_start() {
     [ "$rc" -eq 3 ] && { echo "slot $k: $SLOTDIR/$k"; exit 3; }
     drop "item-$item"; drop "slot-$k"; exit 1
   fi
+  # the babysit clock is this run's own: a run that resumes the item starts it again
   write "$f" "$f" "$ITEM_KEYS" "item=$item" state=active "branch=$branch" "slot=$k" \
-    "session=$ME" "seen_at=$(now)" "updated_at=$(now)"
+    "session=$ME" "seen_at=$(now)" babysit_since=- round_at=- babysat_out=- "updated_at=$(now)"
   echo "slot $k: $SLOTDIR/$k on $branch"
+}
+
+# A run babysits the pull request it opened until it is done — approved, green,
+# mergeable — or cannot be, in its own turn: the item stays held, so no other
+# run takes it, and the run that wrote the change answers its review. `wait`
+# is how it waits without leaving the turn: one look a minute, up to WAIT_FOR,
+# and back to the run the moment there is something to do. What counts as new
+# is what came after the run last came back from a wait (round_at).
+#
+# pr_state <pr> <since> — prints the verdict line; 0 act on it, 3 nothing yet,
+# 2 unreadable
+pr_state() {
+  local json
+  json="$(gh pr view "$1" -R "$REPO" --json state,mergeable,reviewDecision,headRefOid,latestReviews,statusCheckRollup 2>/dev/null)" || return 2
+  printf '%s' "$json" | jq -r --arg since "$2" --arg author "$(cfg author)" '
+    ([.latestReviews[]? | select(.author.login != $author) | select(.submittedAt > $since)]) as $new
+    | ([.statusCheckRollup[]? | (.conclusion // .state // "")]) as $all
+    | ([.statusCheckRollup[]? | select((.conclusion // .state // "") | test("^(FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE|ACTION_REQUIRED|CANCELLED)$"))
+        | select((.completedAt // .startedAt // "") > $since) | (.name // .context)]) as $failed
+    | ([$all[] | select(test("^(SUCCESS|SKIPPED|NEUTRAL)$") | not)] | length == 0) as $green
+    | if .state == "MERGED" then "act merged — the pull request is merged: release the issue"
+      elif .state == "CLOSED" then "act closed — closed without merging: read why, release the issue"
+      elif ($failed | length) > 0 then "act checks failed: \($failed | join(", "))"
+      elif ($new | length) > 0 then "act reviewed by \([$new[].author.login] | unique | join(", ")) (\([$new[].state] | unique | join(", "))): resolve every finding"
+      elif .mergeable == "CONFLICTING" then "act conflicts with the base branch: rebase"
+      elif .reviewDecision == "APPROVED" and $green and .mergeable == "MERGEABLE" then "act done — approved, green and mergeable: release the issue"
+      elif .reviewDecision == "APPROVED" and $green then "wait approved and green; GitHub is still computing mergeability"
+      elif $green then "wait green, waiting for a review"
+      else "wait checks running" end' 2>/dev/null || return 2
+}
+
+cmd_wait() {
+  local pr="${1:?pr}" item f since start nowe waited verdict rc=3 last=""
+  pr="${pr#\#}"
+  need_session
+  item="$(my_lock item- | sed 's/^item-//')"
+  [ -n "$item" ] || { say "this session holds no item — call start first"; exit 1; }
+  f="$(item_file "$item")"
+  write "$f" "$f" "$ITEM_KEYS" "pr=$pr" "updated_at=$(now)"
+  [ -n "$(kv "$f" babysit_since)" ] || write "$f" "$f" "$ITEM_KEYS" "babysit_since=$(now)" "round_at=$(kv "$LOCKS/item-$item/owner" since)"
+  since="$(kv "$f" round_at)"
+  start="$(date -u +%s)"
+  if waited="$(epoch "$(kv "$f" babysit_since)")" && [ $(( (start - waited) / 3600 )) -ge "$MAX_H" ]; then
+    write "$f" "$f" "$ITEM_KEYS" babysat_out=yes
+    echo "timeout — babysat #$pr for ${MAX_H}h (babysit_max_hours). Report where it stands and who it waits on, then finish pr-updated: a later run takes it over when something lands."
+    exit 4
+  fi
+  while :; do
+    stamp "babysit #$pr: ${last:-looking}"
+    verdict="$(pr_state "$pr" "$since")"; rc=$?
+    if [ "$rc" -eq 0 ]; then
+      case "$verdict" in
+        act*) write "$f" "$f" "$ITEM_KEYS" "round_at=$(now)" "updated_at=$(now)"
+              stamp "babysit #$pr: ${verdict#act }"
+              echo "${verdict#act }"; exit 0 ;;
+        *) last="${verdict#wait }" ;;
+      esac
+    else
+      last="GitHub unreadable"
+    fi
+    nowe="$(date -u +%s)"
+    [ $(( nowe - start + WAIT_POLL )) -le "$WAIT_FOR" ] || break
+    sleep "$WAIT_POLL"
+  done
+  echo "nothing yet — $last. Call wait again; do not end the turn."
+  exit 3
 }
 
 cmd_phase() {
@@ -364,7 +442,17 @@ cmd_finish() {
     fi
   fi
   if [ -n "$item" ]; then
-    [ -n "$pr" ] || pr="$(kv "$(item_file "$item")" pr)"
+    f="$(item_file "$item")"
+    [ -n "$pr" ] || pr="$(kv "$f" pr)"
+    case "$outcome" in
+      pr-opened | pr-updated | nothing)
+        if [ -n "$pr" ] && [ "$(kv "$f" babysat_out)" != yes ]; then
+          say "#$item has pull request #$pr, and a run keeps its pull request until it is done:"
+          say "babysit it — bash \"\$HOME/scripts/run-state.sh\" wait $pr — and finish released once it is approved, green and mergeable,"
+          say "blocked when it cannot get there, or pr-updated once wait says babysit_max_hours is up (docs/babysit.md)."
+          exit 1
+        fi ;;
+    esac
     why="$(reported "$item" "$outcome" "$pr" "$since")"; rc=$?
     case "$rc" in
       0) ;;
@@ -381,7 +469,7 @@ cmd_finish() {
       waiting-cluster | needs-info | released | blocked) state="$outcome" ;;
       *) state=parked ;;
     esac
-    write "$f" "$f" "$ITEM_KEYS" "state=$state" ${pr:+"pr=$pr"} session=- "updated_at=$(now)"
+    write "$f" "$f" "$ITEM_KEYS" "state=$state" ${pr:+"pr=$pr"} session=- babysit_since=- round_at=- babysat_out=- "updated_at=$(now)"
     [ -n "$pr" ] || pr="$(kv "$f" pr)"
   fi
   # a saved slot lets go of its branch, so the item's next run may take any slot
@@ -479,6 +567,7 @@ cmd_show() {
 case "${1:-}" in
   start) shift; cmd_start "$@" ;;
   phase) shift; cmd_phase "$@" ;;
+  wait) shift; cmd_wait "$@" ;;
   cluster) cmd_cluster ;;
   cluster-done) cmd_cluster_done ;;
   finish) shift; cmd_finish "$@" ;;
@@ -489,7 +578,7 @@ case "${1:-}" in
   diagnosed) cmd_diagnosed ;;
   show) cmd_show ;;
   *)
-    echo "usage: run-state.sh start|phase|cluster|cluster-done|finish|sweep|held|live|quiet|diagnosed|show" >&2
+    echo "usage: run-state.sh start|phase|wait|cluster|cluster-done|finish|sweep|held|live|quiet|diagnosed|show" >&2
     exit 2
     ;;
 esac

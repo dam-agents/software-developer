@@ -30,8 +30,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info
-  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots stuck_after_min work_repo"
-ITEM_KEYS="item state branch slot pr session seen_at abandoned updated_at"
+  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots babysit_max_hours stuck_after_min work_repo"
+ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
 GATE_KEYS="diagnosed_at diagnoses"
 
 CHECKS=0; FAILS=0; WARNS=0
@@ -97,6 +97,11 @@ else
   case "$S" in
     '' | *[!0-9]*) [ -z "$S" ] || fail config.stuck_after_min "'$S' is not a whole number of minutes" "write 120, or more" ;;
   esac
+  S="$(cfg babysit_max_hours)"
+  case "$S" in
+    '' ) ;;
+    *[!0-9]* | 0) fail config.babysit_max_hours "'$S' is not a whole number of hours" "write 4, or leave it out" ;;
+  esac
   S="$(cfg slots)"
   case "$S" in
     '') ;;
@@ -145,6 +150,20 @@ if [ "$STRUCTURE" = 1 ]; then
   else
     fail harness.stop "no Stop hook in ~/.claude/settings.json — a run can end mid-work, unreported" \
       "bash \$HOME/scripts/harness/claude-code/install.sh"
+  fi
+  INSTALL_FIX="bash \$HOME/scripts/harness/claude-code/install.sh"
+  [ -f "$HOME/.claude/skills/implement-issue/SKILL.md" ] && ok harness.skills "implement-issue loads" ||
+    fail harness.skills "implement-issue does not resolve through ~/.claude/skills — a run cannot use it" "$INSTALL_FIX"
+  if [ -n "$REPO" ]; then
+    src=""
+    for d in .claude/skills .agents/skills; do [ -d "$WORK/${REPO##*/}/$d" ] && { src="$d"; break; }; done
+    if [ -n "$src" ]; then
+      if [ "$(cd "$WORK/.claude/skills" 2>/dev/null && pwd -P)" = "$(cd "$WORK/${REPO##*/}/$src" && pwd -P)" ]; then
+        ok harness.repo_skills "work/.claude/skills -> ${REPO##*/}/$src"
+      else
+        fail harness.repo_skills "the repository's skills are not linked at work/.claude/skills — no run sees them" "$INSTALL_FIX"
+      fi
+    fi
   fi
   [ -f "$WORK/AGENTS.md" ] && ok work.AGENTS "present" ||
     fail work.AGENTS "missing — a harness started in work/ never finds CLAUDE.md" "seed it — $CFG_FIX"

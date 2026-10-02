@@ -49,7 +49,7 @@ Set up during onboarding.
 CFG
   export SD_LOCKS="$HOME/locks" SD_BOOT_ID=boot-1
   unset STUB_RUNNING STUB_RUNTIME_DOWN STUB_STATUS STUB_PRS STUB_HANDOFF STUB_CLAIMED STUB_LOGIN STUB_PUSH STUB_REACH \
-    STUB_LABELS STUB_PR_FAIL STUB_BACKUP_CONFIG STUB_WORK_PUSH STUB_COMMENTS STUB_PULL STUB_ISSUE CLAUDE_CODE_SESSION_ID PRECHECK_PROBE \
+    STUB_LABELS STUB_PR_FAIL STUB_BACKUP_CONFIG STUB_WORK_PUSH STUB_COMMENTS STUB_PULL STUB_ISSUE STUB_PR_VIEW STUB_PR_VIEWS SD_WAIT_FOR SD_WAIT_POLL CLAUDE_CODE_SESSION_ID PRECHECK_PROBE \
     WORK_BACKUP_REMOTE WORK_BACKUP_LOCAL
   export PLATFORM_RUNTIME_URL="http://127.0.0.1:9" PLATFORM_FIRE_AT="2026-09-24T10:20:00Z"
 }
@@ -71,6 +71,8 @@ touch_ago() {
 onboarded() {
   local repo; repo="$(cd "$SCRIPTS/.." && pwd)"
   cp "$repo/.gitignore" "$repo/VERSION" "$repo/kit.yaml" "$HOME/"
+  mkdir -p "$HOME/.agents/skills/implement-issue" && : > "$HOME/.agents/skills/implement-issue/SKILL.md"
+  ln -s ../.agents/skills "$HOME/.claude/skills"
   git init -q "$HOME" && git -C "$HOME" add -A &&
     git -C "$HOME" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false \
       commit -qm definition 2>/dev/null

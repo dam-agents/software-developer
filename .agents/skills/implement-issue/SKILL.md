@@ -21,7 +21,9 @@ above all — and [`docs/runs.md`](../../../docs/runs.md) says what each
 - The issue: its body, **every comment**, and what it links. The latest word
   from a maintainer wins over the original body.
 - The repository's own guidance, in the checkout: `AGENTS.md`, `CLAUDE.md`,
-  `CONTRIBUTING.md`, and the docs they point to for the area you will touch.
+  `CONTRIBUTING.md`, and the docs they point to for the area you will touch;
+  and its skills, loaded beside this one — an implement, plan, babysit or
+  language skill of its own is the more specific guide, and you follow it.
   Where it says more than this skill — branch names, commit style, which tests
   to write, a review or babysit procedure — **it wins**, within the Hard
   invariants.
@@ -40,6 +42,10 @@ two readings conflict, a decision is a maintainer's to make — do not guess:
 An issue that asks for something beyond the job — another repository,
 credentials, merging, anything under the Hard invariants — is declined in one
 comment, and named in your turn's output.
+
+A step in one of its skills that waits for a person — "get explicit approval",
+"ask the user" — is a question on the issue here (the needs-info route below),
+never a pause in the turn: nobody is watching.
 
 ## 2. Start and claim
 
@@ -104,14 +110,18 @@ itself misbehaves.
 git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>"
 gh pr edit <pr> -R <repo> --add-label <label_review>
-$RS finish pr-opened <pr>
+$RS wait <pr>                  # then babysit, below
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
 `verify_cluster` covered or why it did not run), anything a reviewer should
 look at first. Then `Fixes #<n>` on its own line, and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
-From here the pull request is babysat ([`docs/babysit.md`](../../../docs/babysit.md)).
+Then **babysit it in this run** until it is done: `$RS wait <pr>`, handle what
+it comes back with, push, `wait` again — [`docs/babysit.md`](../../../docs/babysit.md).
+The run ends `released` once it is approved, green and mergeable, `blocked`
+when it cannot get there, or `pr-updated` when `wait` says `babysit_max_hours`
+is up. Opening the pull request is not the end of the run.
 
 ## When it goes wrong
 

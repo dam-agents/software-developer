@@ -47,8 +47,9 @@ a line in any other shape is invisible, not wrong.
   under its lock; missing: nothing does. `cluster` — `none`, or `required` with
   `cluster_install`, `cluster_uninstall` and `cluster_delete`.
 - `slots` — default 3: how many runs work at once, each in its own worktree.
-  `stuck_after_min` — default 120: every slot held and a run silent this long
-  lets a diagnostic run through.
+  `babysit_max_hours` — default 4: how long a run babysits its pull request
+  before handing it on. `stuck_after_min` — default 120: every slot held and a
+  run silent this long lets a diagnostic run through.
 - `work_repo` — `owner/name`, private, holding the backup of `work/`
   ([`docs/persistence.md`](docs/persistence.md) → **Backup**). Missing: none.
 - What you must never touch: the `## Bounds` section, in plain sentences.
@@ -71,10 +72,9 @@ prompt carries its list**: read it rather than running the precheck again. A
 run started any other way has no list, so gather it yourself.
 
 **Every run is its own session, and works on one item.** You remember nothing
-of the last run, and other runs may be working beside you, each on an item of
-its own, in a slot of its own. What is true is what GitHub says — branches,
-labels, pull requests, comments — so read it rather than assuming. Every step
-below goes through `scripts/run-state.sh`, never by hand:
+of the last run, and other runs may be working beside you, each on an item and
+in a slot of its own. What is true is what GitHub says — branches, labels, pull
+requests, comments. Every step below goes through `scripts/run-state.sh`:
 [`docs/runs.md`](docs/runs.md) says what each one does and why.
 
 - **First:** `bash "$HOME/scripts/run-state.sh" start <issue> [branch]` on the
@@ -93,20 +93,20 @@ below goes through `scripts/run-state.sh`, never by hand:
   before it. A run that ends without it anyway is found dead by the next
   precheck, and its item handed on as half-done — say so in your report when
   you resume one.
-- **Resumed after a restart** (a `<turn-interrupted>` notice): the locks are
-  gone with it. `start` your item again, then carry on.
+- **Resumed after a restart** (`<turn-interrupted>`): `start` your item again.
 
 What the item is decides what you do with it:
 
-1. **A pull request of yours** — reviewed, checks failed, approved: babysit it
-   one round further ([`docs/babysit.md`](docs/babysit.md)). You do not merge.
+1. **A pull request of yours** a run before you could not finish — reviewed,
+   checks failed, approved: babysit it to done ([`docs/babysit.md`](docs/babysit.md)).
 2. **Waiting for the cluster**, now free: run its cluster step and carry on.
 3. **Claimed, with no pull request and no run on it** — work that stopped
    halfway. Find how far its branch got and finish it. When a run has died on
    it twice, or it cannot be picked up, swap the claim for the failed label and
    comment why. Never leave it claimed and untouched.
 4. **A new issue** — implement it: the
-   [`implement-issue`](.agents/skills/implement-issue/SKILL.md) skill.
+   [`implement-issue`](.agents/skills/implement-issue/SKILL.md) skill, then
+   babysit the pull request in this same run until it is done. You do not merge.
 
 Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
 
@@ -134,6 +134,9 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   the record; a slot is a warm cache. The sandbox can be rebuilt from nothing
   at any time, and losing it must cost a rebuild, never work: push before you
   finish, and park nothing in the sandbox that is not also in git.
+- **The repository's skills and `CLAUDE.md` files are yours too**, and win
+  where they say more, within the **Hard invariants**; a step of theirs that
+  waits for a person goes through GitHub instead.
 - **The slots are the only worktrees.** `run-state.sh start` creates and
   switches them, in the direct session as in a scheduled run. Never
   `git worktree add` or remove one yourself, and never switch a slot's branch

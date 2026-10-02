@@ -9,6 +9,30 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 2.1.0 — 2026-10-02
+
+The repository's own skills load in every run: onboarding links
+`work/.claude/skills` to the checkout's skills, because a run works from
+`work/` and Claude Code loads project skills from there alone. The checkout
+itself is kept on its default branch, fast-forwarded by `run-state.sh start`,
+so the linked skills stay current. A step of theirs that waits for a person
+goes through GitHub instead.
+
+The run that opens a pull request now babysits it in its own turn until it is
+approved, green and mergeable, or cannot be: `run-state.sh wait <pr>` blocks up
+to nine minutes at a time for the next thing to do, and `finish` refuses
+`pr-opened`, `pr-updated` and `nothing` until then. The item stays held, so no
+new tick takes it. A run gives it up after `babysit_max_hours` (default 4);
+the precheck's new-run babysitting remains for that, and for runs that died.
+
+**Upgrade:**
+
+1. Add `- babysit_max_hours: 4` to `work/CONFIG.md` (or leave it out for the
+   default), and run `bash "$HOME/scripts/harness/claude-code/install.sh"`;
+   show the operator the skills it linked.
+2. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`: it now checks
+   `harness.skills` and `harness.repo_skills`.
+
 ## 2.0.0 — 2026-10-02
 
 Up to `slots` runs (default 3) now work at once, one issue each, each in a
