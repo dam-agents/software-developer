@@ -79,6 +79,18 @@ cmp -s "$HOME/work/CONFIG.md" "$HOME/config.saved" || fail "CONFIG.md differs"
 is "$(cat "$HOME/work/VERSION")" "1.0.0" "VERSION"
 done_
 
+CASE="the backup repository's own README and LICENSE stay"; backed
+seedc="$(mktemp -d)"; git init -q -b main "$seedc/c"; echo readme > "$seedc/c/README.md"; echo l > "$seedc/c/LICENSE"
+git -C "$seedc/c" add -A
+git -C "$seedc/c" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qm init
+git -C "$seedc/c" push -q "$HOME/remote.git" HEAD:main; rm -rf "$seedc"
+backup restore
+is "$RC" 2 "a repository with no CONFIG.md holds no backup"
+[ ! -f "$HOME/work/README.md" ] || fail "restored the repository's README"
+backup persist
+is "$(remote_files)" "CONFIG.md LICENSE README.md " "kept beside the backup"
+done_
+
 CASE="restore from an empty or unreachable remote"; backed
 backup restore
 is "$RC" 2 "empty remote"

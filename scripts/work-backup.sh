@@ -9,7 +9,8 @@
 # What travels is work/'s own top-level files: CONFIG.md, the logs, VERSION,
 # AGENTS.md. Never a directory — the checkout and its worktrees live on GitHub
 # already — never a dotfile, and never RUN.md or GATE.md, which describe this
-# sandbox's processes and mean nothing on another one.
+# sandbox's processes and mean nothing on another one. A README.md or LICENSE
+# belongs to the backup repository itself, and stays there untouched.
 #
 # All git happens in a clone on tmpfs, never in work/: the home volume is
 # virtiofs over NFS, and a .git there corrupts under concurrent runs
@@ -56,6 +57,7 @@ REMOTE="${WORK_BACKUP_REMOTE:-https://$REF}"
 # carried <dir> — the top-level files that travel, one name per line
 carried() {
   find "$1" -mindepth 1 -maxdepth 1 -type f ! -name '.*' ! -name RUN.md ! -name GATE.md \
+    ! -name README.md ! -name LICENSE \
     -exec basename {} \; 2>/dev/null | sort
 }
 
