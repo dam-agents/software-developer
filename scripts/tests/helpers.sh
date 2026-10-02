@@ -47,8 +47,10 @@ Set up during onboarding.
 
 - Nothing under deploy/ is ours to change.
 CFG
-  unset STUB_STATUS STUB_PRS STUB_HANDOFF STUB_CLAIMED STUB_LOGIN STUB_PUSH STUB_REACH \
-    STUB_LABELS STUB_PR_FAIL CLAUDE_CODE_SESSION_ID PRECHECK_PROBE
+  export SD_LOCKS="$HOME/locks" SD_BOOT_ID=boot-1
+  unset STUB_RUNNING STUB_RUNTIME_DOWN STUB_STATUS STUB_PRS STUB_HANDOFF STUB_CLAIMED STUB_LOGIN STUB_PUSH STUB_REACH \
+    STUB_LABELS STUB_PR_FAIL STUB_BACKUP_CONFIG STUB_WORK_PUSH STUB_COMMENTS STUB_PULL STUB_ISSUE CLAUDE_CODE_SESSION_ID PRECHECK_PROBE \
+    WORK_BACKUP_REMOTE WORK_BACKUP_LOCAL
   export PLATFORM_RUNTIME_URL="http://127.0.0.1:9" PLATFORM_FIRE_AT="2026-09-24T10:20:00Z"
 }
 
@@ -73,6 +75,8 @@ onboarded() {
     git -C "$HOME" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false \
       commit -qm definition 2>/dev/null
   date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.software-developer-onboarded"
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"%s"}]}]}}' \
+    "$HOME/scripts/harness/claude-code/enforce-finish.sh" > "$HOME/.claude/settings.json"
   echo "# pointer" > "$HOME/work/AGENTS.md"
   cp "$HOME/VERSION" "$HOME/work/VERSION"
   git init -q "$HOME/work/widgets" &&
@@ -81,10 +85,33 @@ onboarded() {
 
 verify() { OUT="$(bash "$SCRIPTS/verify-onboarding.sh" "$@" 2>"$HOME/err")"; RC=$?; }
 
-record() {   # record key=value ... — a work/RUN.md as run-state.sh would write it
-  { printf '# RUN\n\n'; for p in "$@"; do printf -- '- %s: %s\n' "${p%%=*}" "${p#*=}"; done; } \
-    > "$HOME/work/RUN.md"
+# lock <name> key=value ... — a lock as run-state.sh would leave it
+lock() {
+  local l="$SD_LOCKS/$1"; shift
+  mkdir -p "$l"
+  { printf '# owner\n\n'; for p in "boot=boot-1" "$@"; do printf -- '- %s: %s\n' "${p%%=*}" "${p#*=}"; done; } > "$l/owner"
 }
+
+# item <n> key=value ... — a work/items/<n>.md
+item() {
+  local n="$1"; shift
+  mkdir -p "$HOME/work/items"
+  { printf '# %s\n\n- item: %s\n' "$n" "$n"; for p in "$@"; do printf -- '- %s: %s\n' "${p%%=*}" "${p#*=}"; done; } \
+    > "$HOME/work/items/$n.md"
+}
+
+# origin — work/widgets cloned from a local bare origin with one commit on main
+origin_checkout() {
+  local seed; seed="$(mktemp -d)"
+  git init -q --bare -b main "$HOME/widgets.git"
+  git init -q -b main "$seed/s" && echo hello > "$seed/s/README.md" && echo dist/ > "$seed/s/.gitignore"
+  git -C "$seed/s" add -A
+  git -C "$seed/s" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qm init
+  git -C "$seed/s" push -q "$HOME/widgets.git" main; rm -rf "$seed"
+  rm -rf "$HOME/work/widgets"
+  git clone -q "$HOME/widgets.git" "$HOME/work/widgets"
+}
+gitc() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
 
 precheck() { OUT="$(cd "$HOME/work" && bash "$SCRIPTS/precheck.sh" 2>"$HOME/err")"; RC=$?; }
 state() { OUT="$(bash "$SCRIPTS/run-state.sh" "$@" 2>"$HOME/err")"; RC=$?; }

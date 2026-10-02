@@ -3,125 +3,66 @@
 # anything else = broken, the run happens anyway and the reason is recorded.
 #
 # PRECHECK_PROBE=1 answers only "is there work, and can GitHub be read": no
-# sandbox gate and no state written. verify-onboarding.sh and the audit use it
-# to prove the detection end to end without claiming a run nobody will start.
+# slot gate and no state written. verify-onboarding.sh and the audit use it to
+# prove the detection end to end.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 . "$HERE/lib/time.sh"
 STATE="$HERE/run-state.sh"
-RUN="$HOME/work/RUN.md"
 GATE="$HOME/work/GATE.md"
+ITEMS="$HOME/work/items"
 SINCE="${PLATFORM_LAST_RUN_AT:-}"
 
-# Every exit that lets a work run through claims work/RUN.md first, so the next
-# occurrence can tell a run that is still working from one that died.
-allow() {
-  [ -n "${PRECHECK_PROBE:-}" ] ||
-    "$STATE" claim "${PLATFORM_FIRE_AT:-unknown}" >/dev/null 2>&1 || true
-  exit 0
-}
+LOCKS="${SD_LOCKS:-/dev/shm/software-developer}"
 
-# One run at a time, because there is one cluster, and nothing queues fresh
-# sessions behind each other. Two witnesses decide whether the last run is over:
-# the runtime, which says live whether the sandbox is doing anything, and
-# work/RUN.md, which says whether a run of ours claimed it and never closed.
+# Up to `slots` runs at once, one item each (scripts/run-state.sh). Nothing is
+# claimed here: a run takes its item and its slot itself, atomically, so two
+# runs let through close together simply take different items. What this gate
+# does is free what dead runs left, decline while every slot is held, and
+# leave out of the list what a live run already holds.
 #
-#   idle, record open    the run is gone — nothing can be running in an idle
-#                        sandbox — so the record is abandoned and this run is
-#                        told what it may have left half-done
-#   busy, record open    the run is presumed alive while it shows a sign of life
-#                        (a phase stamp, or its own transcript moving)
-#   busy, no record      something else holds it: a chat, a terminal, background
-#                        work left running
-#
-# Busy with no sign of life past `stuck_after_min` is the one thing declining
-# cannot fix, and it is silent — the panel just counts declines — so it lets a
-# DIAGNOSTIC run through, which may not build, and whose only job is to say
-# what is holding the sandbox. At most one per backoff window, doubling from an
-# hour to a day, so a sandbox nobody frees does not cost a turn an hour forever.
-#
-# A runtime that does not answer is not a reason to stop ticking: this gate only
-# runs because that same runtime delivered the fire. Unless a run of ours holds
-# the record — then a guess could start a second build, so it counts as busy.
-STUCK_MIN="$(cfg stuck_after_min)"
-case "$STUCK_MIN" in '' | *[!0-9]*) STUCK_MIN=120 ;; esac
-GRACE_SEC=120
-NOW="$(date -u +%s)"
+# Every slot held, and one of the holders silent past `stuck_after_min`, is the
+# one thing declining cannot fix, and it is silent — the panel just counts
+# declines — so it lets a DIAGNOSTIC run through, which may not build, and
+# whose only job is to say what is stuck. At most one per backoff window,
+# doubling from an hour to a day.
 NOTE=""
+N="$(cfg slots)"; case "$N" in '' | *[!0-9]* | 0) N=3 ;; esac
 
-STATUS="$(curl -fsS --max-time 5 "${PLATFORM_RUNTIME_URL:-}/api/status" 2>/dev/null)"
-IDLE="$(printf '%s' "$STATUS" | jq -r '.idle' 2>/dev/null)"
-HELD="$(kv "$RUN" run_state)"
-SESSION="$(kv "$RUN" session)"
-PHASE="$(kv "$RUN" phase)"
-PHASE_AT="$(kv "$RUN" phase_at)"
-
-# The newest sign that the run holding the record is still working. Its own
-# transcript moves on every tool call without the run doing anything, so a run
-# busy in a long step still shows life; a single step longer than
-# stuck_after_min is what that key exists to be raised for.
-last_life() {
-  local best=0 t e f
-  for t in "$(kv "$RUN" claimed_at)" "$PHASE_AT"; do
-    e="$(epoch "$t")" && [ "$e" -gt "$best" ] && best="$e"
-  done
-  f="$(find "$HOME/.claude/projects" -maxdepth 2 -name "$SESSION.jsonl" 2>/dev/null | head -1)"
-  [ -n "$f" ] && e="$(mtime "$f")" && [ "$e" -gt "$best" ] && best="$e"
-  echo "$best"
-}
-
-if [ -n "${PRECHECK_PROBE:-}" ]; then
-  :
-elif [ "$IDLE" = true ]; then
-  if [ "$HELD" = running ]; then
-    claimed="$(epoch "$(kv "$RUN" claimed_at)")" || claimed=0
-    # claimed moments ago and not started yet — the session is still opening
-    [ $(( NOW - claimed )) -lt "$GRACE_SEC" ] && exit 1
-    NOTE="The run before this one (session $SESSION, last at \"$PHASE\" since $PHASE_AT) never closed work/RUN.md, and the sandbox is idle, so it is not running any more. Whatever it was doing may be half-done: look at its issue and branch before taking anything new."
-    "$STATE" abandon "sandbox idle, record still open" >/dev/null 2>&1 || true
+if [ -z "${PRECHECK_PROBE:-}" ]; then
+  ABANDONED="$("$STATE" sweep 2>/dev/null | tr '\n' ' ' | sed -E 's/ $//')"
+  [ -z "$ABANDONED" ] ||
+    NOTE="A run working on $ABANDONED stopped without finishing (its session is not running any more); its branch and slot hold what it got to."
+  if [ "$("$STATE" live)" -ge "$N" ]; then
+    QUIET="$("$STATE" quiet)"
+    [ -n "$QUIET" ] || exit 1
+    NOW="$(date -u +%s)"
+    n="$(kv "$GATE" diagnoses)"; n="${n:-0}"
+    wait_min=60; i=0
+    while [ "$i" -lt "$n" ] && [ "$wait_min" -lt 1440 ]; do
+      wait_min=$(( wait_min * 2 )); i=$(( i + 1 ))
+    done
+    [ "$wait_min" -gt 1440 ] && wait_min=1440
+    if last="$(epoch "$(kv "$GATE" diagnosed_at)")"; then
+      [ $(( (NOW - last) / 60 )) -ge "$wait_min" ] || exit 1
+    fi
+    "$STATE" diagnosed >/dev/null 2>&1 || true
+    echo "DIAGNOSTIC RUN — do not build, do not start an item, do not take new work."
+    echo
+    echo "Every one of the $N slots is held, and these runs have shown no sign of life for $(cfg stuck_after_min | grep . || echo 120) minutes or more:"
+    printf '%s\n' "$QUIET" | sed 's/^/- /'
+    echo
+    echo "Find out what is holding them and report — docs/diagnostic-run.md."
+    exit 0
   fi
-  [ -f "$GATE" ] && "$STATE" free >/dev/null 2>&1
-elif [ "$IDLE" = false ] || [ "$HELD" = running ]; then
-  if [ "$HELD" = running ]; then
-    quiet="$(last_life)"
-  else
-    "$STATE" busy >/dev/null 2>&1 || true
-    quiet="$(epoch "$(kv "$GATE" busy_since)")" || quiet="$NOW"
-  fi
-  quiet_min=$(( (NOW - quiet) / 60 ))
-  [ "$quiet_min" -ge "$STUCK_MIN" ] || exit 1
-
-  n="$(kv "$GATE" diagnoses)"; n="${n:-0}"
-  wait_min=60
-  i=0
-  while [ "$i" -lt "$n" ] && [ "$wait_min" -lt 1440 ]; do
-    wait_min=$(( wait_min * 2 )); i=$(( i + 1 ))
-  done
-  [ "$wait_min" -gt 1440 ] && wait_min=1440
-  if last="$(epoch "$(kv "$GATE" diagnosed_at)")"; then
-    [ $(( (NOW - last) / 60 )) -ge "$wait_min" ] || exit 1
-  fi
-  "$STATE" diagnosed >/dev/null 2>&1 || true
-
-  echo "DIAGNOSTIC RUN — do not build, do not claim, do not take new work."
-  echo
-  echo "The sandbox has read busy with nothing moving for $quiet_min minutes, and the tick has stepped aside every occurrence since."
-  if [ "$HELD" = running ]; then
-    echo "work/RUN.md is held by session $SESSION, last at \"$PHASE\" since $PHASE_AT."
-  else
-    echo "No run holds work/RUN.md, so something else is keeping the sandbox busy: a chat turn, an open terminal, or background work."
-  fi
-  BG="$(printf '%s' "$STATUS" | jq -r '.backgroundWork[]? | "- \(.id): \(.description // .command // "no description")"' 2>/dev/null)"
-  echo "Background work the runtime is holding the sandbox for:"
-  echo "${BG:-none reported}"
-  echo
-  echo "Find out what is holding it and report — docs/diagnostic-run.md."
-  exit 0
+  # the cluster's other holder, if any, and whether it is free
+  CLUSTER_FREE=1; [ -d "$LOCKS/cluster" ] && CLUSTER_FREE=0
 else
-  NOTE="The runtime did not say whether the sandbox is busy, so another run may still be in flight. Check before you build: one cluster, one build."
+  CLUSTER_FREE=1
 fi
+HELD=" $("$STATE" held 2>/dev/null | tr '\n' ' ') "
 
 REPO="$(cfg repo)"
 if [ -z "$REPO" ]; then
@@ -142,6 +83,8 @@ fi
 
 HANDOFF="$(cfg label_handoff)"; HANDOFF="${HANDOFF:-agent/implement}"
 CLAIMED="$(cfg label_claimed)"; CLAIMED="${CLAIMED:-agent/in-progress}"
+NEEDS_INFO="$(cfg label_needs_info)"; NEEDS_INFO="${NEEDS_INFO:-agent/needs-info}"
+FAILED_LABEL="$(cfg label_failed)"; FAILED_LABEL="${FAILED_LABEL:-agent/failed}"
 
 # The login onboarding recorded, else whoever the token belongs to. `@me` is
 # the last resort: resolving it costs a call, and a token without user scope
@@ -170,27 +113,52 @@ PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" --state open --limit 50 \
   exit 2
 }
 
+# What the local cache knows of each item (scripts/run-state.sh): when a run
+# last looked at it, what state it was left in, how often a run died on it.
+# Missing or lost, every item reads as never seen: the labels, branches and
+# pull requests on GitHub are the truth, and this cache is never pushed.
+ITEMS_JSON="$(for f in "$ITEMS"/*.md; do
+  [ -f "$f" ] || continue
+  jq -n --arg item "$(basename "$f" .md)" --arg seen "$(kv "$f" seen_at)" \
+    --arg state "$(kv "$f" state)" --arg ab "$(kv "$f" abandoned)" --arg branch "$(kv "$f" branch)" \
+    '{($item): {seen: $seen, state: $state, abandoned: ($ab | tonumber? // 0), branch: $branch}}'
+done | jq -s 'add // {}')" || ITEMS_JSON='{}'
+
 # A pull request is babysat until it is approved and green (docs/babysit.md),
-# so it wakes a run for anything that happened to it since the last run: a
-# review of any kind, or a check that failed. Both are gated on the last run,
-# so one the agent could not fix is reported once rather than every tick.
-# Approval is not gated: releasing the issue is that run's job.
-PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" '
-  map(. + {
-    reviewed: (([.latestReviews[]? | select(.author.login != $author) | .submittedAt] | max // "") > $since),
-    failed: ([.statusCheckRollup[]?
+# so it wakes a run for anything that happened to it since a run last started
+# on its item: a review of any kind, approval included, or a check that failed
+# — once, so what the agent could not fix, and an approval it already acted on
+# while the pull request waits for a person to merge it, are not reported every
+# tick. Its item is the issue its body names (`Fixes #<n>`), and an item a live
+# run holds is left out.
+PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" \
+    --arg held "$HELD" --argjson items "$ITEMS_JSON" '
+  map(.number as $pr | . + {item: ((.body // "") | capture("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #(?<n>[0-9]+)").n // "pr\($pr)")})
+  | map(. + {since: ($items[.item].seen // $since)})
+  | map(select(.item as $i | $held | contains(" \($i) ") | not))
+  | map(. + {
+    reviewed: (([.latestReviews[]? | select(.author.login != $author) | .submittedAt] | max // "") > .since),
+    failed: (.since as $s | [.statusCheckRollup[]?
       | select((.conclusion // .state // "") | test("^(FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE|ACTION_REQUIRED)$"))
-      | select((.completedAt // .startedAt // "") > $since)
+      | select((.completedAt // .startedAt // "") > $s)
       | (.name // .context)])
   })
-  | map(select(.reviewDecision == "APPROVED" or .reviewed or (.failed | length > 0)))
+  | map(select(.reviewed or (.failed | length > 0)))
   | .[]
-  | "- #\(.number) \(.title) — \([
-      (if .reviewDecision == "APPROVED" then "approved" else empty end),
+  | "- \(if (.item | startswith("pr")) then .item else "#\(.item)" end) — PR #\(.number) \(.title) — \([
+      (if .reviewed and .reviewDecision == "APPROVED" then "approved" else empty end),
       (if .reviewed and .reviewDecision != "APPROVED" then "reviewed; resolve every finding and re-request review" else empty end),
       (if (.failed | length > 0) then "checks failed: \(.failed | join(", "))" else empty end)
     ] | join("; ")) — docs/babysit.md\n  \(.url)"
 ')" || exit 2
+
+# Items a run parked because the cluster was taken: due again once it is free
+CLUSTER_WORK=""
+if [ "$CLUSTER_FREE" = 1 ]; then
+  CLUSTER_WORK="$(printf '%s' "$ITEMS_JSON" | jq -r --arg held "$HELD" '
+    to_entries | map(select(.value.state == "waiting-cluster" and (.key as $i | $held | contains(" \($i) ") | not)))
+    | sort_by(.value.seen) | .[] | "- #\(.key) on \(.value.branch) — run its cluster step"')" || exit 2
+fi
 
 ISSUES="$(gh_json issue list -R "$REPO" --label "$HANDOFF" --state open --limit 50 \
   --json number,title,url,labels)" || {
@@ -199,18 +167,20 @@ ISSUES="$(gh_json issue list -R "$REPO" --label "$HANDOFF" --state open --limit 
   exit 2
 }
 
-ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" '
-  map(select([.labels[].name] | index($claimed) | not))
-  | .[]
+ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info "$NEEDS_INFO" \
+    --arg failed "$FAILED_LABEL" --arg held "$HELD" '
+  map(select([.labels[].name] | (index($claimed) or index($info) or index($failed)) | not))
+  | map(select(.number as $i | $held | contains(" \($i) ") | not))
+  | reverse | .[]
   | "- #\(.number) \(.title)\n  \(.url)"
 ')" || exit 2
 
-# Work an earlier run started and never finished. A run holds no memory of the
-# one before it, so an issue left claimed with no pull request to show for it is
-# invisible to both queries above: the claim hides it from the hand-off list, and
-# there is nothing open to review. That is the one thing a resumed session used
-# to remember, so it is named here instead. The link between the two is the
-# `Fixes #<n>` line every pull request body carries (CLAUDE.md → "Rules").
+# Work a run started and never finished: claimed, no pull request to show for
+# it, and no live run on it. The claim hides it from the hand-off list, and
+# there is nothing open to review, so it is named here. The link between issue
+# and pull request is the `Fixes #<n>` line every pull request body carries
+# (CLAUDE.md → "Rules"). How often a run has died on it is said, because the
+# second time it is released rather than tried again.
 CLAIMED_ISSUES="$(gh_json issue list -R "$REPO" --label "$CLAIMED" --state open --limit 50 \
   --json number,title,url)" || {
   echo "gh could not list issues on $REPO with label '$CLAIMED', twice:" >&2
@@ -218,29 +188,39 @@ CLAIMED_ISSUES="$(gh_json issue list -R "$REPO" --label "$CLAIMED" --state open 
   exit 2
 }
 
-RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" '
+RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" --arg held "$HELD" \
+    --argjson items "$ITEMS_JSON" '
   map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))
+  | map(select(.number as $i | $held | contains(" \($i) ") | not))
+  | map(select(($items["\(.number)"].state // "") | IN("waiting-cluster", "blocked", "needs-info") | not))
   | .[]
-  | "- #\(.number) \(.title)\n  \(.url)"
+  | "- #\(.number) \(.title)\(($items["\(.number)"].abandoned // 0) as $a
+      | if $a > 0 then " — a run died on it \($a) time(s)" else "" end)\n  \(.url)"
 ')" || exit 2
 
-[ -z "$PR_WORK" ] && [ -z "$ISSUE_WORK" ] && [ -z "$RESUME_WORK" ] && exit 1
+[ -z "$PR_WORK" ] && [ -z "$CLUSTER_WORK" ] && [ -z "$ISSUE_WORK" ] && [ -z "$RESUME_WORK" ] && exit 1
 
 echo "Repository: $REPO"
+echo "Take the first item below that \`run-state.sh start\` gives you, and that one alone; another run takes the next."
 [ -n "$NOTE" ] && { echo; echo "$NOTE"; }
 if [ -n "$PR_WORK" ]; then
   echo
-  echo "Your open pull requests needing attention — handle these first:"
+  echo "Your open pull requests needing attention:"
   echo "$PR_WORK"
+fi
+if [ -n "$CLUSTER_WORK" ]; then
+  echo
+  echo "Waiting for the cluster, which is free now:"
+  echo "$CLUSTER_WORK"
 fi
 if [ -n "$RESUME_WORK" ]; then
   echo
-  echo "Claimed by a run that never opened a pull request — finish or release these before taking anything new:"
+  echo "Claimed, with no pull request and no run on it — finish or release:"
   echo "$RESUME_WORK"
 fi
 if [ -n "$ISSUE_WORK" ]; then
   echo
-  echo "Unclaimed issues labelled $HANDOFF — take AT MOST ONE:"
+  echo "Unclaimed issues labelled $HANDOFF, oldest first:"
   echo "$ISSUE_WORK"
 fi
-allow
+exit 0

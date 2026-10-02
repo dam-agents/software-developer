@@ -3,7 +3,6 @@
 # names its fix.
 . "$(dirname "$0")/helpers.sh"
 
-IDLE='{"idle":true,"backgroundWork":[]}'
 setcfg() { sed -i.bak "s#^- $1: .*#- $1: $2#" "$HOME/work/CONFIG.md"; }
 
 CASE="--config passes a complete CONFIG.md"; sandbox
@@ -42,30 +41,38 @@ done_
 CASE="a full run fails a drifted instance"; sandbox; onboarded
 mkdir "$HOME/work/.git"
 echo "local edit" >> "$HOME/kit.yaml"
+echo '{}' > "$HOME/.claude/settings.json"
 echo "0.9.0" > "$HOME/work/VERSION"
 rm -rf "$HOME/work/widgets"
 echo "not a run-state line" >> "$HOME/work/TICK.log"
-printf -- '- run_state: maybe\n' > "$HOME/work/RUN.md"
+printf -- '- run_state: idle\n' > "$HOME/work/RUN.md"
+echo "- slots: 1" >> "$HOME/work/CONFIG.md"
+mkdir -p "$HOME/work/slots/1" "$HOME/work/slots/2" "$HOME/work/items"
+printf -- '- item: 3\n- mood: odd\n' > "$HOME/work/items/3.md"
 verify
 is "$RC" 1 "exit"
 has "$OUT" "FAIL work — missing, or a git repository" "work/.git"
+has "$OUT" "FAIL harness.stop — no Stop hook" "the Stop hook"
 has "$OUT" "FAIL definition.clean — edited in place" "dirty definition"
 has "$OUT" "FAIL work.VERSION — adopted '0.9.0'" "version drift"
 has "$OUT" "FAIL checkout — no clone of acme/widgets" "missing clone"
 has "$OUT" "FAIL state.TICK — 1 line(s)" "foreign log line"
-has "$OUT" "FAIL state.RUN — run_state is neither" "malformed record"
+has "$OUT" "FAIL state.RUN — work/RUN.md is a record from before slots" "old record"
+has "$OUT" "FAIL state.items — unknown keys in: 3.md" "foreign item key"
+has "$OUT" "FAIL state.slots — work/slots/{1 2} are not worktrees" "fake slots"
+has "$OUT" "FAIL state.slots — 2 slots, more than slots: 1" "too many"
 done_
 
 CASE="--live passes when GitHub and the runtime answer"; sandbox; onboarded
-STUB_STATUS="$IDLE" verify --live
+verify --live
 is "$RC" 0 "exit"
 has "$OUT" "ok   live.auth — acting as dev-bot" "identity"
 has "$OUT" "ok   live.precheck — exit 1" "precheck ran end to end"
-[ ! -f "$HOME/work/RUN.md" ] || fail "the probe claimed a run"
+[ ! -d "$SD_LOCKS" ] || [ -z "$(ls "$SD_LOCKS")" ] || fail "the probe took a lock"
 done_
 
 CASE="--live fails what would break the ticks"; sandbox; onboarded
-STUB_LOGIN=other-bot STUB_PUSH=false STUB_REACH=3 \
+STUB_RUNTIME_DOWN=1 STUB_LOGIN=other-bot STUB_PUSH=false STUB_REACH=3 \
 STUB_LABELS="$(printf 'agent/implement\nagent/in-progress\nagent/failed')" verify --live
 is "$RC" 1 "exit"
 has "$OUT" "acting as other-bot, but author is 'dev-bot'" "identity mismatch"
@@ -73,6 +80,30 @@ has "$OUT" "FAIL live.push — no push" "push"
 has "$OUT" "warn live.scope — the connection can push to 3 repositories" "scope"
 has "$OUT" "FAIL live.label_review — no label 'code-guardian-review'" "label"
 has "$OUT" "FAIL live.runtime" "runtime down"
+has "$OUT" "FAIL live.label_needs_info — no label 'agent/needs-info'" "default needs-info label"
+done_
+
+CASE="a worktree outside the slots fails; verify_cluster needs a cluster"; sandbox; onboarded
+origin_checkout
+git -C "$HOME/work/widgets" worktree add -q --detach "$HOME/work/widgets-extra"
+echo "- verify_cluster: mise run e2e" >> "$HOME/work/CONFIG.md"
+verify
+has "$OUT" "FAIL state.worktrees — worktrees outside work/slots" "stray worktree"
+has "$OUT" "FAIL config.verify_cluster — set, but cluster is not required" "verify_cluster"
+done_
+
+CASE="work_repo is checked when set"; sandbox; onboarded
+echo "- work_repo: acme/widgets-work" >> "$HOME/work/CONFIG.md"
+STUB_REACH=2 verify --live
+is "$RC" 0 "exit"
+has "$OUT" "ok   config.work_repo — acme/widgets-work" "shape"
+has "$OUT" "ok   live.work_repo — acme/widgets-work takes a push" "push"
+has "$OUT" "ok   live.scope — the connection pushes to repo and work_repo alone" "scope counts the backup"
+STUB_REACH=2 STUB_WORK_PUSH=false verify --live
+has "$OUT" "FAIL live.work_repo — no push to acme/widgets-work" "no push"
+setcfg work_repo acme/widgets
+verify --config
+has "$OUT" "FAIL config.work_repo — is repo itself" "never the repository worked on"
 done_
 
 exit "$FAILED"

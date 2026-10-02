@@ -15,11 +15,16 @@ the pull request through review.
 - [`scripts/precheck.sh`](scripts/precheck.sh) — decides whether a run is worth
   waking the agent for, before any model is involved, and holds an occurrence
   back while the run before it is still working.
-- [`scripts/run-state.sh`](scripts/run-state.sh) — the record of the run in
-  flight (`work/RUN.md`), which is how the next tick tells a run still working
-  from one that died.
+- [`scripts/run-state.sh`](scripts/run-state.sh) — which run works on which
+  issue, in which slot, and who holds the cluster; how a dead run's slot is
+  found and freed ([`docs/runs.md`](docs/runs.md)).
 - [`scripts/session-link.sh`](scripts/session-link.sh) — the link back to the
   run that wrote a change, which every pull request carries.
+- [`scripts/work-backup.sh`](scripts/work-backup.sh) — backs `work/` up to a
+  private repository of its own, and restores it on a fresh volume.
+- [`scripts/harness/claude-code/`](scripts/harness/claude-code/) — the `Stop`
+  hook that keeps a run from ending its turn while it still holds an issue,
+  and its installer.
 - [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an
   instance has the shape onboarding promises; every failure names its fix.
 - [`scripts/audit.sh`](scripts/audit.sh) — the deterministic half of the
@@ -42,7 +47,8 @@ account can reach. **Scope it to the repository the agent works on and nothing
 else** — a GitHub App installed on that one repository, or a fine-grained token
 limited to it — with read and write on contents, pull requests and issues. The
 agent is told never to act on another repository; a connection that cannot is
-what keeps that true when an issue body tries to talk it into one.
+what keeps that true when an issue body tries to talk it into one. The one
+addition is the backup repository, when there is one: write on its contents.
 
 Use a machine account rather than your own: otherwise the pull requests it
 opens are indistinguishable from yours.
@@ -55,11 +61,13 @@ All under `work/`, none of it tracked here:
 | --- | --- | --- |
 | `CONFIG.md` | onboarding | the repository, labels, commands and bounds |
 | `AGENTS.md`, `VERSION` | onboarding | a pointer to `CLAUDE.md`; the definition version this instance adopted |
-| `RUN.md` | `scripts/run-state.sh` | the run in flight: its session, phase and since when |
-| `GATE.md` | the precheck, via `run-state.sh` | how long the sandbox has read busy, and the last diagnostic run |
+| `items/<n>.md` | `scripts/run-state.sh` | per issue: branch, slot, state, when a run last started on it |
+| `slots/<k>/` | `scripts/run-state.sh` | the worktrees runs work in, kept warm between runs |
+| `GATE.md` | the precheck, via `run-state.sh` | when it last let a diagnostic run through |
 | `TICK.log` | `scripts/run-state.sh` | one line per closed run, append-only |
 | `AUDIT.log` | the weekly audit | one line per audit: ok, warn and fail counts |
 
-None of it is backed up: everything but `CONFIG.md` is rebuilt from GitHub or
-from nothing, and a lost `CONFIG.md` costs one onboarding conversation —
-[`docs/persistence.md`](docs/persistence.md).
+`CONFIG.md`, `AGENTS.md`, `VERSION` and the two logs are backed up to a
+private repository of their own when `work_repo` names one; the rest is
+rebuilt from GitHub — [`docs/persistence.md`](docs/persistence.md). The locks
+live on tmpfs, outside `work/`, and a restart frees them.

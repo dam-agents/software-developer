@@ -17,5 +17,10 @@
 !/docs/
 !/scripts/
 !/.github/
+!/.agents/
+# The platform installs its own skills beside ours in .agents/skills/: only
+# the bundled ones are definition content, re-included by name.
+/.agents/skills/*
+!/.agents/skills/implement-issue/
 
 .DS_Store

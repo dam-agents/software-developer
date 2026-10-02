@@ -10,7 +10,7 @@ case "$1 $2" in
     if [ "$label" = "${STUB_HANDOFF_LABEL:-agent/implement}" ]; then printf '%s' "${STUB_HANDOFF:-[]}"
     else printf '%s' "${STUB_CLAIMED:-[]}"; fi ;;
   "label list")
-    answer "${STUB_LABELS-$(printf 'agent/implement\nagent/in-progress\nagent/failed\ncode-guardian-review')}" ;;
+    answer "${STUB_LABELS-$(printf 'agent/implement\nagent/in-progress\nagent/failed\ncode-guardian-review\nagent/needs-info')}" ;;
   "api "*)
     shift; path=""; skip=""
     for a in "$@"; do
@@ -20,6 +20,11 @@ case "$1 $2" in
     case "$path" in
       user) answer "${STUB_LOGIN-dev-bot}" ;;
       user/repos*) answer "${STUB_REACH-1}" ;;
+      repos/*/contents/*) answer "${STUB_BACKUP_CONFIG-}" ;;
+      repos/*/issues/*/comments*) answer "${STUB_COMMENTS-[]}" ;;
+      repos/*/pulls/*) answer "${STUB_PULL-}" ;;
+      repos/*/issues/*) answer "${STUB_ISSUE-}" ;;
+      repos/*-work) answer "${STUB_WORK_PUSH-true}" ;;
       repos/*) answer "${STUB_PUSH-true}" ;;
       *) echo "stub gh: unexpected api $path" >&2; exit 9 ;;
     esac ;;

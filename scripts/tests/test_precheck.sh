@@ -1,118 +1,97 @@
 #!/usr/bin/env bash
-# precheck.sh: the verdict for every combination of sandbox state, run record
-# and work on GitHub.
+# precheck.sh: the verdict for every combination of slots, live runs, cached
+# items and work on GitHub.
 . "$(dirname "$0")/helpers.sh"
 
-IDLE='{"idle":true,"backgroundWork":[]}'
-BUSY='{"idle":false,"backgroundWork":[]}'
 ISSUE7='[{"number":7,"title":"Add a flag","url":"https://gh/7","labels":[{"name":"agent/implement"}]}]'
+ISSUES78='[{"number":8,"title":"Newer","url":"https://gh/8","labels":[{"name":"agent/implement"}]},
+           {"number":7,"title":"Older","url":"https://gh/7","labels":[{"name":"agent/implement"}]}]'
+full() {   # every slot held by a live run
+  for k in 1 2 3; do lock "slot-$k" "session=sess-$k" "item=$k" "slot=$k" "since=$(ago 400)" phase=x "phase_at=$(ago "${1:-5}")"; done
+  export STUB_RUNNING="sess-1 sess-2 sess-3"
+}
 
-CASE="idle and nothing to do declines without a claim"; sandbox
-STUB_STATUS="$IDLE" precheck
+CASE="nothing to do declines and writes nothing"; sandbox
+precheck
 is "$RC" 1 "exit"
-[ ! -f "$HOME/work/RUN.md" ] || fail "claimed a run that was never let through"
+[ ! -d "$SD_LOCKS" ] || [ -z "$(ls "$SD_LOCKS")" ] || fail "took a lock"
 done_
 
-CASE="idle with work lets it through and claims it"; sandbox
-STUB_STATUS="$IDLE" STUB_HANDOFF="$ISSUE7" precheck
+CASE="work lets a run through, oldest issue first, and claims nothing"; sandbox
+STUB_HANDOFF="$ISSUES78" precheck
 is "$RC" 0 "exit"
-has "$OUT" "#7 Add a flag" "worklist"
-is "$(field RUN.md run_state)" running "claimed"
-is "$(field RUN.md session)" pending "waiting for the run"
-is "$(field RUN.md occurrence)" 2026-09-24T10:20:00Z "occurrence"
+has "$OUT" "Take the first item below" "the instruction"
+first="$(printf '%s\n' "$OUT" | grep -m1 -oE '#[78] ')"
+is "$first" "#7 " "oldest first"
+[ ! -d "$SD_LOCKS" ] || [ -z "$(ls "$SD_LOCKS")" ] || fail "took a lock"
 done_
 
-CASE="busy with no record declines before any GitHub call"; sandbox
-STUB_STATUS="$BUSY" STUB_HANDOFF="$ISSUE7" precheck
+CASE="every slot held by a live run declines before any GitHub call"; sandbox; full
+STUB_HANDOFF="$ISSUE7" precheck
 is "$RC" 1 "exit"
 no_gh
-[ -n "$(field GATE.md busy_since)" ] || fail "busy streak not started"
 done_
 
-CASE="a busy streak past stuck_after_min lets a diagnostic through"; sandbox
-printf -- '- busy_since: %s\n' "$(ago 130)" > "$HOME/work/GATE.md"
-STUB_STATUS='{"idle":false,"backgroundWork":[{"id":"b1","description":"dev server on :8080"}]}' precheck
+CASE="every slot held, one silent past stuck_after_min, asks for a diagnostic"; sandbox; full 130
+STUB_HANDOFF="$ISSUE7" precheck
 is "$RC" 0 "exit"
 has "$OUT" "DIAGNOSTIC RUN" "diagnostic"
-has "$OUT" "No run holds work/RUN.md" "names the case"
-has "$OUT" "b1: dev server on :8080" "names the background work"
+has "$OUT" "session sess-1, slot 1, #1" "names the holder"
 no_gh
-[ ! -f "$HOME/work/RUN.md" ] || fail "a diagnostic run must not claim"
 is "$(field GATE.md diagnoses)" 1 "counted"
 has "$(cat "$HOME/work/TICK.log")" "diagnostic" "logged"
 done_
 
-CASE="a second diagnostic waits out the doubled window"; sandbox
-printf -- '- busy_since: %s\n- diagnosed_at: %s\n- diagnoses: 1\n' "$(ago 300)" "$(ago 90)" > "$HOME/work/GATE.md"
-STUB_STATUS="$BUSY" precheck
+CASE="a live run's transcript is a sign of life"; sandbox; full 130
+for k in 1 2 3; do t="$HOME/.claude/projects/-home-agent-work/sess-$k.jsonl"; : > "$t"; touch_ago "$t" 3; done
+precheck
+is "$RC" 1 "exit"
+done_
+
+CASE="a second diagnostic waits out the doubled window"; sandbox; full 300
+printf -- '- diagnosed_at: %s\n- diagnoses: 1\n' "$(ago 90)" > "$HOME/work/GATE.md"
+precheck
 is "$RC" 1 "90 minutes into a 2-hour window"
-printf -- '- busy_since: %s\n- diagnosed_at: %s\n- diagnoses: 1\n' "$(ago 300)" "$(ago 125)" > "$HOME/work/GATE.md"
-STUB_STATUS="$BUSY" precheck
+printf -- '- diagnosed_at: %s\n- diagnoses: 1\n' "$(ago 125)" > "$HOME/work/GATE.md"
+precheck
 is "$RC" 0 "past it"
 done_
 
-CASE="busy with a run that stamped a phase recently declines"; sandbox
-record run_state=running session=sess-a "claimed_at=$(ago 200)" phase=building "phase_at=$(ago 10)"
-STUB_STATUS="$BUSY" precheck
-is "$RC" 1 "exit"
-no_gh
-done_
-
-CASE="busy with a run whose transcript moved recently declines"; sandbox
-record run_state=running session=sess-a "claimed_at=$(ago 200)" phase=building "phase_at=$(ago 190)"
-t="$HOME/.claude/projects/-home-agent-work/sess-a.jsonl"; : > "$t"; touch_ago "$t" 3
-STUB_STATUS="$BUSY" precheck
-is "$RC" 1 "the transcript is a sign of life"
-done_
-
-CASE="busy with a run silent past stuck_after_min asks for a diagnostic"; sandbox
-record run_state=running session=sess-a "claimed_at=$(ago 200)" phase=building "phase_at=$(ago 190)"
-STUB_STATUS="$BUSY" precheck
-is "$RC" 0 "exit"
-has "$OUT" "held by session sess-a, last at \"building\"" "names the holder"
-is "$(field RUN.md session)" sess-a "the record is left alone"
-done_
-
-CASE="stuck_after_min is read from CONFIG.md"; sandbox
+CASE="stuck_after_min is read from CONFIG.md"; sandbox; full 190
 sed -i.bak 's/^- stuck_after_min: .*/- stuck_after_min: 300/' "$HOME/work/CONFIG.md"
-record run_state=running session=sess-a "claimed_at=$(ago 200)" phase=building "phase_at=$(ago 190)"
-STUB_STATUS="$BUSY" precheck
+precheck
 is "$RC" 1 "190 quiet minutes is under 300"
 done_
 
-CASE="idle with a record claimed moments ago waits for the session to open"; sandbox
-record run_state=running session=pending "claimed_at=$(ago 0)" phase=claimed "phase_at=$(ago 0)"
-STUB_STATUS="$IDLE" STUB_HANDOFF="$ISSUE7" precheck
-is "$RC" 1 "exit"
-is "$(field RUN.md run_state)" running "left open"
+CASE="a dead run's slot is freed, and its item named"; sandbox
+for k in 1 2 3; do lock "slot-$k" "session=sess-$k" "item=$k" "slot=$k"; done
+lock item-1 session=sess-1 item=1 slot=1
+STUB_RUNNING="sess-2 sess-3" STUB_CLAIMED='[{"number":1,"title":"One","url":"https://gh/1"}]' precheck
+is "$RC" 0 "a slot is free again"
+has "$OUT" "A run working on #1 stopped without finishing" "note"
+has "$OUT" "#1 One — a run died on it 1 time(s)" "resumable, counted"
 done_
 
-CASE="idle with an open record abandons it and says so"; sandbox
-record run_state=running session=sess-a occurrence=O "claimed_at=$(ago 30)" phase=building "phase_at=$(ago 20)" issue=7
-printf -- '- busy_since: %s\n' "$(ago 40)" > "$HOME/work/GATE.md"
-STUB_STATUS="$IDLE" STUB_HANDOFF="$ISSUE7" precheck
+CASE="an item a live run holds is left out"; sandbox
+lock item-7 session=sess-a item=7
+STUB_RUNNING=sess-a STUB_HANDOFF="$ISSUES78" precheck
 is "$RC" 0 "exit"
-has "$OUT" "session sess-a, last at \"building\"" "takeover note"
-has "$(cat "$HOME/work/TICK.log")" "abandoned session=sess-a occurrence=O issue=7" "logged"
-is "$(field RUN.md session)" pending "re-claimed for this run"
-[ ! -f "$HOME/work/GATE.md" ] || fail "the busy streak outlived an idle sandbox"
+lacks "$OUT" "#7 Older" "held"
+has "$OUT" "#8 Newer" "free"
 done_
 
-CASE="an unanswerable runtime with no record lets work through, warned"; sandbox
-STUB_HANDOFF="$ISSUE7" precheck
-is "$RC" 0 "exit"
-has "$OUT" "did not say whether the sandbox is busy" "warning"
-done_
-
-CASE="an unanswerable runtime while a run holds the record counts as busy"; sandbox
-record run_state=running session=sess-a "claimed_at=$(ago 20)" phase=building "phase_at=$(ago 5)"
-STUB_HANDOFF="$ISSUE7" precheck
-is "$RC" 1 "exit"
-no_gh
+CASE="an item waiting for the cluster is due once the cluster is free"; sandbox
+item 5 state=waiting-cluster branch=feat/5 "seen_at=$(ago 30)"
+lock cluster session=sess-a item=6
+STUB_RUNNING=sess-a STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"}]' precheck
+is "$RC" 1 "still taken, and not resumable either"
+rm -rf "$SD_LOCKS/cluster"
+STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"}]' precheck
+is "$RC" 0 "free"
+has "$OUT" "#5 on feat/5 — run its cluster step" "listed"
 done_
 
 CASE="a claimed issue is resumed only when no pull request names it"; sandbox
-STUB_STATUS="$IDLE" \
 STUB_PRS='[{"number":21,"title":"x","url":"https://gh/pr/21","reviewDecision":null,"latestReviews":[],"body":"Fixes #45\n\nFixes #7"}]' \
 STUB_CLAIMED='[{"number":7,"title":"Seven","url":"https://gh/7"},{"number":4,"title":"Four","url":"https://gh/4"},{"number":45,"title":"Forty-five","url":"https://gh/45"}]' \
 precheck
@@ -122,41 +101,56 @@ lacks "$OUT" "#7 Seven" "#7 has its pull request"
 lacks "$OUT" "#45 Forty-five" "#45 has its pull request"
 done_
 
-CASE="a pull request wakes a run for a new review or a newly failed check, once"; sandbox
+CASE="a pull request wakes a run for what came after its item was last looked at"; sandbox
 PR='[{"number":30,"title":"Thirty","url":"https://gh/pr/30","reviewDecision":"REVIEW_REQUIRED","body":"Fixes #3",
   "latestReviews":[{"author":{"login":"guardian"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}],
   "statusCheckRollup":[{"name":"test","conclusion":"FAILURE","completedAt":"2026-09-24T10:06:00Z"},
                        {"name":"lint","conclusion":"SUCCESS","completedAt":"2026-09-24T10:06:00Z"},
                        {"context":"ci/legacy","state":"ERROR","startedAt":"2026-09-24T09:00:00Z"}]}]'
-STUB_STATUS="$IDLE" STUB_PRS="$PR" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+STUB_PRS="$PR" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
 is "$RC" 0 "exit"
-has "$OUT" "#30 Thirty — reviewed; resolve every finding" "a comment-only review wakes it"
+has "$OUT" "#3 — PR #30 Thirty — reviewed; resolve every finding" "a comment-only review wakes it"
 has "$OUT" "checks failed: test —" "names the newly failed check alone"
-STUB_STATUS="$IDLE" STUB_PRS="$PR" PLATFORM_LAST_RUN_AT=2026-09-24T10:10:00Z precheck
-is "$RC" 1 "both already seen by the last run"
+item 3 state=parked seen_at=2026-09-24T10:10:00Z
+STUB_PRS="$PR" PLATFORM_LAST_RUN_AT=2026-09-24T09:00:00Z precheck
+is "$RC" 1 "its item was looked at since, whatever the last run was"
 OWN='[{"number":31,"title":"Own","url":"https://gh/pr/31","reviewDecision":null,"body":"",
   "latestReviews":[{"author":{"login":"dev-bot"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
-STUB_STATUS="$IDLE" STUB_PRS="$OWN" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+STUB_PRS="$OWN" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
 is "$RC" 1 "the agent's own comment is not a review"
 done_
 
-CASE="a probe skips the gate and writes nothing"; sandbox
-record run_state=running session=sess-a "claimed_at=$(ago 20)" phase=building "phase_at=$(ago 5)"
-before="$(cat "$HOME/work/RUN.md")"
-PRECHECK_PROBE=1 STUB_STATUS="$BUSY" STUB_HANDOFF="$ISSUE7" precheck
-is "$RC" 0 "reports the work despite the busy sandbox"
+CASE="an approval wakes a run once, not until someone merges"; sandbox
+APPROVED='[{"number":40,"title":"Forty","url":"https://gh/pr/40","reviewDecision":"APPROVED","body":"Fixes #4",
+  "latestReviews":[{"author":{"login":"maintainer"},"state":"APPROVED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
+STUB_PRS="$APPROVED" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 0 "a new approval"
+has "$OUT" "#4 — PR #40 Forty — approved" "says so"
+item 4 state=released seen_at=2026-09-24T10:20:00Z
+STUB_PRS="$APPROVED" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 1 "already acted on, waiting for a merge"
+done_
+
+CASE="what waits on a person is not work"; sandbox
+item 5 state=blocked; item 6 state=needs-info
+STUB_HANDOFF='[{"number":9,"title":"Nine","url":"https://gh/9","labels":[{"name":"agent/implement"},{"name":"agent/failed"}]}]' \
+STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"},{"number":6,"title":"Six","url":"https://gh/6"}]' precheck
+is "$RC" 1 "a failed issue, a blocked one and one waiting for an answer"
+done_
+
+CASE="a probe skips the gate and writes nothing"; sandbox; full 300
+PRECHECK_PROBE=1 STUB_HANDOFF="$ISSUE7" precheck
+is "$RC" 0 "reports the work despite full slots"
 has "$OUT" "#7 Add a flag" "worklist"
-is "$(cat "$HOME/work/RUN.md")" "$before" "RUN.md untouched"
 [ ! -f "$HOME/work/GATE.md" ] || fail "wrote gate bookkeeping"
-PRECHECK_PROBE=1 STUB_STATUS="$IDLE" precheck
+PRECHECK_PROBE=1 precheck
 is "$RC" 1 "nothing to do still declines"
 done_
 
 CASE="no repository configured declines rather than waking a run to say so"; sandbox
 rm "$HOME/work/CONFIG.md"
-STUB_STATUS="$IDLE" STUB_HANDOFF="$ISSUE7" precheck
+STUB_HANDOFF="$ISSUE7" precheck
 is "$RC" 1 "exit"
-[ ! -f "$HOME/work/RUN.md" ] || fail "claimed a run"
 done_
 
 exit "$FAILED"

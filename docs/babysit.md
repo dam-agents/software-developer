@@ -7,10 +7,10 @@ every check is green, and it merges cleanly** — then a person merges it.
 ## Across runs, never in one
 
 Do not wait inside a run for a review or a check. A review can take an hour,
-and while your turn waits, the sandbox reads busy and no other work starts.
-Push, request review, finish the run. The precheck wakes a later run when a
-review lands or a check fails since the last run (`scripts/precheck.sh`), and
-that run picks the pull request up first.
+and while your turn waits it holds a slot another item could use. Push,
+request review, finish the run. The precheck wakes a later run when a review
+lands or a check fails after a run last started on the item
+(`scripts/precheck.sh`), and that run picks the pull request up first.
 
 ## Each time you hold one
 
@@ -19,7 +19,7 @@ then the reviews and comments since your last push — and handle all of it in
 one round, so one push answers everything:
 
 1. **Failed checks.** Read why (`gh run view <id> --log-failed`), fix the cause,
-   run `verify`. A failure that is not yours to fix — flaky, infrastructure —
+   run `verify`, and `verify_cluster` when the failure was there. A failure that is not yours to fix — flaky, infrastructure —
    gets one re-run, and only of a run on the current head: re-running a
    superseded one cancels the fresh one.
 2. **Review findings**, from people and review bots alike, whatever the
@@ -32,7 +32,11 @@ one round, so one push answers everything:
    review-request label only when nothing re-requests them otherwise.
 
 **Approved, green and mergeable** is finished: drop the claimed label from its
-issue, comment the issue with the pull request link. Approved but red or
+issue, comment the issue with the pull request link, and finish `released`.
+
+**Closed without merging**, the issue still claimed: someone decided against
+it. Read why on the pull request; drop the claim, comment the issue, finish
+`released`. Never reopen it. Approved but red or
 conflicting is not — fix it, and re-request review if the fix was more than
 mechanical. You never merge.
 

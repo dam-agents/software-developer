@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # config.sh — the one reader of the `- key: value` files under work/: CONFIG.md,
-# which onboarding writes, and RUN.md / GATE.md, which scripts/run-state.sh
+# which onboarding writes, and items/*.md / GATE.md, which scripts/run-state.sh
 # writes. Sourced, never run. A value parses the same way in every script that
 # reads it because there is only this copy of the parser.
 #

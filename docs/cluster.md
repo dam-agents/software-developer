@@ -1,7 +1,13 @@
 # The cluster
 
 Only when `cluster: required` in `work/CONFIG.md`; the three commands below are
-its `cluster_install`, `cluster_uninstall` and `cluster_delete`.
+its `cluster_install`, `cluster_uninstall` and `cluster_delete`, and
+`verify_cluster` is what runs on it.
+
+**Every one of them runs under `run-state.sh cluster`**, which one item holds
+at a time ([runs.md](runs.md) → **The cluster**). One cluster serves every
+slot, and an install or an end-to-end suite replaces what is on it — a test
+run's install over another branch's, its data reset under another's suite.
 
 `IS_SANDBOX` is already set for you, so the repository's own cluster tasks drive
 the k3s running here instead of looking for a VM manager.
@@ -21,8 +27,9 @@ Three different things can be wrong, and they have different fixes.
   `cluster_delete`, then `cluster_install`, which builds it back. You lose
   every cached image with it, so try the pair first.
 
-**Switching branches means rebuilding.** You may have several pull requests
-open, but the cluster serves the branch you are verifying right now.
+**Every holder installs its own branch.** What the last holder left there is
+not yours: install before you run `verify_cluster`, and when you are told the
+last holder died mid-use, `cluster_uninstall` first.
 
 The platform describes this sandbox in `/etc/AGENTS.md` — what is installed,
 what persists, how to start the container runtime. Read it rather than

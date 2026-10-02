@@ -74,12 +74,28 @@ if [ -n "$REPO" ] && [ -n "$AUTHOR" ]; then
   probe="$(cd "$WORK" && PRECHECK_PROBE=1 bash "$HERE/precheck.sh" 2>/dev/null)"
   case $? in
     0 | 1)
-      resume="$(printf '%s\n' "$probe" | sed -n '/^Claimed by a run that never opened/,/^$/p' |
+      resume="$(printf '%s\n' "$probe" | sed -n '/^Claimed, with no pull request and no run on it/,/^$/p' |
         grep -oE '^- #[0-9]+' | sed 's/^- //' | tr '\n' ' ' | sed -E 's/ $//')"
       [ -z "$resume" ] && echo "ok   issues.orphaned — no claimed issue without a pull request" ||
         echo "warn issues.orphaned — claimed, no pull request: $resume" ;;
     *) echo "warn issues.orphaned — not measured: the precheck could not read GitHub" ;;
   esac
+fi
+
+# The backup holds the CONFIG.md this instance runs on — the one file nothing
+# else can rebuild. Every closed run pushes it, so a difference is a backup
+# that has been failing.
+WORK_REPO="$(cfg work_repo)"
+if [ -n "$WORK_REPO" ]; then
+  case "$WORK_REPO" in */*/*) WHOST="${WORK_REPO%%/*}"; WSLUG="${WORK_REPO#*/}" ;; *) WHOST=github.com; WSLUG="$WORK_REPO" ;; esac
+  if ! held="$(gh api --hostname "$WHOST" "repos/$WSLUG/contents/CONFIG.md" --jq .content 2>/dev/null | base64 -d 2>/dev/null)" ||
+     [ -z "$held" ]; then
+    echo "warn backup.config — not measured: could not read CONFIG.md from $WORK_REPO"
+  elif [ "$held" = "$(cat "$WORK/CONFIG.md" 2>/dev/null)" ]; then
+    echo "ok   backup.config — $WORK_REPO holds the current CONFIG.md"
+  else
+    echo "warn backup.config — $WORK_REPO holds another CONFIG.md: the backup is failing — bash \$HOME/scripts/work-backup.sh persist says why"
+  fi
 fi
 
 nfs="$(find "$WORK" -name '.nfs*' 2>/dev/null | wc -l | tr -d ' ')"

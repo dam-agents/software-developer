@@ -18,9 +18,10 @@ user can decide — never your own work:
 
 | id | label |
 |----|-------|
+| `backup` | Where `work/` is backed up, and whether a backup exists already |
 | `repo` | Which repository to work on |
-| `labels` | Which labels mean hand-off, claimed, failed, review-requested |
-| `verify` | How to build, check and test — and whether it needs a cluster |
+| `labels` | Which labels mean hand-off, claimed, failed, review-requested, needs-info |
+| `verify` | How to build, check and test — and which part needs the cluster |
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
 | `bounds` | What you must never touch |
@@ -33,20 +34,43 @@ steps if the conversation calls for it — steps you keep stay ticked.
 One question at a time. Suggest an answer with each question so the user is
 confirming or correcting rather than composing from nothing.
 
+- **Backup** — first, because a backup answers everything else. Ask for the
+  private repository `work/` is backed up to, suggesting `<owner>/<agent>-work`;
+  the user creates it, and the connection needs write on its contents. "None"
+  is an answer: there is no backup, and `work_repo` stays out. Otherwise write
+  `- work_repo: <owner/name>` to `work/CONFIG.md` and restore:
+
+  ```sh
+  bash "$HOME/scripts/work-backup.sh" restore; echo "exit $?"
+  ```
+
+  `0` — this agent's state is back: keep `work_repo` in the restored
+  `CONFIG.md` (add it again if it is missing), show the user the file, and ask
+  only what is still missing. `2` — the repository holds no backup yet; carry
+  on, the first run's backup fills it. `1` — **stop**: report the output, and
+  re-run onboarding once the repository is reachable. Never write a new
+  `CONFIG.md` over a backup that exists.
+
 - **Repository** — `owner/name`. Ask; do not assume. If they are setting this
   up for the platform's own development the answer is `dam-agents/dam`, but
   that is one answer among many and nothing here is built around it.
 - **Labels** — suggest hand-off `agent/implement`, claimed
   `agent/in-progress`, failed `agent/failed`, review-requested
-  `code-guardian-review`, and say these are only a convention. Whatever they
+  `code-guardian-review`, needs-info `agent/needs-info` (an issue too unclear
+  to implement, waiting on its author), and say these are only a convention. Whatever they
   choose, check it exists: `gh label list -R <slug>`. A label you invent is a
   label nothing ever applies.
-- **Verification** — the command that builds, checks and tests, recorded as
-  `verify`. Always through the repository's own task runner if it has one,
-  never the underlying tool; read its README or contributing guide first and
-  propose what you find, so the user is correcting you rather than dictating.
-  Ask whether any of it needs a cluster — most repositories need none, and then
-  you never start one: `cluster: none`.
+- **Verification** — up to three runs work at once, each in a worktree of its
+  own, so split it in two. `verify` builds, checks and tests without a
+  cluster, and runs in every worktree side by side. `verify_cluster` is what
+  needs the cluster — an end-to-end suite — and runs under a lock, one at a
+  time. Always through the repository's own task runner if it has one, never
+  the underlying tool; read its README or contributing guide first and propose
+  what you find, so the user is correcting you rather than dictating. Most
+  repositories need no cluster: then `cluster: none`, and no `verify_cluster`.
+  Check what the tasks touch rather than what they are called: one that
+  reinstalls or resets a shared cluster belongs to `verify_cluster` whatever
+  port or name it uses.
 - **Cluster** — only if the answer above was yes (`cluster: required`): the
   commands that install the platform onto the cluster (creating the cluster
   when there is none), uninstall it again, and delete the cluster outright, as
@@ -102,12 +126,16 @@ that is not one of them fails verification, because nothing would ever read it:
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
 - label_review: code-guardian-review
+- label_needs_info: agent/needs-info
 - verify: mise run check
+- verify_cluster: mise run e2e
 - cluster: none
 - cluster_install: mise run cluster:install
 - cluster_uninstall: mise run cluster:uninstall
 - cluster_delete: mise run cluster:delete
+- slots: 3
 - stuck_after_min: 120
+- work_repo: owner/name-work
 
 ## Bounds
 
@@ -115,10 +143,12 @@ Plain sentences, one per line: what you must never touch, and whether you may
 merge (by default you may not).
 ```
 
-With `cluster: none`, leave the three `cluster_` lines out.
+With `cluster: none`, leave the three `cluster_` lines and `verify_cluster`
+out; with no backup, leave out `work_repo`.
 
-`stuck_after_min` is not a question for the user: write the default, and raise
-it later if one build step can run longer than two hours. Get `repo`,
+`slots` and `stuck_after_min` are not questions for the user: write the
+defaults. Lower `slots` when the sandbox cannot run that many builds at once;
+raise `stuck_after_min` when one build step can run longer than two hours. Get `repo`,
 `label_handoff` and `label_claimed` right in particular: the precheck decides
 whether the agent wakes at all, and a wrong label there means either waking for
 nothing or never waking.
@@ -146,15 +176,27 @@ scheduled run does that, where it is visible and can be retried.
 
 ## 5. Finish
 
-Only once every step above succeeded. Record the version this instance adopts,
-then the sentinel — before the verification, so a failure in it never re-runs
-the whole intake:
+Register the harness hook that keeps a run from ending mid-work
+([`docs/runs.md`](docs/runs.md) → **Reports**); it takes effect from the next
+session:
 
 ```sh
-head -1 "$HOME/VERSION" > "$HOME/work/VERSION"
+bash "$HOME/scripts/harness/claude-code/install.sh"
+```
+
+Only once every step above succeeded. Record the version this instance adopts,
+then the sentinel — before the verification, so a failure in it never re-runs
+the whole intake. A restored `work/VERSION` is kept: migrate from it instead
+(`docs/persistence.md` → **Definition version & upgrade**).
+
+```sh
+[ -f "$HOME/work/VERSION" ] || head -1 "$HOME/VERSION" > "$HOME/work/VERSION"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.software-developer-onboarded"
 bash "$HOME/scripts/verify-onboarding.sh" --live
 ```
+
+With `work_repo` set, back the new `work/` up now rather than at the first
+run: `bash "$HOME/scripts/work-backup.sh" persist`.
 
 Apply every `FAIL` line's `fix:` and re-run until it prints `PASS`; an
 operator-only fix goes to the user. It warns that only MCP can list schedules:

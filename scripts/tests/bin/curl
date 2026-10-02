@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
-# Stub curl: the runtime's /api/status answer, or a failed connection.
-[ -n "${STUB_STATUS:-}" ] || exit 7
-printf '%s' "$STUB_STATUS"
+# Stub curl: the runtime. sessions.list answers from STUB_RUNNING (the session
+# ids running a turn); /api/status from STUB_STATUS. STUB_RUNTIME_DOWN=1 is a
+# runtime that does not answer.
+[ -z "${STUB_RUNTIME_DOWN:-}" ] || exit 7
+url=""; sid=""
+for a in "$@"; do
+  case "$a" in
+    http*) url="$a" ;;
+    input=*) sid="$(printf '%s' "${a#input=}" | sed -n 's/.*"sessionId":"\([^"]*\)".*/\1/p')" ;;
+  esac
+done
+case "$url" in
+  */api/trpc/sessions.list*)
+    case " ${STUB_RUNNING:-} " in
+      *" $sid "*) printf '{"result":{"data":{"sessions":[{"sessionId":"%s","running":true}]}}}' "$sid" ;;
+      *) printf '{"result":{"data":{"sessions":[]}}}' ;;
+    esac ;;
+  */api/status) [ -n "${STUB_STATUS:-}" ] || exit 7; printf '%s' "$STUB_STATUS" ;;
+  *) exit 7 ;;
+esac
