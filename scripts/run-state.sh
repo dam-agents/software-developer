@@ -382,15 +382,16 @@ cmd_cluster_done() { if [ -d "$LOCKS/cluster" ] && mine "$LOCKS/cluster"; then d
 # 2 GitHub could not be read
 gh_get() { gh api --hostname "$HOST" "$@" 2>/dev/null; }
 reported() {
-  local item="$1" outcome="$2" pr="$3" since="$4" n="" author t got json labels missing=""
-  author="$(cfg author)"
+  local item="$1" outcome="$2" pr="$3" since="$4" n="" author mine t got json labels missing=""
+  author="$(cfg author)"; mine="$(cfg label_mine)"
   case "$item" in pr*) pr="${pr:-${item#pr}}" ;; *) n="$item" ;; esac
   if [ "$outcome" = pr-opened ]; then
     [ -n "$pr" ] || { echo "pr-opened names no pull request: finish pr-opened <pr>"; return 1; }
     json="$(gh_get "repos/$SLUG/pulls/$pr")" || return 2
-    got="$(printf '%s' "$json" | jq -r --arg me "$ME" --arg n "$n" --arg a "$author" '
+    got="$(printf '%s' "$json" | jq -r --arg me "$ME" --arg n "$n" --arg a "$author" --arg mine "$mine" "$JQ_LOGIN"'
       [ (if .state == "open" then empty else "is not open" end),
-        (if ($a == "" or .user.login == $a) then empty else "was not opened by \($a)" end),
+        (if ($a == "" or (.user.login | login) == ($a | login)) then empty else "was not opened by \($a)" end),
+        (if $mine == "" or any(.labels[]?; .name == $mine) then empty else "does not carry \($mine)" end),
         (if (.body // "") | contains($me) then empty else "carries no session link" end),
         (if $n == "" or ((.body // "") | test("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #\($n)(\\D|$)")) then empty
          else "does not say Fixes #\($n)" end)
@@ -401,7 +402,7 @@ reported() {
     for t in $n $pr; do
       json="$(gh_get "repos/$SLUG/issues/$t/comments?since=$since&per_page=100")" || return 2
       if printf '%s' "$json" | jq -e --arg me "$ME" --arg a "$author" \
-          'any(.[]; ($a == "" or .user.login == $a) and ((.body // "") | contains($me)))' >/dev/null 2>&1; then
+          "$JQ_LOGIN"'any(.[]; ($a == "" or (.user.login | login) == ($a | login)) and ((.body // "") | contains($me)))' >/dev/null 2>&1; then
         got=1; break
       fi
     done

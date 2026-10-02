@@ -106,4 +106,20 @@ verify --config
 has "$OUT" "FAIL config.work_repo — is repo itself" "never the repository worked on"
 done_
 
+
+CASE="--live: a GitHub App's login and reach are not measured, and it is told about label_mine"; sandbox; onboarded
+STUB_LOGIN= STUB_INSTALLATION=1 verify --live
+has "$OUT" "warn live.auth — acting as a GitHub App" "no login to compare"
+has "$OUT" "warn live.mine — no label_mine" "shared identity"
+has "$OUT" "warn live.push — not measured" "no permissions to read"
+lacks "$OUT" "FAIL live.push" "not failed"
+has "$OUT" "ok   live.scope" "the installation's repositories"
+echo "- label_mine: agent/mine" >> "$HOME/work/CONFIG.md"
+STUB_LOGIN= STUB_INSTALLATION=1 verify --live
+has "$OUT" "ok   live.mine — only pull requests labelled agent/mine" "set"
+has "$OUT" "FAIL live.label_mine — no label 'agent/mine'" "the label must exist"
+STUB_LOGIN= verify --live
+has "$OUT" "FAIL live.auth — GitHub did not answer" "neither a user nor an app"
+done_
+
 exit "$FAILED"

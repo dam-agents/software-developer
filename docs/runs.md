@@ -87,7 +87,7 @@ It reads, never writes:
 
 - **Every outcome:** nothing unpushed in the slot.
 - **`pr-opened`:** the pull request is open, opened by `author`, says
-  `Fixes #<n>`, and carries this run's session link.
+  `Fixes #<n>`, carries this run's session link, and `label_mine` when set.
 - **Every other outcome:** a comment by `author` on the issue or its pull
   request, written or edited since this run started, carrying this run's
   session id — the link from `session-link.sh` does; without `app_url`, write

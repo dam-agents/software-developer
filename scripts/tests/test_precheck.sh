@@ -153,4 +153,17 @@ STUB_HANDOFF="$ISSUE7" precheck
 is "$RC" 1 "exit"
 done_
 
+
+CASE="label_mine: only labelled pull requests are yours, and a bot is one login"; sandbox
+precheck
+lacks "$(cat "$HOME/gh.calls")" "--label agent/mine" "no label filter without the key"
+sed -i.bak 's/^- author: .*/- author: dev-app[bot]/' "$HOME/work/CONFIG.md"
+echo "- label_mine: agent/mine" >> "$HOME/work/CONFIG.md"
+BOT='[{"number":32,"title":"Bot","url":"https://gh/pr/32","reviewDecision":null,"body":"Fixes #9",
+  "latestReviews":[{"author":{"login":"app/dev-app"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
+STUB_PRS="$BOT" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 1 "the bot's own comment, as app/name, is not a review"
+has "$(cat "$HOME/gh.calls")" "pr list -R acme/widgets --author dev-app[bot] --label agent/mine" "lists only labelled pull requests"
+done_
+
 exit "$FAILED"

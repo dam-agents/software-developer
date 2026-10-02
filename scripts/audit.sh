@@ -57,7 +57,8 @@ REPO="$(cfg repo)"; AUTHOR="$(cfg author)"
 if [ -n "$REPO" ] && [ -n "$AUTHOR" ]; then
   # Your pull requests waiting on review for more than a week. A listing that
   # failed is "not measured", never "none".
-  json="$(gh pr list -R "$REPO" --author "$AUTHOR" --state open --limit 100 \
+  MINE="$(cfg label_mine)"
+  json="$(gh pr list -R "$REPO" --author "$AUTHOR" ${MINE:+--label "$MINE"} --state open --limit 100 \
     --json number,createdAt,reviewDecision 2>/dev/null)"
   if [ $? -ne 0 ] || ! stale="$(printf '%s' "$json" | jq -er --arg cutoff "$CUTOFF" \
       '[.[] | select(.createdAt < $cutoff and .reviewDecision != "APPROVED") | "#\(.number)"] | join(" ")' 2>/dev/null)"; then

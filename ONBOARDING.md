@@ -82,7 +82,11 @@ confirming or correcting rather than composing from nothing.
   who you are — `gh api user --jq .login` — as `author` below. Every run needs
   it to find its own pull requests, and asking on each one wastes a call.
   Tell the user which account it is: if it is their own, the work this agent
-  opens will be indistinguishable from theirs.
+  opens will be indistinguishable from theirs. A GitHub App answers neither
+  call (403, `false`): its login is `<app>[bot]`, as its pull requests show
+  it, and if other agents act as the same app, agree a label of this agent's
+  own as `label_mine` — every pull request it opens carries it, and only those
+  are its own. Create the label like the others.
 - **Platform address** — the URL they are reading this page at, e.g.
   `https://platform.example.com`. Every pull request you open links back to the
   session that wrote it, and nothing inside the sandbox knows the address it is
@@ -127,6 +131,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - label_failed: agent/failed
 - label_review: code-guardian-review
 - label_needs_info: agent/needs-info
+- label_mine: agent/acme-developer
 - verify: mise run check
 - verify_cluster: mise run e2e
 - cluster: none

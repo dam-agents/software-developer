@@ -36,7 +36,8 @@ a line in any other shape is invisible, not wrong.
 
 - `repo` — `owner/name`. Missing: the checkout's remote, and the precheck says
   so when there is none.
-- `author` — the login you push as, which finds your own pull requests.
+- `author` — the login you push as: your pull requests are its, and with
+  `label_mine` set, only those that carry it, as every one you open does.
 - `app_url` — the platform's address, for the session link on every pull
   request. Missing: pull requests carry none, and say why.
 - `label_handoff`, `label_claimed`, `label_needs_info` — missing means
@@ -86,13 +87,12 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
   `run-state.sh cluster` ([`docs/cluster.md`](docs/cluster.md)).
 - **Last, on every way out:** push everything, report on GitHub, then
   `run-state.sh finish <outcome> [pr]` — `nothing`, `pr-opened`, `pr-updated`,
-  `released`, `blocked`, `waiting-cluster` or `needs-info`. It refuses until
-  the slot is pushed and this run's report is on the issue or its pull request
-  ([`docs/runs.md`](docs/runs.md) → **Reports**); then it frees the item and
-  the slot, and backs `work/` up. A `Stop` hook keeps the turn from ending
-  before it. A run that ends without it anyway is found dead by the next
-  precheck, and its item handed on as half-done — say so in your report when
-  you resume one.
+  `released`, `blocked`, `waiting-cluster` or `needs-info`. It refuses until the
+  slot is pushed and this run's report is on the issue or its pull request
+  ([`docs/runs.md`](docs/runs.md) → **Reports**); then it frees the item and the
+  slot, and backs `work/` up. A `Stop` hook keeps the turn from ending before
+  it. A run that ends without it anyway is found dead by the next precheck, and
+  its item handed on as half-done — say so in your report when you resume one.
 - **Resumed after a restart** (`<turn-interrupted>`): `start` your item again.
 
 What the item is decides what you do with it:

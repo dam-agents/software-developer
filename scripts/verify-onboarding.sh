@@ -29,7 +29,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
-KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info
+KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info label_mine
   verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots babysit_max_hours stuck_after_min work_repo"
 ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
 GATE_KEYS="diagnosed_at diagnoses"
@@ -225,28 +225,42 @@ fi
 
 # -------------------------------------------------------------------- live
 if [ "$LIVE" = 1 ]; then
-  login="$(gh api --hostname "$HOST" user --jq .login 2>/dev/null)"
-  if [ -z "$login" ]; then
+  # A GitHub App installation token has no user to answer as, and reports no
+  # permissions on a repository: its identity and its reach are not measured.
+  login="$(gh api --hostname "$HOST" user --jq .login 2>/dev/null)" || login=""
+  app=""
+  [ -n "$login" ] || app="$(gh api --hostname "$HOST" installation/repositories --jq .total_count 2>/dev/null)" || app=""
+  case "$app" in '' | *[!0-9]*) app="" ;; esac
+  if [ -n "$app" ]; then
+    warn live.auth "acting as a GitHub App, which names no login — author '$(cfg author)' is not measured" \
+      "check it is the app's bot, as its pull requests show it: name[bot]"
+    [ -n "$(cfg label_mine)" ] && ok live.mine "only pull requests labelled $(cfg label_mine) are yours" ||
+      warn live.mine "no label_mine: every pull request this app opens reads as yours, other agents' too" "set \`- label_mine: <label>\` unless the app is this agent's alone"
+  elif [ -z "$login" ]; then
     fail live.auth "GitHub did not answer on $HOST" "operator-only: grant the GitHub connection (README → The GitHub connection)"
-  elif [ "$login" = "$(cfg author)" ]; then
+  elif [ "$(printf '%s' "$login" | tr '[:upper:]' '[:lower:]')" = "$(cfg author | tr '[:upper:]' '[:lower:]')" ]; then
     ok live.auth "acting as $login"
   else
     fail live.auth "acting as $login, but author is '$(cfg author)' — the precheck would never find your pull requests" "set \`- author: $login\`"
   fi
 
   if [ -n "$SLUG" ]; then
-    push="$(gh api --hostname "$HOST" "repos/$SLUG" --jq .permissions.push 2>/dev/null)"
-    [ "$push" = true ] && ok live.push "$REPO takes a push" ||
-      fail live.push "no push to $REPO (${push:-no answer})" "operator-only: the connection needs write on contents, pull requests and issues"
-    want=1
-    if [ -n "$WORK_REPO" ]; then
-      want=2
-      wpush="$(gh api --hostname "$WHOST" "repos/$WSLUG" --jq .permissions.push 2>/dev/null)"
-      [ "$wpush" = true ] && ok live.work_repo "$WORK_REPO takes a push" ||
-        fail live.work_repo "no push to $WORK_REPO (${wpush:-no answer}) — every backup fails" \
-          "operator-only: create it private, and grant the connection write on its contents"
+    want=1; [ -n "$WORK_REPO" ] && want=2
+    if [ -n "$app" ]; then
+      warn live.push "not measured: a GitHub App reports no permissions — check it has write on contents, pull requests and issues of $REPO${WORK_REPO:+, and contents of $WORK_REPO}"
+      reach="$app"
+    else
+      push="$(gh api --hostname "$HOST" "repos/$SLUG" --jq .permissions.push 2>/dev/null)"
+      [ "$push" = true ] && ok live.push "$REPO takes a push" ||
+        fail live.push "no push to $REPO (${push:-no answer})" "operator-only: the connection needs write on contents, pull requests and issues"
+      if [ -n "$WORK_REPO" ]; then
+        wpush="$(gh api --hostname "$WHOST" "repos/$WSLUG" --jq .permissions.push 2>/dev/null)"
+        [ "$wpush" = true ] && ok live.work_repo "$WORK_REPO takes a push" ||
+          fail live.work_repo "no push to $WORK_REPO (${wpush:-no answer}) — every backup fails" \
+            "operator-only: create it private, and grant the connection write on its contents"
+      fi
+      reach="$(gh api --hostname "$HOST" "user/repos?per_page=100" --jq '[.[] | select(.permissions.push)] | length' 2>/dev/null)"
     fi
-    reach="$(gh api --hostname "$HOST" "user/repos?per_page=100" --jq '[.[] | select(.permissions.push)] | length' 2>/dev/null)"
     case "$reach" in
       "$want") ok live.scope "the connection pushes to repo$([ "$want" = 2 ] && echo ' and work_repo') alone" ;;
       '' | *[!0-9]*) warn live.scope "could not count the repositories the connection can push to" ;;
@@ -256,7 +270,7 @@ if [ "$LIVE" = 1 ]; then
     if [ -z "$have" ]; then
       warn live.labels "could not list the labels of $REPO"
     else
-      for k in label_handoff label_claimed label_failed label_review label_needs_info; do
+      for k in label_handoff label_claimed label_failed label_review label_needs_info label_mine; do
         l="$(cfg "$k")"
         [ "$k" = label_needs_info ] && l="${l:-agent/needs-info}"
         [ -n "$l" ] || continue

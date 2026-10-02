@@ -223,4 +223,18 @@ is "$RC" 0 "exit"
 has "$(cat "$HOME/work/TICK.log")" "nothing session=sess-a issue=- slot=-" "log line"
 done_
 
+
+CASE="label_mine: pr-opened needs the label; a bot's login matches in any spelling"; sandbox; origin_checkout
+sed -i.bak 's/^- author: .*/- author: dev-app[bot]/' "$HOME/work/CONFIG.md"
+echo "- label_mine: agent/mine" >> "$HOME/work/CONFIG.md"
+as sess-a start 7 feat/7
+echo "- babysat_out: yes" >> "$HOME/work/items/7.md"
+STUB_PULL='{"state":"open","user":{"login":"Dev-App[bot]"},"labels":[],"body":"Fixes #7 sess-a"}' as sess-a finish pr-opened 21
+is "$RC" 1 "unlabelled"
+has "$(cat "$HOME/err")" "does not carry agent/mine" "says what"
+lacks "$(cat "$HOME/err")" "was not opened by" "the login matched"
+STUB_PULL='{"state":"open","user":{"login":"dev-app[bot]"},"labels":[{"name":"agent/mine"}],"body":"Fixes #7 sess-a"}' as sess-a finish pr-opened 21
+is "$RC" 0 "labelled"
+done_
+
 exit "$FAILED"
