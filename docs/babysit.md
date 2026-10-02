@@ -42,7 +42,12 @@ mechanical. You never merge.
 
 **The repository's own process wins where it says more.** If the checkout
 documents how its pull requests are driven to merge — a babysit or review
-skill, `CONTRIBUTING` — follow it, within the **Hard invariants**.
+skill, `CONTRIBUTING` — follow it, within the **Hard invariants**, for what
+one round does: how to mark it ready, whom to ask, how to answer findings.
+**Except its waiting.** Where it says to watch, poll or loop until a review or
+a check arrives, do the round, push, finish — the precheck wakes the next run
+when one does (**Across runs, never in one**, above). A run that waits holds a
+slot another item could use, for as long as a reviewer takes.
 
 **When you cannot get it green**, say so on the pull request — what fails, what
 you tried — and finish the run `blocked`. The precheck does not wake for the
