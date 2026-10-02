@@ -9,22 +9,43 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
-## 1.3.0 — 2026-10-02
+## 2.0.0 — 2026-10-02
 
-`work/` can be backed up to a private repository of its own: a new optional
-key, `work_repo`, and `scripts/work-backup.sh`, which `run-state.sh finish`
-runs last (`docs/persistence.md` → **Backup**). Off without the key.
+Up to `slots` runs (default 3) now work at once, one issue each, each in a
+worktree of its own under `work/slots/` that stays warm between runs. Only the
+cluster is one at a time, under a lock of its own, so a pull request waiting
+on review holds nothing. The locks live on tmpfs, and a holder is freed only
+when the runtime says its session is not running a turn, or the sandbox
+restarted. `work/RUN.md` is gone; `work/items/<n>.md` caches each issue's
+branch, slot and state (`docs/runs.md`). New issues are implemented through
+the bundled `implement-issue` skill; an issue too unclear to implement goes to
+`agent/needs-info`. `work/` can be backed up to a private `work_repo`
+(`docs/persistence.md` → **Backup**), through `scripts/work-backup.sh`.
 
 **Upgrade:**
 
-1. Offer the backup to the operator: it needs a private repository they
+1. Wait until no run is in flight (`list_schedules` shows the tick idle, or
+   pause it), then delete `work/RUN.md`, and `work/GATE.md` if it holds a
+   `busy_since` line.
+2. List the checkout's worktrees (`git -C "$HOME/work/<name>" worktree list`).
+   For each one outside `work/slots/`: push anything unsaved to its branch,
+   then `git worktree remove` it — never `--force` on unsaved work; ask the
+   operator about that.
+3. Split `verify` with the operator: what runs without a cluster stays in
+   `verify`; what needs the cluster — an end-to-end suite, anything that
+   reinstalls or resets it — becomes `verify_cluster`. Leave `verify_cluster`
+   out when nothing needs the cluster.
+4. Create the needs-info label on `repo` once the operator agrees to its name
+   (`gh label create agent/needs-info -R <repo>`), and add
+   `- label_needs_info: <name>` to `work/CONFIG.md` when it is not the default.
+5. Offer the backup to the operator: it needs a private repository they
    create (suggest `<owner>/<agent>-work`), and write on its contents for the
-   connection — **operator only**. For a yes, add
-   `- work_repo: <owner/name>` to `work/CONFIG.md`, then run
-   `bash "$HOME/scripts/work-backup.sh" persist` and check that it says
-   `backed up`. For a no, nothing changes.
-2. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`: with the key set
-   it checks the push to `work_repo`, and counts it in `live.scope`.
+   connection — **operator only**. For a yes, add `- work_repo: <owner/name>`
+   to `work/CONFIG.md`, then run `bash "$HOME/scripts/work-backup.sh" persist`
+   and check that it says `backed up`.
+6. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live` and apply every
+   fix: it now checks the slots, the items, the needs-info label, the push to
+   `work_repo`, and that the runtime lists sessions.
 
 ## 1.2.0 — 2026-10-01
 

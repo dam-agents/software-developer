@@ -7,8 +7,8 @@ to this definition itself.
 
 | Path | Kind | Holds |
 | --- | --- | --- |
-| `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/` |
-| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `RUN.md`, `GATE.md`, `TICK.log`, `AUDIT.log`, and the target repository's checkout |
+| `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, `.agents/skills/implement-issue/` |
+| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, and the target repository's checkout |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
 and a `.git` that concurrent runs change there corrupts — `Stale file handle`,
@@ -22,8 +22,8 @@ The `.gitignore` at `$HOME` is an allowlist, so `work/` and the home's secrets
 ## Backup
 
 Every fact about the work lives on GitHub — labels, branches, pull requests —
-and the tick rebuilds its own bookkeeping from nothing: a missing `RUN.md` is
-no run in flight. What nothing rebuilds is `CONFIG.md`, and the history in
+and the tick rebuilds its own bookkeeping from nothing: a missing item file is
+an item no run has started on yet, and the locks live on tmpfs anyway. What nothing rebuilds is `CONFIG.md`, and the history in
 `TICK.log` and `AUDIT.log`. With `work_repo` set, those travel to a private
 repository of their own through `scripts/work-backup.sh`, which pushes straight
 to its default branch — a repository of data, never of changes for review, and
@@ -98,7 +98,7 @@ repository — the one repository beside `repo` you may act on, and only this wa
 
 ```sh
 git -C "$HOME" checkout -b "<type>/<short-slug>" FETCH_HEAD
-git -C "$HOME" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github
+git -C "$HOME" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github .agents/skills/implement-issue
 git -C "$HOME" commit -m "<type>: <what changed>"
 git -C "$HOME" push -u origin "<type>/<short-slug>"
 (cd "$HOME" && gh pr create --title "<title>" --body "<what and why>")

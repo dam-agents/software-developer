@@ -112,7 +112,6 @@ is "$RC" 0 "persist never fails the run"
 done_
 
 CASE="finish backs up the run's log line"; backed
-record run_state=running session=sess-a occurrence=O "claimed_at=$(ago 5)" phase=x "phase_at=$(ago 1)"
 CLAUDE_CODE_SESSION_ID=sess-a state finish nothing
 is "$RC" 0 "exit"
 has "$(cat "$HOME/err")" "backed up" "persisted"

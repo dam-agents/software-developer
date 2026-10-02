@@ -29,10 +29,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
-KNOWN="repo author app_url label_handoff label_claimed label_failed label_review
-  verify cluster cluster_install cluster_uninstall cluster_delete stuck_after_min work_repo"
-RUN_KEYS="run_state session occurrence claimed_at phase phase_at issue pr outcome ended_at"
-GATE_KEYS="busy_since diagnosed_at diagnoses"
+KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info
+  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots stuck_after_min work_repo"
+ITEM_KEYS="item state branch slot pr session seen_at abandoned updated_at"
+GATE_KEYS="diagnosed_at diagnoses"
 
 CHECKS=0; FAILS=0; WARNS=0
 ok()   { CHECKS=$((CHECKS + 1)); printf 'ok   %s — %s\n' "$1" "$2"; }
@@ -97,6 +97,14 @@ else
   case "$S" in
     '' | *[!0-9]*) [ -z "$S" ] || fail config.stuck_after_min "'$S' is not a whole number of minutes" "write 120, or more" ;;
   esac
+  S="$(cfg slots)"
+  case "$S" in
+    '') ;;
+    *[!0-9]* | 0) fail config.slots "'$S' is not a whole number of slots" "write 3, or leave it out" ;;
+  esac
+  if [ -n "$(cfg verify_cluster)" ] && [ "$(cfg cluster)" != required ]; then
+    fail config.verify_cluster "set, but cluster is not required — nothing would ever run it" "set cluster: required with its commands, or drop verify_cluster"
+  fi
 
   u="$(unknown_in "$CONFIG" "$KNOWN")"
   [ -z "$u" ] && ok config.keys "every bullet is a known key" ||
@@ -146,18 +154,38 @@ if [ "$STRUCTURE" = 1 ]; then
     fi
   fi
 
-  if [ -f "$WORK/RUN.md" ]; then
-    u="$(unknown_in "$WORK/RUN.md" "$RUN_KEYS")"
-    case "$(kv "$WORK/RUN.md" run_state)" in
-      running | idle) [ -z "$u" ] && ok state.RUN "$(kv "$WORK/RUN.md" run_state)" ||
-        fail state.RUN "unknown key(s): $u" "RUN.md is written only by scripts/run-state.sh — remove the lines" ;;
-      *) fail state.RUN "run_state is neither running nor idle" "bash \$HOME/scripts/run-state.sh abandon \"malformed record\"" ;;
-    esac
-  fi
+  [ ! -f "$WORK/RUN.md" ] ||
+    fail state.RUN "work/RUN.md is a record from before slots — nothing reads it" "remove it (CHANGELOG.md → 2.0.0)"
+  bad=""
+  for f in "$WORK"/items/*.md; do
+    [ -f "$f" ] || continue
+    [ -z "$(unknown_in "$f" "$ITEM_KEYS")" ] || bad="$bad $(basename "$f")"
+  done
+  [ -z "$bad" ] || fail state.items "unknown keys in:$bad" "the items are written only by scripts/run-state.sh — delete the file; GitHub rebuilds it"
   if [ -f "$WORK/GATE.md" ]; then
     u="$(unknown_in "$WORK/GATE.md" "$GATE_KEYS")"
     [ -z "$u" ] && ok state.GATE "well-formed" ||
-      fail state.GATE "unknown key(s): $u" "bash \$HOME/scripts/run-state.sh free"
+      fail state.GATE "unknown key(s): $u" "delete work/GATE.md; the precheck starts it again"
+  fi
+  if [ -n "$REPO" ]; then
+    CO="$WORK/${REPO##*/}"
+    if [ -d "$WORK/slots" ]; then
+      bad=""; n=0
+      for d in "$WORK"/slots/*; do
+        [ -e "$d" ] || continue
+        n=$((n + 1))
+        [ "$(cd "$d" 2>/dev/null && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)" = "$(cd "$CO/.git" 2>/dev/null && pwd -P)" ] ||
+          bad="$bad $(basename "$d")"
+      done
+      want="$(cfg slots)"; want="${want:-3}"
+      [ -z "$bad" ] || fail state.slots "work/slots/{${bad# }} are not worktrees of the checkout" "remove them; run-state.sh start creates slots"
+      [ "$n" -le "$want" ] || fail state.slots "$n slots, more than slots: $want" "remove the highest with git worktree remove, once nothing unsaved is in them"
+      [ -z "$bad" ] && [ "$n" -le "$want" ] && ok state.slots "$n of $want created"
+    fi
+    extra="$(git -C "$CO" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p' |
+      grep -vxF "$(cd "$CO" 2>/dev/null && pwd -P)" | grep -v "/work/slots/[0-9]*$" | tr '\n' ' ')"
+    [ -z "$extra" ] || fail state.worktrees "worktrees outside work/slots: $extra" \
+      "push what is in them, then git worktree remove — the slots are the only worktrees (CLAUDE.md → Rules)"
   fi
   if [ -f "$WORK/TICK.log" ]; then
     bad="$(grep -cvE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z [a-z-]+ ' "$WORK/TICK.log")"
@@ -202,18 +230,21 @@ if [ "$LIVE" = 1 ]; then
     if [ -z "$have" ]; then
       warn live.labels "could not list the labels of $REPO"
     else
-      for k in label_handoff label_claimed label_failed label_review; do
-        l="$(cfg "$k")"; [ -n "$l" ] || continue
+      for k in label_handoff label_claimed label_failed label_review label_needs_info; do
+        l="$(cfg "$k")"
+        [ "$k" = label_needs_info ] && l="${l:-agent/needs-info}"
+        [ -n "$l" ] || continue
         printf '%s\n' "$have" | grep -qxF "$l" && ok "live.$k" "$l exists" ||
           fail "live.$k" "no label '$l' on $REPO — nothing will ever apply it" "create it, or correct the key"
       done
     fi
   fi
 
-  if curl -fsS --max-time 5 "${PLATFORM_RUNTIME_URL:-}/api/status" 2>/dev/null | jq -e 'has("idle")' >/dev/null 2>&1; then
-    ok live.runtime "the runtime answers — the precheck can see the sandbox"
+  if curl -fsS --max-time 5 --get --data-urlencode 'input={"sessionId":"verify-onboarding"}' \
+      "${PLATFORM_RUNTIME_URL:-}/api/trpc/sessions.list" 2>/dev/null | jq -e '.result.data.sessions | type == "array"' >/dev/null 2>&1; then
+    ok live.runtime "the runtime lists sessions — a dead run's slot can be freed"
   else
-    fail live.runtime "no answer from \$PLATFORM_RUNTIME_URL/api/status — every tick would run ungated" "operator-only: report it; the runtime publishes this for every agent"
+    fail live.runtime "no answer from \$PLATFORM_RUNTIME_URL/api/trpc/sessions.list — no dead run's slot is ever freed" "operator-only: report it; the runtime serves this for every agent"
   fi
 
   start=$SECONDS

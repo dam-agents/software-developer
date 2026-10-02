@@ -74,7 +74,7 @@ if [ -n "$REPO" ] && [ -n "$AUTHOR" ]; then
   probe="$(cd "$WORK" && PRECHECK_PROBE=1 bash "$HERE/precheck.sh" 2>/dev/null)"
   case $? in
     0 | 1)
-      resume="$(printf '%s\n' "$probe" | sed -n '/^Claimed by a run that never opened/,/^$/p' |
+      resume="$(printf '%s\n' "$probe" | sed -n '/^Claimed, with no pull request and no run on it/,/^$/p' |
         grep -oE '^- #[0-9]+' | sed 's/^- //' | tr '\n' ' ' | sed -E 's/ $//')"
       [ -z "$resume" ] && echo "ok   issues.orphaned — no claimed issue without a pull request" ||
         echo "warn issues.orphaned — claimed, no pull request: $resume" ;;

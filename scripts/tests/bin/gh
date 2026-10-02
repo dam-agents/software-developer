@@ -10,7 +10,7 @@ case "$1 $2" in
     if [ "$label" = "${STUB_HANDOFF_LABEL:-agent/implement}" ]; then printf '%s' "${STUB_HANDOFF:-[]}"
     else printf '%s' "${STUB_CLAIMED:-[]}"; fi ;;
   "label list")
-    answer "${STUB_LABELS-$(printf 'agent/implement\nagent/in-progress\nagent/failed\ncode-guardian-review')}" ;;
+    answer "${STUB_LABELS-$(printf 'agent/implement\nagent/in-progress\nagent/failed\ncode-guardian-review\nagent/needs-info')}" ;;
   "api "*)
     shift; path=""; skip=""
     for a in "$@"; do

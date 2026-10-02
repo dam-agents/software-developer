@@ -9,8 +9,8 @@
 # What travels is CARRIED below, by name, and nothing else: an allowlist, which
 # every persist also commits as the backup's .gitignore, so no `git add` in the
 # clone can ever pick up another file. Never a directory — the checkout and its
-# worktrees live on GitHub already — and never RUN.md or GATE.md, which
-# describe this sandbox's processes and mean nothing on another one. A
+# worktrees live on GitHub already — and never items/ or GATE.md, which
+# describe this sandbox's runs and are rebuilt from GitHub. A
 # README.md or LICENSE belongs to the backup repository itself and stays.
 # A carried file that looks like it holds a credential stops the push.
 #
