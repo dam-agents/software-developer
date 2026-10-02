@@ -9,6 +9,27 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 2.2.0 — 2026-10-02
+
+An `author` other agents share — a GitHub App's bot — no longer makes their
+pull requests read as yours: with the new, optional `label_mine` set, every pull
+request this agent opens carries that label, and the precheck, the audit and
+`finish pr-opened` count only those. Missing, nothing changes. Logins now
+compare in any of GitHub's spellings (`name[bot]`, `app/name`, any case), and
+`verify-onboarding.sh --live` reports an app identity's login and permissions
+as not measured instead of failing them.
+
+**Upgrade:**
+
+1. Only if `author` is an identity other agents act as too: agree a label with
+   the operator, create it on `repo` (operator-only if the connection cannot),
+   add `- label_mine: <label>` to `work/CONFIG.md`, and put the label on every
+   open pull request of `author` that is this agent's (its body carries
+   `Written by this agent`). Then
+   `bash "$HOME/scripts/work-backup.sh" persist`.
+2. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`: it now checks
+   `live.label_mine`, and `live.mine` for an app.
+
 ## 2.1.0 — 2026-10-02
 
 The repository's own skills load in every run: onboarding links

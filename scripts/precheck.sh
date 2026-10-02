@@ -94,6 +94,9 @@ if [ -z "$AUTHOR" ]; then
   AUTHOR="$(gh api user --jq .login 2>/dev/null)" || true
 fi
 AUTHOR="${AUTHOR:-@me}"
+# With `label_mine` set, a pull request is yours only when it carries it too: an
+# identity other agents share (a GitHub App's bot) opens theirs as well.
+MINE="$(cfg label_mine)"
 
 ERR="$(mktemp)"
 trap 'rm -f "$ERR"' EXIT
@@ -106,9 +109,9 @@ gh_json() {
   gh "$@" 2>"$ERR"
 }
 
-PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" --state open --limit 50 \
+PRS="$(gh_json pr list -R "$REPO" --author "$AUTHOR" ${MINE:+--label "$MINE"} --state open --limit 50 \
   --json number,title,url,reviewDecision,latestReviews,statusCheckRollup,body)" || {
-  echo "gh could not list pull requests on $REPO as author '$AUTHOR', twice:" >&2
+  echo "gh could not list pull requests on $REPO as author '$AUTHOR'${MINE:+ labelled '$MINE'}, twice:" >&2
   cat "$ERR" >&2
   exit 2
 }
@@ -132,12 +135,12 @@ done | jq -s 'add // {}')" || ITEMS_JSON='{}'
 # tick. Its item is the issue its body names (`Fixes #<n>`), and an item a live
 # run holds is left out.
 PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" \
-    --arg held "$HELD" --argjson items "$ITEMS_JSON" '
+    --arg held "$HELD" --argjson items "$ITEMS_JSON" "$JQ_LOGIN"'
   map(.number as $pr | . + {item: ((.body // "") | capture("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #(?<n>[0-9]+)").n // "pr\($pr)")})
   | map(. + {since: ($items[.item].seen // $since)})
   | map(select(.item as $i | $held | contains(" \($i) ") | not))
   | map(. + {
-    reviewed: (([.latestReviews[]? | select(.author.login != $author) | .submittedAt] | max // "") > .since),
+    reviewed: (([.latestReviews[]? | select((.author.login | login) != ($author | login)) | .submittedAt] | max // "") > .since),
     failed: (.since as $s | [.statusCheckRollup[]?
       | select((.conclusion // .state // "") | test("^(FAILURE|ERROR|TIMED_OUT|STARTUP_FAILURE|ACTION_REQUIRED)$"))
       | select((.completedAt // .startedAt // "") > $s)

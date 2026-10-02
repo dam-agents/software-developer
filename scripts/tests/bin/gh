@@ -26,6 +26,7 @@ case "$1 $2" in
     done
     case "$path" in
       user) answer "${STUB_LOGIN-dev-bot}" ;;
+      installation/repositories*) answer "${STUB_INSTALLATION-}" ;;
       user/repos*) answer "${STUB_REACH-1}" ;;
       repos/*/contents/*) answer "${STUB_BACKUP_CONFIG-}" ;;
       repos/*/issues/*/comments*) answer "${STUB_COMMENTS-[]}" ;;

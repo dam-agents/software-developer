@@ -20,3 +20,9 @@ kv() {
 
 # cfg <key> — a key of work/CONFIG.md
 cfg() { kv "$HOME/work/CONFIG.md" "$1"; }
+
+# A login as GitHub spells it differently by API: a GitHub App's bot is
+# `name[bot]` over REST and `app/name` in gh's JSON, and case never matters.
+# Prepend to a jq program; `login` maps every spelling to one.
+# shellcheck disable=SC2034
+JQ_LOGIN='def login: ascii_downcase | sub("^app/"; "") | sub("\\[bot\\]$"; "");'

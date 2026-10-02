@@ -108,7 +108,7 @@ itself misbehaves.
 
 ```sh
 git push
-gh pr create -R <repo> --title "<type>: <what>" --body "<body>"
+gh pr create -R <repo> --title "<type>: <what>" --body "<body>" [--label <label_mine>]
 gh pr edit <pr> -R <repo> --add-label <label_review>
 $RS wait <pr>                  # then babysit, below
 ```
@@ -117,6 +117,8 @@ The body: what changed and why, how it was verified (the commands, and what
 `verify_cluster` covered or why it did not run), anything a reviewer should
 look at first. Then `Fixes #<n>` on its own line, and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
+With `label_mine` set it carries that label from the start: without it, no
+later run finds the pull request, and `finish` refuses `pr-opened`.
 Then **babysit it in this run** until it is done: `$RS wait <pr>`, handle what
 it comes back with, push, `wait` again — [`docs/babysit.md`](../../../docs/babysit.md).
 The run ends `released` once it is approved, green and mergeable, `blocked`
