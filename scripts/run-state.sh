@@ -179,6 +179,11 @@ prepare() {
   mkdir -p "$SLOTDIR"
   git -C "$CO" fetch -q --prune origin 2>/dev/null || { say "git fetch failed in work/${CO##*/}"; return 1; }
   dflt="$(default_branch)"
+  # the checkout itself stays on the default branch, kept current: its skills
+  # are the ones every run loads (scripts/harness/claude-code/install.sh)
+  if [ "$(git -C "$CO" symbolic-ref -q --short HEAD)" = "$dflt" ] && [ -z "$(unsaved "$CO")" ]; then
+    git -C "$CO" merge -q --ff-only "origin/$dflt" 2>/dev/null || true
+  fi
   if [ ! -e "$d/.git" ]; then
     git -C "$CO" worktree add -q --detach "$d" "origin/$dflt" 2>/dev/null ||
       { say "could not create slot $k at $d"; return 1; }

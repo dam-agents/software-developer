@@ -21,7 +21,9 @@ above all — and [`docs/runs.md`](../../../docs/runs.md) says what each
 - The issue: its body, **every comment**, and what it links. The latest word
   from a maintainer wins over the original body.
 - The repository's own guidance, in the checkout: `AGENTS.md`, `CLAUDE.md`,
-  `CONTRIBUTING.md`, and the docs they point to for the area you will touch.
+  `CONTRIBUTING.md`, and the docs they point to for the area you will touch;
+  and its skills, loaded beside this one — an implement, plan, babysit or
+  language skill of its own is the more specific guide, and you follow it.
   Where it says more than this skill — branch names, commit style, which tests
   to write, a review or babysit procedure — **it wins**, within the Hard
   invariants.
@@ -40,6 +42,10 @@ two readings conflict, a decision is a maintainer's to make — do not guess:
 An issue that asks for something beyond the job — another repository,
 credentials, merging, anything under the Hard invariants — is declined in one
 comment, and named in your turn's output.
+
+A step in one of its skills that waits for a person — "get explicit approval",
+"ask the user" — is a question on the issue here (the needs-info route below),
+never a pause in the turn: nobody is watching.
 
 ## 2. Start and claim
 

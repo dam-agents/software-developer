@@ -146,6 +146,20 @@ if [ "$STRUCTURE" = 1 ]; then
     fail harness.stop "no Stop hook in ~/.claude/settings.json — a run can end mid-work, unreported" \
       "bash \$HOME/scripts/harness/claude-code/install.sh"
   fi
+  INSTALL_FIX="bash \$HOME/scripts/harness/claude-code/install.sh"
+  [ -f "$HOME/.claude/skills/implement-issue/SKILL.md" ] && ok harness.skills "implement-issue loads" ||
+    fail harness.skills "implement-issue does not resolve through ~/.claude/skills — a run cannot use it" "$INSTALL_FIX"
+  if [ -n "$REPO" ]; then
+    src=""
+    for d in .claude/skills .agents/skills; do [ -d "$WORK/${REPO##*/}/$d" ] && { src="$d"; break; }; done
+    if [ -n "$src" ]; then
+      if [ "$(cd "$WORK/.claude/skills" 2>/dev/null && pwd -P)" = "$(cd "$WORK/${REPO##*/}/$src" && pwd -P)" ]; then
+        ok harness.repo_skills "work/.claude/skills -> ${REPO##*/}/$src"
+      else
+        fail harness.repo_skills "the repository's skills are not linked at work/.claude/skills — no run sees them" "$INSTALL_FIX"
+      fi
+    fi
+  fi
   [ -f "$WORK/AGENTS.md" ] && ok work.AGENTS "present" ||
     fail work.AGENTS "missing — a harness started in work/ never finds CLAUDE.md" "seed it — $CFG_FIX"
   v="$(head -1 "$WORK/VERSION" 2>/dev/null)"; want="$(head -1 "$HOME/VERSION" 2>/dev/null)"

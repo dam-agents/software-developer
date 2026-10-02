@@ -71,6 +71,8 @@ touch_ago() {
 onboarded() {
   local repo; repo="$(cd "$SCRIPTS/.." && pwd)"
   cp "$repo/.gitignore" "$repo/VERSION" "$repo/kit.yaml" "$HOME/"
+  mkdir -p "$HOME/.agents/skills/implement-issue" && : > "$HOME/.agents/skills/implement-issue/SKILL.md"
+  ln -s ../.agents/skills "$HOME/.claude/skills"
   git init -q "$HOME" && git -C "$HOME" add -A &&
     git -C "$HOME" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false \
       commit -qm definition 2>/dev/null

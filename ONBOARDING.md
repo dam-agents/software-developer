@@ -176,9 +176,14 @@ scheduled run does that, where it is visible and can be retried.
 
 ## 5. Finish
 
-Register the harness hook that keeps a run from ending mid-work
-([`docs/runs.md`](docs/runs.md) → **Reports**); it takes effect from the next
-session:
+Wire the harness; it takes effect from the next session. It registers the
+hook that keeps a run from ending mid-work ([`docs/runs.md`](docs/runs.md) →
+**Reports**), and makes the skills load: the bundled ones through
+`~/.claude/skills`, and the repository's own through `work/.claude/skills`, a
+link to the checkout's skills — a run works from `work/`, and Claude Code
+loads project skills from there alone. Show the user the skills it linked:
+any that stops to ask a person for approval runs unattended here, so that
+step goes through GitHub instead (`CLAUDE.md` → **Rules**).
 
 ```sh
 bash "$HOME/scripts/harness/claude-code/install.sh"

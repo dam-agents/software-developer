@@ -9,6 +9,22 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 2.1.0 — 2026-10-02
+
+The repository's own skills load in every run: onboarding links
+`work/.claude/skills` to the checkout's skills, because a run works from
+`work/` and Claude Code loads project skills from there alone. The checkout
+itself is kept on its default branch, fast-forwarded by `run-state.sh start`,
+so the linked skills stay current. A step of theirs that waits for a person
+goes through GitHub instead.
+
+**Upgrade:**
+
+1. Run `bash "$HOME/scripts/harness/claude-code/install.sh"`, and show the
+   operator the skills it linked.
+2. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`: it now checks
+   `harness.skills` and `harness.repo_skills`.
+
 ## 2.0.0 — 2026-10-02
 
 Up to `slots` runs (default 3) now work at once, one issue each, each in a
