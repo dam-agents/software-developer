@@ -9,7 +9,8 @@ DEFAULT_COMMENTS='[{"user":{"login":"dev-bot"},"body":"Done. sess-a sess-b sess-
 as() {
   local s="$1"; shift
   CLAUDE_CODE_SESSION_ID="$s" STUB_RUNNING="${RUNNING-sess-a sess-b sess-c}" \
-    STUB_COMMENTS="${STUB_COMMENTS-$DEFAULT_COMMENTS}" state "$@"
+    STUB_COMMENTS="${STUB_COMMENTS-$DEFAULT_COMMENTS}" SD_WAIT_FOR="${SD_WAIT_FOR:-3}" SD_WAIT_POLL="${SD_WAIT_POLL:-1}" \
+    state "$@"
 }
 slot() { git -C "$HOME/work/slots/$1" rev-parse --abbrev-ref HEAD 2>/dev/null; }
 
@@ -46,15 +47,14 @@ done_
 CASE="finish gives everything back and logs the run"; sandbox; origin_checkout
 as sess-a start 7 feat/7
 mkdir -p "$HOME/work/slots/1/dist"; echo built > "$HOME/work/slots/1/dist/out"
-STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"x\n\nFixes #7\n\nWritten by this agent — https://p/a/x?s=sess-a"}' \
-  as sess-a finish pr-opened 21
+STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
 is "$RC" 0 "exit"
 [ -z "$(ls "$SD_LOCKS")" ] || fail "locks left: $(ls "$SD_LOCKS")"
-is "$(field items/7.md state)" parked "parked"
+is "$(field items/7.md state)" released "released"
 is "$(field items/7.md pr)" 21 "pr"
 is "$(slot 1)" HEAD "the slot lets go of the branch"
 [ -e "$HOME/work/slots/1/dist" ] || fail "the build output went with it"
-has "$(cat "$HOME/work/TICK.log")" "pr-opened session=sess-a issue=7 slot=1 pr=21 minutes=" "log line"
+has "$(cat "$HOME/work/TICK.log")" "released session=sess-a issue=7 slot=1 pr=21 minutes=" "log line"
 as sess-b start 8 feat/8; as sess-c start 7
 is "$(slot 1)" feat/8 "8 took the first free slot"
 is "$(slot 2)" feat/7 "7 resumes its branch from the item record"
@@ -139,6 +139,7 @@ STUB_COMMENTS='[{"user":{"login":"dev-bot"},"body":"another run, sess-b"}]' as s
 is "$RC" 1 "no comment from this run"
 has "$(cat "$HOME/err")" "no comment from this run on #7" "says where"
 [ -d "$SD_LOCKS/item-7" ] || fail "gave the item back unreported"
+echo "- babysat_out: yes" >> "$HOME/work/items/7.md"
 STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"Fixes #8\nhttps://p/a/x?s=sess-a"}' as sess-a finish pr-opened 21
 is "$RC" 1 "the pull request names another issue"
 has "$(cat "$HOME/err")" "does not say Fixes #7" "says what"
@@ -154,6 +155,66 @@ as sess-a start 7 feat/7
 STUB_COMMENTS= as sess-a finish pr-updated
 is "$RC" 0 "exit"
 has "$(cat "$HOME/work/TICK.log")" "report=unverified" "logged"
+done_
+
+# view <state> <review decision> <mergeable> <checks json> [reviews json]
+view() { printf '{"state":"%s","reviewDecision":"%s","mergeable":"%s","headRefOid":"abc","statusCheckRollup":%s,"latestReviews":%s}' \
+  "$1" "$2" "$3" "$4" "${5:-[]}"; }
+RUNNING_CHECK='[{"name":"e2e","status":"IN_PROGRESS","conclusion":""}]'
+GREEN='[{"name":"e2e","conclusion":"SUCCESS","completedAt":"2026-09-24T10:00:00Z"}]'
+
+CASE="a run keeps its pull request until it is done"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"Fixes #7 sess-a"}' as sess-a finish pr-opened 21
+is "$RC" 1 "opening it is not the end"
+has "$(cat "$HOME/err")" "run-state.sh\" wait 21" "says how to babysit"
+[ -d "$SD_LOCKS/item-7" ] || fail "gave the item back"
+done_
+
+CASE="wait comes back with nothing yet while checks run, then with a review"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_PR_VIEW="$(view OPEN REVIEW_REQUIRED MERGEABLE "$RUNNING_CHECK")" as sess-a wait 21
+is "$RC" 3 "nothing yet"
+has "$OUT" "nothing yet — checks running. Call wait again" "says so"
+has "$(field items/7.md pr)" 21 "remembers the pull request"
+sleep 1; REVIEW="[{\"author\":{\"login\":\"guardian\"},\"state\":\"CHANGES_REQUESTED\",\"submittedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]"
+STUB_PR_VIEWS="$(view OPEN REVIEW_REQUIRED MERGEABLE "$RUNNING_CHECK")
+$(view OPEN CHANGES_REQUESTED MERGEABLE "$RUNNING_CHECK" "$REVIEW")" as sess-a wait 21
+is "$RC" 0 "something to do"
+has "$OUT" "reviewed by guardian (CHANGES_REQUESTED): resolve every finding" "what"
+STUB_PR_VIEW="$(view OPEN CHANGES_REQUESTED MERGEABLE "$RUNNING_CHECK" "$REVIEW")" as sess-a wait 21
+is "$RC" 3 "a review already answered is not new"
+done_
+
+CASE="wait says done once approved, green and mergeable, and then finish releases"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_PR_VIEW="$(view OPEN APPROVED MERGEABLE "$GREEN")" as sess-a wait 21
+is "$RC" 0 "exit"
+has "$OUT" "done — approved, green and mergeable" "done"
+STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
+is "$RC" 0 "released"
+done_
+
+CASE="a failed check is something to do"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+FAILING="[{\"name\":\"test\",\"conclusion\":\"FAILURE\",\"completedAt\":\"$(date -u -d '+1 minute' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1M +%Y-%m-%dT%H:%M:%SZ)\"}]"
+STUB_PR_VIEW="$(view OPEN REVIEW_REQUIRED MERGEABLE "$FAILING")" as sess-a wait 21
+is "$RC" 0 "exit"
+has "$OUT" "checks failed: test" "names it"
+done_
+
+CASE="after babysit_max_hours, wait hands it on and finish lets it go"; sandbox; origin_checkout
+echo "- babysit_max_hours: 1" >> "$HOME/work/CONFIG.md"
+as sess-a start 7 feat/7
+STUB_PR_VIEW="$(view OPEN REVIEW_REQUIRED MERGEABLE "$GREEN")" as sess-a wait 21
+sed -i.bak "s/^- babysit_since: .*/- babysit_since: $(ago 61)/" "$HOME/work/items/7.md"
+as sess-a wait 21
+is "$RC" 4 "timeout"
+has "$OUT" "babysat #21 for 1h" "says so"
+as sess-a finish pr-updated 21
+is "$RC" 0 "now it may go"
+as sess-b start 7
+is "$(field items/7.md babysat_out)" "" "the next run babysits afresh"
 done_
 
 CASE="finish with nothing held still logs the run"; sandbox

@@ -17,6 +17,10 @@ apart is three kinds of lock, taken atomically on tmpfs:
 | slot `<k>` | `start <n>` | the run — one worktree, one run |
 | cluster | `cluster` | the cluster step alone; `cluster-done` or `finish` gives it back |
 
+An item is held until its pull request is done, not until it is opened: the run
+that opens it babysits it with `run-state.sh wait <pr>`
+([babysit.md](babysit.md)), and that is why it keeps its slot meanwhile.
+
 **A lock never outlives the turn that took it.** A holder is dead when the
 runtime says its session is not running a turn, or when the sandbox restarted
 since it was taken (a restart wipes tmpfs, and stops the cluster with it). The

@@ -4,13 +4,32 @@ Read this whenever you open a pull request or work on one of yours. A pull
 request is not done when it is opened: you carry it until it is **approved,
 every check is green, and it merges cleanly** — then a person merges it.
 
-## Across runs, never in one
+## In the run that opened it
 
-Do not wait inside a run for a review or a check. A review can take an hour,
-and while your turn waits it holds a slot another item could use. Push,
-request review, finish the run. The precheck wakes a later run when a review
-lands or a check fails after a run last started on the item
-(`scripts/precheck.sh`), and that run picks the pull request up first.
+The run that wrote the change babysits it, in its own turn, until it is done:
+it keeps the item, so no other run takes it, and the context that wrote the
+change answers its review. Waiting goes through one command:
+
+```sh
+bash "$HOME/scripts/run-state.sh" wait <pr>
+```
+
+It looks at the pull request once a minute for up to nine minutes, and comes
+back with what to do: a new review, a failed check, a conflict, merged or
+closed, or **done** — approved, green and mergeable. Exit `3` is nothing yet:
+call it again, never end the turn. `finish` refuses `pr-opened`, `pr-updated`
+and `nothing` while the pull request is not done.
+
+The run ends on one of three ways out: **done**, so release the issue below;
+**cannot get green**, so finish `blocked`; or `wait` exits `4` because the run
+has babysat it for `babysit_max_hours` (default 4), waiting on a reviewer who
+has not come — report where it stands and who it waits on, and finish
+`pr-updated`.
+
+**A later run takes it over** only when that one could not finish it: it died,
+it hit `babysit_max_hours`, or something landed after it released the issue.
+The precheck wakes it for a review or a failed check newer than its last look
+(`scripts/precheck.sh`), and that run babysits it the same way, from the top.
 
 ## Each time you hold one
 
@@ -32,7 +51,8 @@ one round, so one push answers everything:
    review-request label only when nothing re-requests them otherwise.
 
 **Approved, green and mergeable** is finished: drop the claimed label from its
-issue, comment the issue with the pull request link, and finish `released`.
+issue, comment the issue with the pull request link, and finish `released`
+(`finish released <pr>`).
 
 **Closed without merging**, the issue still claimed: someone decided against
 it. Read why on the pull request; drop the claim, comment the issue, finish
@@ -44,10 +64,10 @@ mechanical. You never merge.
 documents how its pull requests are driven to merge — a babysit or review
 skill, `CONTRIBUTING` — follow it, within the **Hard invariants**, for what
 one round does: how to mark it ready, whom to ask, how to answer findings.
-**Except its waiting.** Where it says to watch, poll or loop until a review or
-a check arrives, do the round, push, finish — the precheck wakes the next run
-when one does (**Across runs, never in one**, above). A run that waits holds a
-slot another item could use, for as long as a reviewer takes.
+**Its waiting goes through `wait`.** Where it says to watch, poll or loop until
+a review or a check arrives, call `run-state.sh wait <pr>` instead (**In the
+run that opened it**, above): it keeps the run's phase stamped, gives up at
+`babysit_max_hours`, and never outlasts the tool's time limit.
 
 **When you cannot get it green**, say so on the pull request — what fails, what
 you tried — and finish the run `blocked`. The precheck does not wake for the

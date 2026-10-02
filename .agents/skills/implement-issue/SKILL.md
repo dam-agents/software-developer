@@ -110,14 +110,18 @@ itself misbehaves.
 git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>"
 gh pr edit <pr> -R <repo> --add-label <label_review>
-$RS finish pr-opened <pr>
+$RS wait <pr>                  # then babysit, below
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
 `verify_cluster` covered or why it did not run), anything a reviewer should
 look at first. Then `Fixes #<n>` on its own line, and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
-From here the pull request is babysat ([`docs/babysit.md`](../../../docs/babysit.md)).
+Then **babysit it in this run** until it is done: `$RS wait <pr>`, handle what
+it comes back with, push, `wait` again — [`docs/babysit.md`](../../../docs/babysit.md).
+The run ends `released` once it is approved, green and mergeable, `blocked`
+when it cannot get there, or `pr-updated` when `wait` says `babysit_max_hours`
+is up. Opening the pull request is not the end of the run.
 
 ## When it goes wrong
 

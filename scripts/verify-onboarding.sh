@@ -30,8 +30,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info
-  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots stuck_after_min work_repo"
-ITEM_KEYS="item state branch slot pr session seen_at abandoned updated_at"
+  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots babysit_max_hours stuck_after_min work_repo"
+ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
 GATE_KEYS="diagnosed_at diagnoses"
 
 CHECKS=0; FAILS=0; WARNS=0
@@ -96,6 +96,11 @@ else
   S="$(cfg stuck_after_min)"
   case "$S" in
     '' | *[!0-9]*) [ -z "$S" ] || fail config.stuck_after_min "'$S' is not a whole number of minutes" "write 120, or more" ;;
+  esac
+  S="$(cfg babysit_max_hours)"
+  case "$S" in
+    '' ) ;;
+    *[!0-9]* | 0) fail config.babysit_max_hours "'$S' is not a whole number of hours" "write 4, or leave it out" ;;
   esac
   S="$(cfg slots)"
   case "$S" in

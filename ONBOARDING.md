@@ -134,6 +134,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - cluster_uninstall: mise run cluster:uninstall
 - cluster_delete: mise run cluster:delete
 - slots: 3
+- babysit_max_hours: 4
 - stuck_after_min: 120
 - work_repo: owner/name-work
 
@@ -146,8 +147,8 @@ merge (by default you may not).
 With `cluster: none`, leave the three `cluster_` lines and `verify_cluster`
 out; with no backup, leave out `work_repo`.
 
-`slots` and `stuck_after_min` are not questions for the user: write the
-defaults. Lower `slots` when the sandbox cannot run that many builds at once;
+`slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
+user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;
 raise `stuck_after_min` when one build step can run longer than two hours. Get `repo`,
 `label_handoff` and `label_claimed` right in particular: the precheck decides
 whether the agent wakes at all, and a wrong label there means either waking for
