@@ -217,6 +217,30 @@ as sess-b start 7
 is "$(field items/7.md babysat_out)" "" "the next run babysits afresh"
 done_
 
+PULL21='{"number":21,"state":"open","mergeable":true,"head":{"sha":"abc"},"user":{"login":"dev-bot"},"body":"Fixes #7 sess-a"}'
+GREEN_RUNS='{"check_runs":[{"id":1,"name":"e2e","status":"completed","conclusion":"success","completed_at":"2026-09-24T10:00:00Z"}]}'
+
+CASE="wait reads GraphQL only when the pull request changed"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_ETAG='"e1"' STUB_PULL="$PULL21" STUB_PR_VIEW="$(view OPEN REVIEW_REQUIRED MERGEABLE "$RUNNING_CHECK")" as sess-a wait 21
+is "$RC" 3 "nothing yet"
+has "$OUT" "checks running" "the GraphQL verdict, kept"
+is "$(grep -c '^pr view' "$HOME/gh.calls")" 1 "one GraphQL read for three looks"
+done_
+
+CASE="GraphQL refused, wait reads REST, and an approval there is never done"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_PULL="$PULL21" STUB_PR_VIEW= STUB_CHECKS="$GREEN_RUNS" \
+STUB_REVIEWS='[{"user":{"login":"maintainer"},"state":"APPROVED","submitted_at":"2020-01-01T00:00:00Z"}]' as sess-a wait 21
+is "$RC" 3 "not done"
+has "$OUT" "approved by its reviews and green; GitHub's review decision is unreadable" "says why"
+sleep 1; NOWZ="$(date -u -d '+1 minute' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1M +%Y-%m-%dT%H:%M:%SZ)"
+STUB_PULL="$PULL21" STUB_PR_VIEW= STUB_CHECKS="$GREEN_RUNS" \
+STUB_REVIEWS="[{\"user\":{\"login\":\"guardian\"},\"state\":\"CHANGES_REQUESTED\",\"submitted_at\":\"$NOWZ\"}]" as sess-a wait 21
+is "$RC" 0 "a review is still something to do"
+has "$OUT" "reviewed by guardian (CHANGES_REQUESTED)" "what"
+done_
+
 CASE="finish with nothing held still logs the run"; sandbox
 as sess-a finish nothing
 is "$RC" 0 "exit"

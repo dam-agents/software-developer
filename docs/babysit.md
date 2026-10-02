@@ -14,7 +14,8 @@ change answers its review. Waiting goes through one command:
 bash "$HOME/scripts/run-state.sh" wait <pr>
 ```
 
-It looks at the pull request once a minute for up to nine minutes, and comes
+It looks at the pull request once a minute for up to nine minutes — an
+unchanged one costs no API budget (`scripts/lib/github.sh`) — and comes
 back with what to do: a new review, a failed check, a conflict, merged or
 closed, or **done** — approved, green and mergeable. Exit `3` is nothing yet:
 call it again, never end the turn. `finish` refuses `pr-opened`, `pr-updated`
@@ -34,7 +35,9 @@ The precheck wakes it for a review or a failed check newer than its last look
 ## Each time you hold one
 
 Read its state — `gh pr view <n> --json reviewDecision,mergeable,statusCheckRollup,headRefOid`,
-then the reviews and comments since your last push — and handle all of it in
+or, when GraphQL's budget is spent, `gh api repos/<repo>/pulls/<n>` and its
+`/reviews` and the head's `/check-runs` over REST — then the reviews and
+comments since your last push — and handle all of it in
 one round, so one push answers everything:
 
 1. **Failed checks.** Read why (`gh run view <id> --log-failed`), fix the cause,

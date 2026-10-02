@@ -9,6 +9,20 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 2.3.0 — 2026-10-02
+
+GitHub reads spend less of the API budget, and survive GraphQL's running out:
+an app installation's hourly GraphQL budget is shared by every agent on it, and
+once spent, the precheck failed every tick. The precheck now reads its whole
+list in one GraphQL request, and over REST, a budget of its own, when GraphQL
+refuses — saying so in the list it hands the run. `run-state.sh wait` reads the
+pull request with conditional REST requests, free while nothing changed, and
+spends a GraphQL read only on a change; with GraphQL refused it decides from
+REST alone, but never that a pull request is done. The shared reads live in the
+new `scripts/lib/github.sh`.
+
+**Upgrade:** none.
+
 ## 2.2.0 — 2026-10-02
 
 An `author` other agents share — a GitHub App's bot — no longer makes their
