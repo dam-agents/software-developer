@@ -84,6 +84,7 @@ fi
 HANDOFF="$(cfg label_handoff)"; HANDOFF="${HANDOFF:-agent/implement}"
 CLAIMED="$(cfg label_claimed)"; CLAIMED="${CLAIMED:-agent/in-progress}"
 NEEDS_INFO="$(cfg label_needs_info)"; NEEDS_INFO="${NEEDS_INFO:-agent/needs-info}"
+FAILED_LABEL="$(cfg label_failed)"; FAILED_LABEL="${FAILED_LABEL:-agent/failed}"
 
 # The login onboarding recorded, else whoever the token belongs to. `@me` is
 # the last resort: resolving it costs a call, and a token without user scope
@@ -124,11 +125,12 @@ ITEMS_JSON="$(for f in "$ITEMS"/*.md; do
 done | jq -s 'add // {}')" || ITEMS_JSON='{}'
 
 # A pull request is babysat until it is approved and green (docs/babysit.md),
-# so it wakes a run for anything that happened to it since a run last looked
-# at its item: a review of any kind, or a check that failed — once, so one the
-# agent could not fix is reported once rather than every tick. Approval is not
-# gated: releasing the issue is that run's job. Its item is the issue its body
-# names (`Fixes #<n>`), and an item a live run holds is left out.
+# so it wakes a run for anything that happened to it since a run last started
+# on its item: a review of any kind, approval included, or a check that failed
+# — once, so what the agent could not fix, and an approval it already acted on
+# while the pull request waits for a person to merge it, are not reported every
+# tick. Its item is the issue its body names (`Fixes #<n>`), and an item a live
+# run holds is left out.
 PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" \
     --arg held "$HELD" --argjson items "$ITEMS_JSON" '
   map(.number as $pr | . + {item: ((.body // "") | capture("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #(?<n>[0-9]+)").n // "pr\($pr)")})
@@ -141,10 +143,10 @@ PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR
       | select((.completedAt // .startedAt // "") > $s)
       | (.name // .context)])
   })
-  | map(select(.reviewDecision == "APPROVED" or .reviewed or (.failed | length > 0)))
+  | map(select(.reviewed or (.failed | length > 0)))
   | .[]
   | "- \(if (.item | startswith("pr")) then .item else "#\(.item)" end) — PR #\(.number) \(.title) — \([
-      (if .reviewDecision == "APPROVED" then "approved" else empty end),
+      (if .reviewed and .reviewDecision == "APPROVED" then "approved" else empty end),
       (if .reviewed and .reviewDecision != "APPROVED" then "reviewed; resolve every finding and re-request review" else empty end),
       (if (.failed | length > 0) then "checks failed: \(.failed | join(", "))" else empty end)
     ] | join("; ")) — docs/babysit.md\n  \(.url)"
@@ -165,8 +167,9 @@ ISSUES="$(gh_json issue list -R "$REPO" --label "$HANDOFF" --state open --limit 
   exit 2
 }
 
-ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info "$NEEDS_INFO" --arg held "$HELD" '
-  map(select([.labels[].name] | (index($claimed) or index($info)) | not))
+ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info "$NEEDS_INFO" \
+    --arg failed "$FAILED_LABEL" --arg held "$HELD" '
+  map(select([.labels[].name] | (index($claimed) or index($info) or index($failed)) | not))
   | map(select(.number as $i | $held | contains(" \($i) ") | not))
   | reverse | .[]
   | "- #\(.number) \(.title)\n  \(.url)"
@@ -189,7 +192,7 @@ RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" --arg 
     --argjson items "$ITEMS_JSON" '
   map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))
   | map(select(.number as $i | $held | contains(" \($i) ") | not))
-  | map(select(($items["\(.number)"].state // "") != "waiting-cluster"))
+  | map(select(($items["\(.number)"].state // "") | IN("waiting-cluster", "blocked", "needs-info") | not))
   | .[]
   | "- #\(.number) \(.title)\(($items["\(.number)"].abandoned // 0) as $a
       | if $a > 0 then " — a run died on it \($a) time(s)" else "" end)\n  \(.url)"

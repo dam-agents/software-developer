@@ -120,6 +120,24 @@ STUB_PRS="$OWN" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
 is "$RC" 1 "the agent's own comment is not a review"
 done_
 
+CASE="an approval wakes a run once, not until someone merges"; sandbox
+APPROVED='[{"number":40,"title":"Forty","url":"https://gh/pr/40","reviewDecision":"APPROVED","body":"Fixes #4",
+  "latestReviews":[{"author":{"login":"maintainer"},"state":"APPROVED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
+STUB_PRS="$APPROVED" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 0 "a new approval"
+has "$OUT" "#4 — PR #40 Forty — approved" "says so"
+item 4 state=released seen_at=2026-09-24T10:20:00Z
+STUB_PRS="$APPROVED" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 1 "already acted on, waiting for a merge"
+done_
+
+CASE="what waits on a person is not work"; sandbox
+item 5 state=blocked; item 6 state=needs-info
+STUB_HANDOFF='[{"number":9,"title":"Nine","url":"https://gh/9","labels":[{"name":"agent/implement"},{"name":"agent/failed"}]}]' \
+STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"},{"number":6,"title":"Six","url":"https://gh/6"}]' precheck
+is "$RC" 1 "a failed issue, a blocked one and one waiting for an answer"
+done_
+
 CASE="a probe skips the gate and writes nothing"; sandbox; full 300
 PRECHECK_PROBE=1 STUB_HANDOFF="$ISSUE7" precheck
 is "$RC" 0 "reports the work despite full slots"
