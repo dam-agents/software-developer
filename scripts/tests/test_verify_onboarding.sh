@@ -75,4 +75,18 @@ has "$OUT" "FAIL live.label_review — no label 'code-guardian-review'" "label"
 has "$OUT" "FAIL live.runtime" "runtime down"
 done_
 
+CASE="work_repo is checked when set"; sandbox; onboarded
+echo "- work_repo: acme/widgets-work" >> "$HOME/work/CONFIG.md"
+STUB_STATUS="$IDLE" STUB_REACH=2 verify --live
+is "$RC" 0 "exit"
+has "$OUT" "ok   config.work_repo — acme/widgets-work" "shape"
+has "$OUT" "ok   live.work_repo — acme/widgets-work takes a push" "push"
+has "$OUT" "ok   live.scope — the connection pushes to repo and work_repo alone" "scope counts the backup"
+STUB_STATUS="$IDLE" STUB_REACH=2 STUB_WORK_PUSH=false verify --live
+has "$OUT" "FAIL live.work_repo — no push to acme/widgets-work" "no push"
+setcfg work_repo acme/widgets
+verify --config
+has "$OUT" "FAIL config.work_repo — is repo itself" "never the repository worked on"
+done_
+
 exit "$FAILED"

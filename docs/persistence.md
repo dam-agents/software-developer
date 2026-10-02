@@ -8,7 +8,7 @@ to this definition itself.
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/` |
-| `$HOME/work` | runtime state, a plain directory | `CONFIG.md`, `AGENTS.md`, `VERSION`, `RUN.md`, `GATE.md`, `TICK.log`, `AUDIT.log`, and the target repository's checkout |
+| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `RUN.md`, `GATE.md`, `TICK.log`, `AUDIT.log`, and the target repository's checkout |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
 and a `.git` that concurrent runs change there corrupts — `Stale file handle`,
@@ -19,13 +19,31 @@ The `.gitignore` at `$HOME` is an allowlist, so `work/` and the home's secrets
 (`.ssh`, `.claude`, `.config`) are invisible to the definition. **Never
 `git clean` in `$HOME`**, and never `git add` outside the paths in the table.
 
-## No backup, by design
+## Backup
 
-Nothing under `work/` is backed up. Every fact about the work lives on GitHub —
-labels, branches, pull requests — and the tick rebuilds its own bookkeeping
-from nothing: a missing `RUN.md` is no run in flight. The one file that cannot
-be reconstructed is `CONFIG.md`, and losing it costs one onboarding
-conversation: delete `$HOME/.software-developer-onboarded` and follow
+Every fact about the work lives on GitHub — labels, branches, pull requests —
+and the tick rebuilds its own bookkeeping from nothing: a missing `RUN.md` is
+no run in flight. What nothing rebuilds is `CONFIG.md`, and the history in
+`TICK.log` and `AUDIT.log`. With `work_repo` set, those travel to a private
+repository of their own through `scripts/work-backup.sh`, which pushes straight
+to its default branch — a repository of data, never of changes for review, and
+the only one a script pushes to. Its header says exactly what travels, and why
+the git never happens in `work/` itself:
+
+- **persist** — `run-state.sh finish` runs it last, so every closed run is
+  backed up. In the direct session, run it after you change `CONFIG.md`:
+  `bash "$HOME/scripts/work-backup.sh" persist`. It never fails the run: a
+  backup it could not push is retried by the next one. It refuses a `work/`
+  that would delete `CONFIG.md` or shorten a log the backup holds — a volume
+  nobody restored. Restore it; `WORK_BACKUP_ALLOW_DELETE=1` only when the
+  operator means the loss.
+- **restore** — onboarding runs it on a fresh volume (`ONBOARDING.md` → **2.
+  Ask**). Exit `0` restored · `2` nothing there to restore · `1` failed: stop,
+  and never write a new `CONFIG.md` over a backup that exists.
+
+The weekly audit checks that the backup holds the current `CONFIG.md`.
+Without `work_repo` there is no backup: a lost `CONFIG.md` costs one onboarding
+conversation — delete `$HOME/.software-developer-onboarded` and follow
 `ONBOARDING.md`. Until then the precheck finds no repository and declines every
 tick, and the weekly audit reports the missing keys.
 

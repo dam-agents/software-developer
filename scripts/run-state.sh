@@ -17,7 +17,8 @@
 #   claim <occurrence>       precheck, on letting a work run through
 #   start                    the run's first act: stamps its session on the claim
 #   phase <text> [issue]     the run, before each long step
-#   finish <outcome> [pr]    the run's last act, on every way out
+#   finish <outcome> [pr]    the run's last act, on every way out; then backs
+#                            work/ up (work-backup.sh persist)
 #   abandon <reason>         closes a record whose run is gone
 #   busy | free | diagnosed  precheck bookkeeping between runs
 #   show                     both files, for a human
@@ -109,7 +110,9 @@ case "${1:-}" in
   finish)
     mine || exit 1
     [ -n "${3:-}" ] && { write "$RUN" "$RUN" "$RUN_KEYS" "pr=$3" || exit 2; }
-    close "${2:?outcome}"
+    close "${2:?outcome}" || exit 2
+    # last, so the backup carries this run's TICK.log line
+    bash "$HERE/work-backup.sh" persist >&2
     ;;
   abandon)
     held || exit 0

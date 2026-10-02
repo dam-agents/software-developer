@@ -49,4 +49,14 @@ has "$OUT" "warn definition.version — checked out $(head -1 "$SCRIPTS/../VERSI
 has "$OUT" "runs: none closed this week" "an empty log"
 done_
 
+CASE="the backup holds the current CONFIG.md"; sandbox; onboarded; origin "$(cat "$HOME/VERSION")"
+echo "- work_repo: acme/widgets-work" >> "$HOME/work/CONFIG.md"
+STUB_REACH=2 STUB_BACKUP_CONFIG="$(base64 < "$HOME/work/CONFIG.md" | tr -d "\n")" audit
+has "$OUT" "ok   backup.config" "current"
+STUB_REACH=2 STUB_BACKUP_CONFIG="$(echo old | base64 | tr -d "\n")" audit
+has "$OUT" "warn backup.config — acme/widgets-work holds another CONFIG.md" "stale"
+STUB_REACH=2 audit
+has "$OUT" "warn backup.config — not measured" "unreadable"
+done_
+
 exit "$FAILED"

@@ -9,6 +9,23 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 1.3.0 — 2026-10-02
+
+`work/` can be backed up to a private repository of its own: a new optional
+key, `work_repo`, and `scripts/work-backup.sh`, which `run-state.sh finish`
+runs last (`docs/persistence.md` → **Backup**). Off without the key.
+
+**Upgrade:**
+
+1. Offer the backup to the operator: it needs a private repository they
+   create (suggest `<owner>/<agent>-work`), and write on its contents for the
+   connection — **operator only**. For a yes, add
+   `- work_repo: <owner/name>` to `work/CONFIG.md`, then run
+   `bash "$HOME/scripts/work-backup.sh" persist` and check that it says
+   `backed up`. For a no, nothing changes.
+2. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`: with the key set
+   it checks the push to `work_repo`, and counts it in `live.scope`.
+
 ## 1.2.0 — 2026-10-01
 
 The kit sets `PLATFORM_SANDBOX=1`, so a repository's own tooling can tell it

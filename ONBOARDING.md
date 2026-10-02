@@ -18,6 +18,7 @@ user can decide — never your own work:
 
 | id | label |
 |----|-------|
+| `backup` | Where `work/` is backed up, and whether a backup exists already |
 | `repo` | Which repository to work on |
 | `labels` | Which labels mean hand-off, claimed, failed, review-requested |
 | `verify` | How to build, check and test — and whether it needs a cluster |
@@ -32,6 +33,23 @@ steps if the conversation calls for it — steps you keep stay ticked.
 
 One question at a time. Suggest an answer with each question so the user is
 confirming or correcting rather than composing from nothing.
+
+- **Backup** — first, because a backup answers everything else. Ask for the
+  private repository `work/` is backed up to, suggesting `<owner>/<agent>-work`;
+  the user creates it, and the connection needs write on its contents. "None"
+  is an answer: there is no backup, and `work_repo` stays out. Otherwise write
+  `- work_repo: <owner/name>` to `work/CONFIG.md` and restore:
+
+  ```sh
+  bash "$HOME/scripts/work-backup.sh" restore; echo "exit $?"
+  ```
+
+  `0` — this agent's state is back: keep `work_repo` in the restored
+  `CONFIG.md` (add it again if it is missing), show the user the file, and ask
+  only what is still missing. `2` — the repository holds no backup yet; carry
+  on, the first run's backup fills it. `1` — **stop**: report the output, and
+  re-run onboarding once the repository is reachable. Never write a new
+  `CONFIG.md` over a backup that exists.
 
 - **Repository** — `owner/name`. Ask; do not assume. If they are setting this
   up for the platform's own development the answer is `dam-agents/dam`, but
@@ -108,6 +126,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - cluster_uninstall: mise run cluster:uninstall
 - cluster_delete: mise run cluster:delete
 - stuck_after_min: 120
+- work_repo: owner/name-work
 
 ## Bounds
 
@@ -115,7 +134,8 @@ Plain sentences, one per line: what you must never touch, and whether you may
 merge (by default you may not).
 ```
 
-With `cluster: none`, leave the three `cluster_` lines out.
+With `cluster: none`, leave the three `cluster_` lines out; with no backup,
+leave out `work_repo`.
 
 `stuck_after_min` is not a question for the user: write the default, and raise
 it later if one build step can run longer than two hours. Get `repo`,
@@ -148,13 +168,17 @@ scheduled run does that, where it is visible and can be retried.
 
 Only once every step above succeeded. Record the version this instance adopts,
 then the sentinel — before the verification, so a failure in it never re-runs
-the whole intake:
+the whole intake. A restored `work/VERSION` is kept: migrate from it instead
+(`docs/persistence.md` → **Definition version & upgrade**).
 
 ```sh
-head -1 "$HOME/VERSION" > "$HOME/work/VERSION"
+[ -f "$HOME/work/VERSION" ] || head -1 "$HOME/VERSION" > "$HOME/work/VERSION"
 date -u +%Y-%m-%dT%H:%M:%SZ > "$HOME/.software-developer-onboarded"
 bash "$HOME/scripts/verify-onboarding.sh" --live
 ```
+
+With `work_repo` set, back the new `work/` up now rather than at the first
+run: `bash "$HOME/scripts/work-backup.sh" persist`.
 
 Apply every `FAIL` line's `fix:` and re-run until it prints `PASS`; an
 operator-only fix goes to the user. It warns that only MCP can list schedules:

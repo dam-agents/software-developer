@@ -82,6 +82,22 @@ if [ -n "$REPO" ] && [ -n "$AUTHOR" ]; then
   esac
 fi
 
+# The backup holds the CONFIG.md this instance runs on — the one file nothing
+# else can rebuild. Every closed run pushes it, so a difference is a backup
+# that has been failing.
+WORK_REPO="$(cfg work_repo)"
+if [ -n "$WORK_REPO" ]; then
+  case "$WORK_REPO" in */*/*) WHOST="${WORK_REPO%%/*}"; WSLUG="${WORK_REPO#*/}" ;; *) WHOST=github.com; WSLUG="$WORK_REPO" ;; esac
+  if ! held="$(gh api --hostname "$WHOST" "repos/$WSLUG/contents/CONFIG.md" --jq .content 2>/dev/null | base64 -d 2>/dev/null)" ||
+     [ -z "$held" ]; then
+    echo "warn backup.config — not measured: could not read CONFIG.md from $WORK_REPO"
+  elif [ "$held" = "$(cat "$WORK/CONFIG.md" 2>/dev/null)" ]; then
+    echo "ok   backup.config — $WORK_REPO holds the current CONFIG.md"
+  else
+    echo "warn backup.config — $WORK_REPO holds another CONFIG.md: the backup is failing — bash \$HOME/scripts/work-backup.sh persist says why"
+  fi
+fi
+
 nfs="$(find "$WORK" -name '.nfs*' 2>/dev/null | wc -l | tr -d ' ')"
 [ "$nfs" = 0 ] && echo "ok   volume.nfs — no silly-rename leftovers" ||
   echo "warn volume.nfs — $nfs .nfs* file(s) under work/: something deleted a file still held open"

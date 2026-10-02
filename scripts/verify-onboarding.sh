@@ -30,7 +30,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url label_handoff label_claimed label_failed label_review
-  verify cluster cluster_install cluster_uninstall cluster_delete stuck_after_min"
+  verify cluster cluster_install cluster_uninstall cluster_delete stuck_after_min work_repo"
 RUN_KEYS="run_state session occurrence claimed_at phase phase_at issue pr outcome ended_at"
 GATE_KEYS="busy_since diagnosed_at diagnoses"
 
@@ -55,6 +55,8 @@ unknown_in() {
 
 REPO="$(cfg repo)"
 case "$REPO" in */*/*) HOST="${REPO%%/*}"; SLUG="${REPO#*/}" ;; *) HOST=github.com; SLUG="$REPO" ;; esac
+WORK_REPO="$(cfg work_repo)"
+case "$WORK_REPO" in */*/*) WHOST="${WORK_REPO%%/*}"; WSLUG="${WORK_REPO#*/}" ;; *) WHOST=github.com; WSLUG="$WORK_REPO" ;; esac
 
 # ------------------------------------------------------------------ CONFIG
 CFG_FIX="ONBOARDING.md → 3. Write it down"
@@ -68,6 +70,15 @@ else
 
   if [ -n "$REPO" ] && ! printf '%s' "$REPO" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
     fail config.repo "'$REPO' is not [host/]owner/name" "write the slug alone, no URL"
+  fi
+  if [ -z "$WORK_REPO" ]; then
+    ok config.work_repo "unset — work/ is not backed up (docs/persistence.md → Backup)"
+  elif ! printf '%s' "$WORK_REPO" | grep -qE '^([A-Za-z0-9.-]+/)?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
+    fail config.work_repo "'$WORK_REPO' is not [host/]owner/name" "write the slug alone, no URL"
+  elif [ "$WORK_REPO" = "$REPO" ]; then
+    fail config.work_repo "is repo itself — the backup would push to the default branch of the repository you work on" "name a repository of its own"
+  else
+    ok config.work_repo "$WORK_REPO"
   fi
   APP="$(cfg app_url)"
   if [ -n "$APP" ] && ! printf '%s' "$APP" | grep -qE '^https?://[^[:space:]]+$'; then
@@ -173,11 +184,19 @@ if [ "$LIVE" = 1 ]; then
     push="$(gh api --hostname "$HOST" "repos/$SLUG" --jq .permissions.push 2>/dev/null)"
     [ "$push" = true ] && ok live.push "$REPO takes a push" ||
       fail live.push "no push to $REPO (${push:-no answer})" "operator-only: the connection needs write on contents, pull requests and issues"
+    want=1
+    if [ -n "$WORK_REPO" ]; then
+      want=2
+      wpush="$(gh api --hostname "$WHOST" "repos/$WSLUG" --jq .permissions.push 2>/dev/null)"
+      [ "$wpush" = true ] && ok live.work_repo "$WORK_REPO takes a push" ||
+        fail live.work_repo "no push to $WORK_REPO (${wpush:-no answer}) — every backup fails" \
+          "operator-only: create it private, and grant the connection write on its contents"
+    fi
     reach="$(gh api --hostname "$HOST" "user/repos?per_page=100" --jq '[.[] | select(.permissions.push)] | length' 2>/dev/null)"
     case "$reach" in
-      1) ok live.scope "the connection pushes to this repository alone" ;;
+      "$want") ok live.scope "the connection pushes to repo$([ "$want" = 2 ] && echo ' and work_repo') alone" ;;
       '' | *[!0-9]*) warn live.scope "could not count the repositories the connection can push to" ;;
-      *) warn live.scope "the connection can push to $reach repositories — README → The GitHub connection asks for one" ;;
+      *) warn live.scope "the connection can push to $reach repositories — README → The GitHub connection asks for $want" ;;
     esac
     have="$(gh label list -R "$REPO" --limit 500 --json name --jq '.[].name' 2>/dev/null)"
     if [ -z "$have" ]; then

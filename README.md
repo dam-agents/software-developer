@@ -20,6 +20,8 @@ the pull request through review.
   from one that died.
 - [`scripts/session-link.sh`](scripts/session-link.sh) — the link back to the
   run that wrote a change, which every pull request carries.
+- [`scripts/work-backup.sh`](scripts/work-backup.sh) — backs `work/` up to a
+  private repository of its own, and restores it on a fresh volume.
 - [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an
   instance has the shape onboarding promises; every failure names its fix.
 - [`scripts/audit.sh`](scripts/audit.sh) — the deterministic half of the
@@ -42,7 +44,8 @@ account can reach. **Scope it to the repository the agent works on and nothing
 else** — a GitHub App installed on that one repository, or a fine-grained token
 limited to it — with read and write on contents, pull requests and issues. The
 agent is told never to act on another repository; a connection that cannot is
-what keeps that true when an issue body tries to talk it into one.
+what keeps that true when an issue body tries to talk it into one. The one
+addition is the backup repository, when there is one: write on its contents.
 
 Use a machine account rather than your own: otherwise the pull requests it
 opens are indistinguishable from yours.
@@ -60,6 +63,6 @@ All under `work/`, none of it tracked here:
 | `TICK.log` | `scripts/run-state.sh` | one line per closed run, append-only |
 | `AUDIT.log` | the weekly audit | one line per audit: ok, warn and fail counts |
 
-None of it is backed up: everything but `CONFIG.md` is rebuilt from GitHub or
-from nothing, and a lost `CONFIG.md` costs one onboarding conversation —
-[`docs/persistence.md`](docs/persistence.md).
+Everything but `RUN.md` and `GATE.md` is backed up to a private repository of
+its own when `work_repo` names one; the checkout under `work/` is not, as it
+lives on GitHub already — [`docs/persistence.md`](docs/persistence.md).
