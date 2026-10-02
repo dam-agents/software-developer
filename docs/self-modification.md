@@ -86,12 +86,13 @@ would weaken §10 is refused, and the defect reported instead.
 
 ## 7. Data backup
 
-`work/`'s top-level files are backed up to `work_repo` when it is set
-(`docs/persistence.md` → **Backup**); its directories are not. Something
-unreconstructable goes into a top-level file of `work/`, never a directory,
-and never into `RUN.md` or `GATE.md`, which do not travel. An append-only log
-is added to `APPEND_ONLY` in `scripts/work-backup.sh`, so a backup never
-overwrites it with a shorter one.
+`work/` is backed up to `work_repo` when it is set (`docs/persistence.md` →
+**Backup**), but only the files named in `CARRIED` in `scripts/work-backup.sh`
+— an allowlist, which the backup also commits as its `.gitignore`. A change
+that puts something unreconstructable into `work/` adds its file there, and an
+append-only one to `APPEND_ONLY` too, so a backup never overwrites it with a
+shorter one. A credential never belongs in a carried file; persist refuses one
+that looks like it does.
 
 ## 8. Change process
 

@@ -28,7 +28,9 @@ no run in flight. What nothing rebuilds is `CONFIG.md`, and the history in
 repository of their own through `scripts/work-backup.sh`, which pushes straight
 to its default branch — a repository of data, never of changes for review, and
 the only one a script pushes to. Its header says exactly what travels, and why
-the git never happens in `work/` itself:
+the git never happens in `work/` itself. Only the files it names travel — the
+backup's `.gitignore` shuts out everything else — and a file that looks like it
+holds a credential stops the push:
 
 - **persist** — `run-state.sh finish` runs it last, so every closed run is
   backed up. In the direct session, run it after you change `CONFIG.md`:

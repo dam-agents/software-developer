@@ -6,11 +6,13 @@
 #   persist   work/ -> commit -> push; run-state.sh finish calls it last
 #   restore   the backup -> work/, on a fresh volume (ONBOARDING.md)
 #
-# What travels is work/'s own top-level files: CONFIG.md, the logs, VERSION,
-# AGENTS.md. Never a directory — the checkout and its worktrees live on GitHub
-# already — never a dotfile, and never RUN.md or GATE.md, which describe this
-# sandbox's processes and mean nothing on another one. A README.md or LICENSE
-# belongs to the backup repository itself, and stays there untouched.
+# What travels is CARRIED below, by name, and nothing else: an allowlist, which
+# every persist also commits as the backup's .gitignore, so no `git add` in the
+# clone can ever pick up another file. Never a directory — the checkout and its
+# worktrees live on GitHub already — and never RUN.md or GATE.md, which
+# describe this sandbox's processes and mean nothing on another one. A
+# README.md or LICENSE belongs to the backup repository itself and stays.
+# A carried file that looks like it holds a credential stops the push.
 #
 # All git happens in a clone on tmpfs, never in work/: the home volume is
 # virtiofs over NFS, and a .git there corrupts under concurrent runs
@@ -38,6 +40,7 @@ LOCK="$LOCAL.lock"
 LOCK_TTL_MIN=10
 BRANCH="${WORK_BACKUP_BRANCH:-main}"
 RETRIES=3
+CARRIED="CONFIG.md AGENTS.md VERSION TICK.log AUDIT.log"
 PROTECTED="CONFIG.md"
 APPEND_ONLY="TICK.log AUDIT.log"
 
@@ -54,11 +57,29 @@ fi
 case "$WORK_REPO" in */*/*) REF="$WORK_REPO" ;; *) REF="github.com/$WORK_REPO" ;; esac
 REMOTE="${WORK_BACKUP_REMOTE:-https://$REF}"
 
-# carried <dir> — the top-level files that travel, one name per line
+# carried <dir> — the CARRIED files present in <dir>, one name per line
 carried() {
-  find "$1" -mindepth 1 -maxdepth 1 -type f ! -name '.*' ! -name RUN.md ! -name GATE.md \
-    ! -name README.md ! -name LICENSE \
-    -exec basename {} \; 2>/dev/null | sort
+  local f
+  for f in $CARRIED; do [ -f "$1/$f" ] && echo "$f"; done
+  return 0
+}
+
+# gitignore — the backup's own .gitignore: everything out, CARRIED back in
+gitignore() {
+  local f
+  printf '# Written by scripts/work-backup.sh on every persist, never by hand.\n/*\n'
+  for f in .gitignore README.md LICENSE $CARRIED; do printf '!/%s\n' "$f"; done
+}
+
+# A token, a key or a password assignment in a carried file. Patterns, not
+# proof: a match stops the push and names the file, never the match.
+SECRET_RE='gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|(password|passwd|secret|token)[[:space:]]*[:=][[:space:]]*[^[:space:]<]{8,}'
+secrets_in() {
+  local f
+  for f in $(carried "$WORK"); do
+    grep -qiE "$SECRET_RE" "$WORK/$f" 2>/dev/null && printf ' %s' "$f"
+  done
+  return 0
 }
 
 git_() { git -C "$LOCAL" -c user.name=software-developer \
@@ -103,7 +124,7 @@ seed() {
 lines() { [ -f "$1" ] && wc -l < "$1" | tr -d ' ' || echo 0; }
 
 persist() {
-  local attempt=0 f gone
+  local attempt=0 f gone leak
   lock || { say "another persist is running — skipping; the next run backs up what it misses."; return 0; }
   while [ "$attempt" -lt "$RETRIES" ]; do
     attempt=$((attempt + 1))
@@ -118,6 +139,11 @@ persist() {
         [ "$(lines "$WORK/$f")" -lt "$(lines "$LOCAL/$f")" ] && gone="$gone $f"
       done
     fi
+    leak="$(secrets_in)"
+    if [ -n "$leak" ]; then
+      say "refused: what looks like a credential is in${leak} — remove it from work/; nothing was pushed."
+      return 0
+    fi
     if [ -n "$gone" ]; then
       say "refused: work/ would lose${gone} the backup holds — it looks unrestored; restore it first (docs/persistence.md → Backup)."
       return 0
@@ -126,6 +152,7 @@ persist() {
     # mirror: what left work/ leaves the backup, what is in work/ is copied in
     carried "$LOCAL" | while read -r f; do rm -f "$LOCAL/$f"; done
     carried "$WORK" | while read -r f; do cp "$WORK/$f" "$LOCAL/$f"; done
+    gitignore > "$LOCAL/.gitignore"
     git_ add -A || continue
     if git_ diff --cached --quiet; then say "nothing to back up."; return 0; fi
     git_ commit -qm "chore(work): back up work/ $(date -u +%Y-%m-%dT%H:%M:%SZ)" || continue

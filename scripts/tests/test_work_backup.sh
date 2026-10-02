@@ -28,10 +28,12 @@ CASE="persist carries work/'s files, and nothing else"; backed
 echo "1 line" > "$HOME/work/TICK.log"; echo v > "$HOME/work/VERSION"
 echo "- run_state: idle" > "$HOME/work/RUN.md"; echo "- busy_since: x" > "$HOME/work/GATE.md"
 echo tmp > "$HOME/work/.RUN.md.abc"; mkdir -p "$HOME/work/widgets/.git"; echo x > "$HOME/work/widgets/f"
+echo stray > "$HOME/work/notes.txt"
 backup persist
 is "$RC" 0 "exit"
 has "$OUT" "backed up" "pushed"
-is "$(remote_files)" "CONFIG.md TICK.log VERSION " "files"
+is "$(remote_files)" ".gitignore CONFIG.md TICK.log VERSION " "only the allowlist travels"
+git -C "$HOME/remote.git" show main:.gitignore | grep -qx '/\*' || fail "the backup's .gitignore does not shut everything out"
 [ ! -e "$HOME/work/.git" ] || fail "made work/ a git repository"
 backup persist
 has "$OUT" "nothing to back up" "an unchanged work/ pushes nothing"
@@ -39,7 +41,7 @@ is "$(remote_commits)" 1 "commits"
 echo "2 line" >> "$HOME/work/TICK.log"; rm "$HOME/work/VERSION"
 backup persist
 is "$(remote_commits)" 2 "a change is a new commit"
-is "$(remote_files)" "CONFIG.md TICK.log " "a file gone from work/ leaves the backup"
+is "$(remote_files)" ".gitignore CONFIG.md TICK.log " "a file gone from work/ leaves the backup"
 done_
 
 CASE="a work/ that was never restored does not overwrite the backup"; backed
@@ -55,11 +57,11 @@ WORK_BACKUP_ALLOW_DELETE=1 backup persist
 is "$(remote_commits)" 2 "the operator may allow it"
 done_
 
-CASE="a second clone's push is rebased onto, never forced over"; backed
+CASE="persist builds on the tip another push left, never forces over it"; backed
 echo a > "$HOME/work/TICK.log"; backup persist
 other="$(mktemp -d)"; git clone -q -b main "$HOME/remote.git" "$other/c"
-echo extra > "$other/c/NOTE.md"
-git -C "$other/c" add NOTE.md
+echo "9.9.9" > "$other/c/VERSION"
+git -C "$other/c" add VERSION
 git -C "$other/c" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qm other
 git -C "$other/c" push -q origin HEAD:main; rm -rf "$other"
 printf 'a\nb\n' > "$HOME/work/TICK.log"; backup persist
@@ -88,7 +90,16 @@ backup restore
 is "$RC" 2 "a repository with no CONFIG.md holds no backup"
 [ ! -f "$HOME/work/README.md" ] || fail "restored the repository's README"
 backup persist
-is "$(remote_files)" "CONFIG.md LICENSE README.md " "kept beside the backup"
+is "$(remote_files)" ".gitignore CONFIG.md LICENSE README.md " "kept beside the backup"
+done_
+
+CASE="a credential in a carried file stops the push"; backed
+echo "- note: token = ghp_$(printf 'a%.0s' $(seq 36))" >> "$HOME/work/CONFIG.md"
+backup persist
+is "$RC" 0 "exit"
+has "$OUT" "refused: what looks like a credential is in CONFIG.md" "names the file"
+lacks "$OUT" "ghp_" "never prints the match"
+is "$(remote_commits)" 0 "nothing pushed"
 done_
 
 CASE="restore from an empty or unreachable remote"; backed
