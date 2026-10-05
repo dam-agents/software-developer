@@ -24,6 +24,7 @@ user can decide — never your own work:
 | `verify` | How to build, check and test — and which part needs the cluster |
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
+| `slack` | Whether, and to which chat, to post the moments a person acts on |
 | `bounds` | What you must never touch |
 
 Tick each with `complete_onboarding_step` as it is answered. Add, rename or drop
@@ -95,6 +96,13 @@ confirming or correcting rather than composing from nothing.
   on this very conversation. A link with no `?s=` means the harness does not
   hand its session id to the shell, and pull requests will link to the agent
   rather than to the run that wrote them — say so, it is worth knowing.
+- **Slack** — optional, and off unless they say yes. Run `describe_channel`
+  for `slack`: when it lists chats, offer to post the moments a person acts on
+  — ready to merge, needs info, blocked, the weekly audit
+  ([`docs/notify.md`](docs/notify.md)) — and ask which chat, the first one
+  listed being the agent's bound channel. Record its id as `slack_channel`.
+  Not connected: skip it, and say a Slack channel can be bound in the agent's
+  settings later.
 - **Bounds** — what is off limits, and explicitly whether you may merge. The
   default is **no**: you stop at approved and a person merges.
 
@@ -142,6 +150,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - babysit_max_hours: 4
 - stuck_after_min: 120
 - work_repo: owner/name-work
+- slack_channel: C0123ABCD
 
 ## Bounds
 
@@ -150,7 +159,7 @@ merge (by default you may not).
 ```
 
 With `cluster: none`, leave the three `cluster_` lines and `verify_cluster`
-out; with no backup, leave out `work_repo`.
+out; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
 user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;

@@ -54,6 +54,12 @@ addition is the backup repository, when there is one: write on its contents.
 Use a machine account rather than your own: otherwise the pull requests it
 opens are indistinguishable from yours.
 
+## Slack
+
+Optional. Bind a channel to the agent in its settings and set `slack_channel`,
+and it posts the moments a person acts on there — ready to merge, needs info,
+blocked, the weekly audit ([`docs/notify.md`](docs/notify.md)).
+
 ## What it keeps on the instance
 
 All under `work/`, none of it tracked here:

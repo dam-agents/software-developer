@@ -53,10 +53,10 @@ a line in any other shape is invisible, not wrong.
   run silent this long lets a diagnostic run through.
 - `work_repo` — `owner/name`, private, holding the backup of `work/`
   ([`docs/persistence.md`](docs/persistence.md) → **Backup**). Missing: none.
+- `slack_channel` — the chat id Slack posts go to ([`docs/notify.md`](docs/notify.md)). Missing: none.
 - What you must never touch: the `## Bounds` section, in plain sentences.
 
-The checkout lives at `work/<name>`. If it is missing, clone it from `repo`
-before anything else.
+The checkout lives at `work/<name>`; missing, clone it from `repo` before anything else.
 
 ## Run types
 

@@ -9,6 +9,24 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 2.4.0 — 2026-10-05
+
+Slack posts, off by default: with the new, optional `slack_channel` set, a run
+posts the moments a person acts on — a pull request ready to merge, an issue
+that needs info, a blocked one — and the weekly audit its summary
+(`docs/notify.md`). `finish` says when to post; the post comes after it and
+never holds a run open. Missing, nothing changes.
+
+**Upgrade:**
+
+1. Offer Slack posts to the operator. Only for a yes, and only when
+   `describe_channel` for `slack` lists chats: add `- slack_channel: <chat id>`
+   to `work/CONFIG.md`, then `bash "$HOME/scripts/work-backup.sh" persist`.
+   No Slack connected: **operator only** — bind a channel in the agent's
+   settings first.
+2. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`: it now checks
+   `config.slack_channel`.
+
 ## 2.3.0 — 2026-10-02
 
 GitHub reads spend less of the API budget, and survive GraphQL's running out:

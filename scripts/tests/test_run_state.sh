@@ -60,6 +60,22 @@ is "$(slot 1)" feat/8 "8 took the first free slot"
 is "$(slot 2)" feat/7 "7 resumes its branch from the item record"
 done_
 
+CASE="with slack_channel set, finish says what to post, and only for a moment a person acts on"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
+lacks "$(cat "$HOME/err")" "notify:" "unset: no posts"
+echo "- slack_channel: C0123ABCD" >> "$HOME/work/CONFIG.md"
+as sess-a start 7 feat/7
+STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
+has "$(cat "$HOME/err")" "notify: if #21 is still open, post that it is ready to merge to slack_channel C0123ABCD" "ready to merge"
+as sess-a start 7 feat/7
+STUB_ISSUE='{"labels":[{"name":"agent/failed"}]}' as sess-a finish blocked
+has "$(cat "$HOME/err")" "notify: post this blocked to slack_channel C0123ABCD" "blocked"
+as sess-a start 7 feat/7
+as sess-a finish waiting-cluster
+lacks "$(cat "$HOME/err")" "notify:" "nothing for a person to do"
+done_
+
 CASE="an item goes back to its own slot when it is free"; sandbox; origin_checkout
 as sess-a start 7 feat/7; as sess-b start 8 feat/8
 as sess-a finish nothing; as sess-b finish nothing
