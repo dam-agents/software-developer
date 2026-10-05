@@ -9,6 +9,31 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 3.1.0 — 2026-10-05
+
+**Grilling in Slack.** With `slack_channel` set, `let's grill <n>` in that
+channel starts a grill of issue #`<n>`: one question per reply in the thread,
+each with a recommended answer, until the decisions are made. Then a breakdown
+into sub-issues, and once the thread plainly approves it, they are filed under
+#`<n>` with the hand-off label, and the decisions go on #`<n>`. Anyone in the
+channel may grill. A grill thread is the one work order besides the hand-off
+label (`CLAUDE.md` → **Trust boundary**). It may only read, ask, and file what
+it approved: no code, no other label, no other repository (`docs/grill.md`).
+
+The questions and drafts follow the repository's own skills when
+`skill_grill` and `skill_file_issue` name them. Otherwise they follow the
+definition's defaults in `.agents/defaults/`, which are kept out of
+`.agents/skills` so that they never shadow the repository's skills.
+
+**Upgrade:**
+
+1. With `slack_channel` set, grilling is on from now on. Tell the operator,
+   and check that only trusted people are in the channel.
+2. Optional, with the operator: look in `work/.claude/skills` for the
+   repository's own grill and issue-filing skills, and name them
+   (`- skill_grill: <dir>`, `- skill_file_issue: <dir>`).
+3. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
+
 ## 3.0.0 — 2026-10-05
 
 The definition serves any repository, and assumes no cluster, platform or

@@ -7,7 +7,7 @@ to this definition itself.
 
 | Path | Kind | Holds |
 | --- | --- | --- |
-| `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, `.agents/skills/implement-issue/` |
+| `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, `.agents/skills/implement-issue/`, `.agents/defaults/` |
 | `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, and the target repository's checkout |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
@@ -98,7 +98,7 @@ repository — the one repository beside `repo` you may act on, and only this wa
 
 ```sh
 git -C "$HOME" checkout -b "<type>/<short-slug>" FETCH_HEAD
-git -C "$HOME" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github .agents/skills/implement-issue
+git -C "$HOME" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github .agents/skills/implement-issue .agents/defaults
 git -C "$HOME" commit -m "<type>: <what changed>"
 git -C "$HOME" push -u origin "<type>/<short-slug>"
 (cd "$HOME" && gh pr create --title "<title>" --body "<what and why>")

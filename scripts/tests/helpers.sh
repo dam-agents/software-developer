@@ -71,6 +71,7 @@ onboarded() {
   local repo; repo="$(cd "$SCRIPTS/.." && pwd)"
   cp "$repo/.gitignore" "$repo/VERSION" "$repo/kit.yaml" "$HOME/"
   mkdir -p "$HOME/.agents/skills/implement-issue" && : > "$HOME/.agents/skills/implement-issue/SKILL.md"
+  for d in grill file-issue; do mkdir -p "$HOME/.agents/defaults/$d" && : > "$HOME/.agents/defaults/$d/SKILL.md"; done
   ln -s ../.agents/skills "$HOME/.claude/skills"
   git init -q "$HOME" && git -C "$HOME" add -A &&
     git -C "$HOME" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false \

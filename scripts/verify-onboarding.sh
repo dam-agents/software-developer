@@ -30,7 +30,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info label_mine
-  verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel schedules"
+  verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel schedules
+  skill_grill skill_file_issue"
 # keys 3.0.0 retired — CHANGELOG.md → 3.0.0 says what each became
 RETIRED="cluster cluster_install cluster_uninstall cluster_delete verify_cluster"
 ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
@@ -174,6 +175,18 @@ if [ "$STRUCTURE" = 1 ]; then
       fi
     fi
   fi
+  for role in grill file_issue; do
+    sk="$(cfg "skill_$role")"; def="$HOME/.agents/defaults/${role//_/-}/SKILL.md"
+    if [ -z "$sk" ]; then
+      [ -f "$def" ] && ok "harness.skill_$role" "unset — the default, ${def#"$HOME"/}" ||
+        fail "harness.skill_$role" "unset, and the default ${def#"$HOME"/} is missing" "restore it from the definition, or name the repository's skill"
+    elif [ -f "$WORK/.claude/skills/$sk/SKILL.md" ]; then
+      ok "harness.skill_$role" "$sk, the repository's"
+    else
+      fail "harness.skill_$role" "'$sk' is not a skill in work/.claude/skills" \
+        "a directory name from: $(ls "$WORK/.claude/skills" 2>/dev/null | tr '\n' ' ')— or leave skill_$role out"
+    fi
+  done
   [ -f "$WORK/AGENTS.md" ] && ok work.AGENTS "present" ||
     fail work.AGENTS "missing — a harness started in work/ never finds CLAUDE.md" "seed it — $CFG_FIX"
   v="$(head -1 "$WORK/VERSION" 2>/dev/null)"; want="$(head -1 "$HOME/VERSION" 2>/dev/null)"
