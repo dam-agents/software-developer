@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 3.2.0 — 2026-10-05
+
+**Slack work beyond grilling.** A message in `slack_channel` aimed at the agent
+is a work order, read with common sense (`docs/slack.md`): a question about
+the code, an issue, a pull request or completed work is answered in the
+thread; an implementation request is drafted as an issue and filed with the
+hand-off label once the thread approves it; a demo of a pull request is
+recorded in a slot — under the exclusive lock when it needs it — and attached
+in the thread; `let's grill <n>` grills as before. Merges, approvals, config,
+schedules and other repositories are still declined. A demo ends
+`run-state.sh finish demo <pr>`, which puts the item back as `start` found it.
+
+**Upgrade:** nothing. With `slack_channel` set, this is on: tell the operator
+that anyone in that channel can now order work.
+
 ## 3.1.1 — 2026-10-05
 
 **Approved ends the review.** A review on an approved pull request — the

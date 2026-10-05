@@ -94,6 +94,8 @@ It reads, never writes:
   request, written or edited since this run started, carrying this run's
   session id — the link from `session-link.sh` does; without `app_url`, write
   `Session <id>`.
+- **`demo`** ([slack.md](slack.md) → **Demo**): the comment, as for every
+  outcome; the item goes back as `start` found it.
 - **`needs-info`, `blocked`, `released`:** the claimed label is off the issue;
   `needs-info` carries `label_needs_info`, `blocked` the failed label.
 

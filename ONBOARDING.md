@@ -102,9 +102,10 @@ confirming or correcting rather than composing from nothing.
   — ready to merge, needs info, blocked, the weekly audit
   ([`docs/notify.md`](docs/notify.md)) — and ask which chat, the first one
   listed being the agent's bound channel. Record its id as `slack_channel`.
-  Say that it also turns on grilling there: anyone in the channel opens
-  `let's grill <n>`, answers the questions in the thread, and approves the
-  sub-issues it files with the hand-off label ([`docs/grill.md`](docs/grill.md)).
+  Say that it also turns on work there: anyone in the channel can ask it
+  questions, a demo of a pull request, an implementation it files as an issue
+  with the hand-off label once they approve, or a grill
+  ([`docs/slack.md`](docs/slack.md)).
   Look in the repository's skills for one that grills a plan and one that
   files issues; offer them as `skill_grill` and `skill_file_issue`, or the
   definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's

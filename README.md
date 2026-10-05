@@ -64,11 +64,13 @@ Optional. Bind a channel to the agent in its settings and set `slack_channel`,
 and it posts the moments a person acts on there — ready to merge, needs info,
 blocked, the weekly audit ([`docs/notify.md`](docs/notify.md)).
 
-It also grills there: open `let's grill <n>` in the channel, answer its
-questions in the thread, and approve the breakdown; it files the sub-issues
-under #`<n>` with the hand-off label, and the tick implements them
-([`docs/grill.md`](docs/grill.md)). Anyone in the channel can grill, so bind
-one only trusted people are in. The questions and drafts follow the
+It also works there ([`docs/slack.md`](docs/slack.md)): it answers questions
+about the code and completed work, records a demo of a pull request, files an
+implementation request as an issue with the hand-off label once the thread
+approves the draft, and grills — `let's grill <n>`, questions in the thread,
+then the approved sub-issues filed under #`<n>` ([`docs/grill.md`](docs/grill.md)).
+Anyone in the channel can order that work, so bind one only trusted people
+are in. The questions and drafts follow the
 repository's own skills when `skill_grill` and `skill_file_issue` name them,
 and the definition's defaults in `.agents/defaults/` otherwise.
 

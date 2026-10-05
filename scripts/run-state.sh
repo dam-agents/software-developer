@@ -27,7 +27,8 @@
 #   finish <outcome> [pr]     the run's last act, on every way out: refused
 #                             until the work is pushed and reported on GitHub
 #                             (below); then backs work/ up, and with
-#                             slack_channel set says what to post (notify:)
+#                             slack_channel set says what to post (notify:).
+#                             `demo` puts the item back as start found it
 #   sweep                     free the locks of dead holders (the precheck)
 #   held                      the items live runs hold, one per line
 #   live                      how many slots are held
@@ -262,6 +263,8 @@ cmd_start() {
   fi
   write "$LOCKS/slot-$k/owner" "$LOCKS/slot-$k/owner" "$OWNER_KEYS" "item=$item" "slot=$k"
   write "$LOCKS/item-$item/owner" "$LOCKS/item-$item/owner" "$OWNER_KEYS" "slot=$k"
+  # the item as this run found it, for `finish demo` to put back; a second start keeps the first
+  [ -f "$f" ] && [ ! -f "$LOCKS/item-$item/before.md" ] && cp "$f" "$LOCKS/item-$item/before.md"
 
   prepare "$k" "$branch"; rc=$?
   if [ "$rc" -ne 0 ]; then
@@ -464,7 +467,7 @@ reported() {
 cmd_finish() {
   local outcome="${1:?outcome}" pr="${2:-}" item slot since f state why rc report=""
   case "$outcome" in
-    nothing | pr-opened | pr-updated | released | blocked | waiting-lock | needs-info) ;;
+    nothing | pr-opened | pr-updated | released | blocked | waiting-lock | needs-info | demo) ;;
     *) say "unknown outcome '$outcome'"; exit 2 ;;
   esac
   item="$(my_lock item- | sed 's/^item-//')"
@@ -507,7 +510,13 @@ cmd_finish() {
       waiting-lock | needs-info | released | blocked) state="$outcome" ;;
       *) state=parked ;;
     esac
-    write "$f" "$f" "$ITEM_KEYS" "state=$state" ${pr:+"pr=$pr"} session=- babysit_since=- round_at=- babysat_out=- "updated_at=$(now)"
+    # a demo changed nothing the precheck goes by: the item's state, and what
+    # it has seen of the pull request, stay as start found them
+    if [ "$outcome" = demo ] && [ -f "$LOCKS/item-$item/before.md" ]; then
+      write "$f" "$LOCKS/item-$item/before.md" "$ITEM_KEYS" "slot=$slot" session=- "updated_at=$(now)"
+    else
+      write "$f" "$f" "$ITEM_KEYS" "state=$state" ${pr:+"pr=$pr"} session=- babysit_since=- round_at=- babysat_out=- "updated_at=$(now)"
+    fi
     [ -n "$pr" ] || pr="$(kv "$f" pr)"
   fi
   # a saved slot lets go of its branch, so the item's next run may take any slot

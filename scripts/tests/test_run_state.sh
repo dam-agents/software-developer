@@ -76,6 +76,26 @@ as sess-a finish waiting-lock
 lacks "$(cat "$HOME/err")" "notify:" "nothing for a person to do"
 done_
 
+CASE="finish demo puts the item back as start found it, and posts nothing"; sandbox; origin_checkout
+echo "- slack_channel: C0123ABCD" >> "$HOME/work/CONFIG.md"
+as sess-a start 7 feat/7
+STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
+seen="$(field items/7.md seen_at)"
+sleep 1
+as sess-b start 7 feat/7
+is "$(field items/7.md state)" active "the demo holds it"
+STUB_COMMENTS='[{"user":{"login":"dev-bot"},"body":"another run, sess-a"}]' as sess-b finish demo 21
+is "$RC" 1 "refused without its report"
+as sess-b finish demo 21
+is "$RC" 0 "exit"
+[ -z "$(ls "$SD_LOCKS")" ] || fail "locks left: $(ls "$SD_LOCKS")"
+is "$(field items/7.md state)" released "state as it was"
+is "$(field items/7.md seen_at)" "$seen" "what it has seen, as it was"
+is "$(field items/7.md pr)" 21 "pr"
+lacks "$(cat "$HOME/err")" "notify:" "the thread has it"
+has "$(cat "$HOME/work/TICK.log")" "demo session=sess-b issue=7" "log line"
+done_
+
 CASE="an item goes back to its own slot when it is free"; sandbox; origin_checkout
 as sess-a start 7 feat/7; as sess-b start 8 feat/8
 as sess-a finish nothing; as sess-b finish nothing
