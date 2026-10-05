@@ -25,7 +25,8 @@
 #   cluster-done              give the cluster back
 #   finish <outcome> [pr]     the run's last act, on every way out: refused
 #                             until the work is pushed and reported on GitHub
-#                             (below); then backs work/ up
+#                             (below); then backs work/ up, and with
+#                             slack_channel set says what to post (notify:)
 #   sweep                     free the locks of dead holders (the precheck)
 #   held                      the items live runs hold, one per line
 #   live                      how many slots are held
@@ -514,6 +515,13 @@ cmd_finish() {
   log_line "$outcome" "$ME" "$item" "$slot" "$pr" "$since" "${report# }"
   # last, so the backup carries this run's TICK.log line
   bash "$HERE/work-backup.sh" persist >&2
+  # a moment a person acts on: the agent posts it, a script never does
+  if [ -n "$(cfg slack_channel)" ]; then
+    case "$outcome" in
+      released) [ -z "$pr" ] || say "notify: if #$pr is still open, post that it is ready to merge to slack_channel $(cfg slack_channel) (docs/notify.md)" ;;
+      needs-info | blocked) say "notify: post this $outcome to slack_channel $(cfg slack_channel) (docs/notify.md)" ;;
+    esac
+  fi
   return 0
 }
 

@@ -19,6 +19,9 @@ a zero.
   them once and a later edit never reaches this agent, so a mismatch is drift
   only this check can find. Report it; changing a schedule is the operator's
   call, in the direct session.
+- **Slack.** With `slack_channel` set: `describe_channel` for `slack` lists
+  it. Missing from the list, or Slack not connected, is a warning — the posts
+  of [notify.md](notify.md) go nowhere.
 - **Every abandoned and diagnostic run of the week.** Read the tail of its
   session's transcript, `~/.claude/projects/*/<session>.jsonl`, and say why it
   ended that way. Name each cause as the environment, your own mistake, or a
@@ -46,6 +49,9 @@ Checks
 
 Action needed: one line per thing a person must do, or "none"
 ```
+
+With `slack_channel` set, post the header and the **Action needed** lines there
+too ([notify.md](notify.md)).
 
 Then its line in `work/AUDIT.log`:
 

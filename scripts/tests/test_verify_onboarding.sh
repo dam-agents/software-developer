@@ -92,6 +92,18 @@ has "$OUT" "FAIL state.worktrees — worktrees outside work/slots" "stray worktr
 has "$OUT" "FAIL config.verify_cluster — set, but cluster is not required" "verify_cluster"
 done_
 
+CASE="slack_channel is a chat id when set"; sandbox
+verify --config
+has "$OUT" "ok   config.slack_channel — unset" "off by default"
+echo "- slack_channel: #dev" >> "$HOME/work/CONFIG.md"
+verify --config
+has "$OUT" "FAIL config.slack_channel — '#dev' is not a chat id" "a name is not an id"
+setcfg slack_channel C0123ABCD
+verify --config
+is "$RC" 0 "exit"
+has "$OUT" "ok   config.slack_channel — C0123ABCD" "an id"
+done_
+
 CASE="work_repo is checked when set"; sandbox; onboarded
 echo "- work_repo: acme/widgets-work" >> "$HOME/work/CONFIG.md"
 STUB_REACH=2 verify --live

@@ -30,7 +30,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info label_mine
-  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots babysit_max_hours stuck_after_min work_repo"
+  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots babysit_max_hours stuck_after_min work_repo slack_channel"
 ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
 GATE_KEYS="diagnosed_at diagnoses"
 
@@ -79,6 +79,14 @@ else
     fail config.work_repo "is repo itself — the backup would push to the default branch of the repository you work on" "name a repository of its own"
   else
     ok config.work_repo "$WORK_REPO"
+  fi
+  SLACK="$(cfg slack_channel)"
+  if [ -z "$SLACK" ]; then
+    ok config.slack_channel "unset — no Slack posts (docs/notify.md)"
+  elif ! printf '%s' "$SLACK" | grep -qE '^[A-Z0-9]+$'; then
+    fail config.slack_channel "'$SLACK' is not a chat id" "the id describe_channel lists for it, e.g. C0123ABCD, not #name"
+  else
+    ok config.slack_channel "$SLACK — that Slack reaches it, only describe_channel can tell"
   fi
   APP="$(cfg app_url)"
   if [ -n "$APP" ] && ! printf '%s' "$APP" | grep -qE '^https?://[^[:space:]]+$'; then
