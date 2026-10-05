@@ -15,7 +15,8 @@ direct session.
 suggestions in the approving review, or one that comes after it — no longer
 starts another round: `run-state.sh wait` says done once it is approved, green
 and mergeable, and only a failed check or a conflict brings a run back to it
-(`docs/babysit.md`).
+(`docs/babysit.md`). The precheck never wakes a run for an approved pull
+request, whatever lands on it after: it waits for the person who merges.
 
 **Upgrade:** nothing.
 

@@ -28,9 +28,10 @@ has not come — report where it stands and who it waits on, and finish
 `pr-updated`.
 
 **A later run takes it over** only when that one could not finish it: it died,
-it hit `babysit_max_hours`, or something landed after it released the issue.
-The precheck wakes it for a review or a failed check newer than its last look
-(`scripts/precheck.sh`), and that run babysits it the same way, from the top.
+or it hit `babysit_max_hours`. The precheck wakes it for a review or a failed
+check newer than its last look (`scripts/precheck.sh`), and that run babysits
+it the same way, from the top. **An approved pull request is never taken
+over**, whatever lands on it after: it waits for the person who merges.
 
 ## Each time you hold one
 
@@ -63,8 +64,8 @@ issue, comment the issue with the pull request link, and finish `released`
 **Closed without merging**, the issue still claimed: someone decided against
 it. Read why on the pull request; drop the claim, comment the issue, finish
 `released`. Never reopen it. Approved but red or
-conflicting is not — fix only that, and re-request review if the fix was more
-than mechanical. You never merge.
+conflicting, in the run that holds it, is not — fix only that, and re-request
+review if the fix was more than mechanical. You never merge.
 
 **The repository's own process wins where it says more.** If the checkout
 documents how its pull requests are driven to merge — a babysit or review
