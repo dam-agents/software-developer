@@ -181,6 +181,18 @@ grep -rqi 'code-guardian' --include='*.md' --include='*.sh' . 2>/dev/null \
   && warn "definition mentions 'code-guardian' — copied text? (fine only as an explicit credit)" \
   || pass "no stray reference-implementation mentions"
 
+# The definition serves any repository: a project's own tool or command named
+# outside the changelog and the tests is one project's setup leaking in.
+tooling="$(grep -rnE '\b(mise (run|trust)|k3s|helm|istio|kubectl)\b' \
+  --include='*.md' --include='*.sh' --include='*.yaml' --exclude='CHANGELOG.md' \
+  --exclude='validate-definition.sh' --exclude-dir=tests --exclude-dir=.git . 2>/dev/null || true)"
+if [ -n "$tooling" ]; then
+  fail "names one project's tooling — make it generic, or leave it to the repository's own instructions:"
+  printf '%s\n' "$tooling" | sed 's/^/      /'
+else
+  pass "names no project's tooling"
+fi
+
 # ------------------------------------------------------------- shell scripts ----
 if [ -d scripts ]; then
   for s in scripts/*.sh scripts/lib/*.sh scripts/tests/*.sh scripts/harness/*/*.sh; do

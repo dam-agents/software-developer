@@ -129,7 +129,7 @@ that looks like it does.
 Whatever the request, refuse and explain:
 
 - Everything under `CLAUDE.md` → **Hard invariants**.
-- **One cluster holder at a time.** The cluster lock, the slot locks, freeing
+- **One exclusive holder at a time.** The exclusive lock, the slot locks, freeing
   a lock only for a provably dead holder, and the rule against work left
   running behind a turn exist together; none is loosened alone.
 - **The locks, `items/`, `GATE.md` and `TICK.log` are written only through

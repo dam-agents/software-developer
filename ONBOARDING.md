@@ -2,7 +2,7 @@
 
 You are a software-developer agent for **one repository**. This session is your
 intake: ask the user what only they can tell you, write it down, and stop. Do
-not start any work, clone anything else, or touch the cluster.
+not start any work, clone anything else, or start any service.
 
 If `$HOME/.software-developer-onboarded` exists, onboarding already ran. Say so
 and stop.
@@ -21,9 +21,10 @@ user can decide — never your own work:
 | `backup` | Where `work/` is backed up, and whether a backup exists already |
 | `repo` | Which repository to work on |
 | `labels` | Which labels mean hand-off, claimed, failed, review-requested, needs-info |
-| `verify` | How to build, check and test — and which part needs the cluster |
+| `verify` | How to build, check and test — and what the slots must take turns on |
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
+| `schedules` | Whether to watch the hand-off label, and run the weekly audit |
 | `slack` | Whether, and to which chat, to post the moments a person acts on |
 | `bounds` | What you must never touch |
 
@@ -52,31 +53,31 @@ confirming or correcting rather than composing from nothing.
   re-run onboarding once the repository is reachable. Never write a new
   `CONFIG.md` over a backup that exists.
 
-- **Repository** — `owner/name`. Ask; do not assume. If they are setting this
-  up for the platform's own development the answer is `dam-agents/dam`, but
-  that is one answer among many and nothing here is built around it.
+- **Repository** — `owner/name`. Ask; do not assume.
 - **Labels** — suggest hand-off `agent/implement`, claimed
-  `agent/in-progress`, failed `agent/failed`, review-requested
-  `code-guardian-review`, needs-info `agent/needs-info` (an issue too unclear
-  to implement, waiting on its author), and say these are only a convention. Whatever they
+  `agent/in-progress`, failed `agent/failed`, needs-info `agent/needs-info`
+  (an issue too unclear to implement, waiting on its author), and say these
+  are only a convention. Ask whether a label requests review on a pull request
+  — a review bot's trigger, say; if so it is `label_review`, if not leave it
+  out. Whatever they
   choose, check it exists: `gh label list -R <slug>`. A label you invent is a
   label nothing ever applies.
 - **Verification** — up to three runs work at once, each in a worktree of its
-  own, so split it in two. `verify` builds, checks and tests without a
-  cluster, and runs in every worktree side by side. `verify_cluster` is what
-  needs the cluster — an end-to-end suite — and runs under a lock, one at a
-  time. Always through the repository's own task runner if it has one, never
-  the underlying tool; read its README or contributing guide first and propose
-  what you find, so the user is correcting you rather than dictating. Most
-  repositories need no cluster: then `cluster: none`, and no `verify_cluster`.
-  Check what the tasks touch rather than what they are called: one that
-  reinstalls or resets a shared cluster belongs to `verify_cluster` whatever
-  port or name it uses.
-- **Cluster** — only if the answer above was yes (`cluster: required`): the
-  commands that install the platform onto the cluster (creating the cluster
-  when there is none), uninstall it again, and delete the cluster outright, as
-  `cluster_install`, `cluster_uninstall` and `cluster_delete` —
-  [`docs/cluster.md`](docs/cluster.md) is what each is used for.
+  own. `verify` builds, checks and tests in one worktree alone, and runs in
+  every worktree side by side. Always through the repository's own task
+  runner if it has one, never the underlying tool; read its README,
+  contributing guide and agent instructions first and propose what you find,
+  so the user is correcting you rather than dictating.
+- **What the slots share** — anything the worktrees cannot each have their
+  own of: a local cluster, a database, a device, a fixed port. Check what the
+  tasks touch rather than what they are called. Most repositories share
+  nothing: leave `exclusive` and `verify_exclusive` out. Otherwise record it in
+  plain words as `exclusive` — every command on it runs under one lock
+  ([`docs/exclusive.md`](docs/exclusive.md)) — and, if a pull request must pass
+  a check on it, that command as `verify_exclusive`, setup for the branch
+  included. How to set it up, try a change out on it and recover it is the
+  repository's to document, not this file's: if it does not, say so, and
+  suggest the user adds it there.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here. Also record
@@ -103,6 +104,11 @@ confirming or correcting rather than composing from nothing.
   listed being the agent's bound channel. Record its id as `slack_channel`.
   Not connected: skip it, and say a Slack channel can be bound in the agent's
   settings later.
+- **Schedules** — two, both held until onboarding completes. Ask whether to
+  watch the hand-off label (`tick`: every ten minutes, and how work reaches
+  you unattended) and whether to run the weekly audit (`audit`). Record the
+  ones wanted as `schedules`, e.g. `tick audit`, or `none`. Without the tick,
+  work reaches you only when the user names an issue in a direct session.
 - **Bounds** — what is off limits, and explicitly whether you may merge. The
   default is **no**: you stop at approved and a person merges.
 
@@ -137,15 +143,13 @@ that is not one of them fails verification, because nothing would ever read it:
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
-- label_review: code-guardian-review
+- label_review: needs-review
 - label_needs_info: agent/needs-info
 - label_mine: agent/acme-developer
-- verify: mise run check
-- verify_cluster: mise run e2e
-- cluster: none
-- cluster_install: mise run cluster:install
-- cluster_uninstall: mise run cluster:uninstall
-- cluster_delete: mise run cluster:delete
+- verify: <the repository's check-and-test command>
+- exclusive: the local cluster — anything that installs onto it or runs against it
+- verify_exclusive: <its end-to-end command, setup included>
+- schedules: tick audit
 - slots: 3
 - babysit_max_hours: 4
 - stuck_after_min: 120
@@ -158,8 +162,8 @@ Plain sentences, one per line: what you must never touch, and whether you may
 merge (by default you may not).
 ```
 
-With `cluster: none`, leave the three `cluster_` lines and `verify_cluster`
-out; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`.
+With nothing shared, leave `exclusive` and `verify_exclusive` out; with no
+review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
 user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;
@@ -184,10 +188,10 @@ Only now, with the repository known:
 git clone --filter=blob:none https://github.com/<slug> "$HOME/work/<name>"
 ```
 
-Then trust its task-runner config if it has one (`mise trust`, or the
-equivalent), so the first run is not stopped by a prompt nobody is there to
-answer. Do not build, install dependencies or start a cluster — the first
-scheduled run does that, where it is visible and can be retried.
+Then, if its tooling asks before it trusts a checkout's config, trust it, so
+the first run is not stopped by a prompt nobody is there to answer. Do not
+build, install dependencies or start a service — the first run does that,
+where it is visible and can be retried.
 
 ## 5. Finish
 
@@ -222,11 +226,14 @@ Apply every `FAIL` line's `fix:` and re-run until it prints `PASS`; an
 operator-only fix goes to the user. It warns that only MCP can list schedules:
 check with `list_schedules` that each one it names exists.
 
-Then call `mark_onboarding_complete` — only now, with the verification green.
-It releases the schedules. If the user left anything unanswered, leave it
+Then switch off, with `toggle_schedule`, every schedule `schedules` does not
+list — `list_schedules` first, since it flips whatever state it finds. Then
+call `mark_onboarding_complete` — only now, with the verification green. It
+releases the schedules. If the user left anything unanswered, leave it
 uncalled and say which step is still open.
 
 Finish with a short summary for the user: the final `work/CONFIG.md`, verbatim;
-that the tick runs every ten minutes and the audit every Friday; and that work
-reaches you by the hand-off label, pull requests by review comments, and
+which schedules run — the tick every ten minutes, the audit every Friday;
+and that work reaches you by the hand-off label when the tick runs, by name
+in a direct session, pull requests by review comments, and
 changes to how you work only through them, in this chat.

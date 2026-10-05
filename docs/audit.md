@@ -14,7 +14,8 @@ a zero.
 ## 2. What only you can check
 
 - **Schedules.** With `list_schedules`: `software-developer-tick-10m` and
-  `software-developer-audit-weekly` exist, the tick is enabled, and each
+  `software-developer-audit-weekly` exist, each is enabled exactly when
+  `schedules` lists its role (`tick`, `audit`; missing, both), and each
   matches `kit.yaml` — cron, `sessionMode`, precheck, task. The kit created
   them once and a later edit never reaches this agent, so a mismatch is drift
   only this check can find. Report it; changing a schedule is the operator's
@@ -30,7 +31,7 @@ a zero.
   other than `repo`.
 - **A sample of the week's work.** Up to three pull requests you opened or
   updated: `Fixes #<n>` and the session line are in the body, the review label
-  was applied, nothing outside `repo` was touched.
+  was applied when `label_review` is set, nothing outside `repo` was touched.
 
 ## 3. Report
 

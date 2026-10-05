@@ -13,7 +13,7 @@ Reading order:
    `$HOME/.software-developer-onboarded` marker.
 
 `/etc/AGENTS.md`, which the platform ships in the image, describes the sandbox
-itself — what is installed, what survives a restart, how to start the cluster
-and the container runtime. It is not repeated here.
+itself — what is installed, what survives a restart, how to start the container
+runtime. It is not repeated here.
 
 This file is a pointer, not a copy: nothing here overrides `CLAUDE.md`.

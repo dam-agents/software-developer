@@ -2,8 +2,8 @@
 
 A DAM [starter kit](https://github.com/dam-agents/dam/blob/main/docs/architecture/starter-kits.md):
 an agent that takes an issue labelled for implementation, writes the change,
-runs the repository's own checks against a cluster in its sandbox, and drives
-the pull request through review.
+runs the repository's own checks in its sandbox, and drives the pull request
+through review.
 
 - [`kit.yaml`](kit.yaml) — what the platform creates: the connection it needs,
   its size, its schedule, and the sandbox it runs in.
@@ -16,7 +16,7 @@ the pull request through review.
   waking the agent for, before any model is involved, and holds an occurrence
   back while the run before it is still working.
 - [`scripts/run-state.sh`](scripts/run-state.sh) — which run works on which
-  issue, in which slot, and who holds the cluster; how a dead run's slot is
+  issue, in which slot, and who holds the exclusive lock; how a dead run's slot is
   found and freed ([`docs/runs.md`](docs/runs.md)).
 - [`scripts/session-link.sh`](scripts/session-link.sh) — the link back to the
   run that wrote a change, which every pull request carries.
@@ -37,9 +37,13 @@ the pull request through review.
 
 **Nothing here names a repository.** Which one to work on, which labels mean
 what, and how to build and test it are asked during onboarding and recorded in
-`work/CONFIG.md` on the instance. The kit was written for the platform's own
-development and its suggested labels come from there, but it is not built
-around it.
+`work/CONFIG.md` on the instance; nor any tool: how a repository is set up,
+tried out and recovered is that repository's own to document — its
+`CLAUDE.md`, skills or contributing guide — and the agent follows it.
+
+Both schedules are optional: onboarding asks whether to watch the hand-off
+label and whether to run the weekly audit. Without the tick, the agent works
+on an issue when you name it in a chat.
 
 ## The GitHub connection
 

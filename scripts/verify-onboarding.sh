@@ -30,7 +30,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info label_mine
-  verify verify_cluster cluster cluster_install cluster_uninstall cluster_delete slots babysit_max_hours stuck_after_min work_repo slack_channel"
+  verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel schedules"
+# keys 3.0.0 retired — CHANGELOG.md → 3.0.0 says what each became
+RETIRED="cluster cluster_install cluster_uninstall cluster_delete verify_cluster"
 ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
 GATE_KEYS="diagnosed_at diagnoses"
 
@@ -63,7 +65,7 @@ CFG_FIX="ONBOARDING.md → 3. Write it down"
 if [ ! -f "$CONFIG" ]; then
   fail config "work/CONFIG.md is missing" "write it — $CFG_FIX"
 else
-  for k in repo author app_url label_handoff label_claimed label_failed label_review verify cluster; do
+  for k in repo author app_url label_handoff label_claimed label_failed verify; do
     if [ -n "$(cfg "$k")" ]; then ok "config.$k" "$(cfg "$k")"
     else fail "config.$k" "missing" "add \`- $k: <value>\` — $CFG_FIX"; fi
   done
@@ -92,15 +94,6 @@ else
   if [ -n "$APP" ] && ! printf '%s' "$APP" | grep -qE '^https?://[^[:space:]]+$'; then
     fail config.app_url "'$APP' is not a URL" "the address from the browser, e.g. https://platform.example.com"
   fi
-  case "$(cfg cluster)" in
-    '' | none) ;;
-    required)
-      for k in cluster_install cluster_uninstall cluster_delete; do
-        [ -n "$(cfg "$k")" ] ||
-          fail "config.$k" "missing, and cluster is required" "ask for it — ONBOARDING.md → 2. Ask"
-      done ;;
-    *) fail config.cluster "'$(cfg cluster)' is neither none nor required" "write one of the two" ;;
-  esac
   S="$(cfg stuck_after_min)"
   case "$S" in
     '' | *[!0-9]*) [ -z "$S" ] || fail config.stuck_after_min "'$S' is not a whole number of minutes" "write 120, or more" ;;
@@ -115,11 +108,19 @@ else
     '') ;;
     *[!0-9]* | 0) fail config.slots "'$S' is not a whole number of slots" "write 3, or leave it out" ;;
   esac
-  if [ -n "$(cfg verify_cluster)" ] && [ "$(cfg cluster)" != required ]; then
-    fail config.verify_cluster "set, but cluster is not required — nothing would ever run it" "set cluster: required with its commands, or drop verify_cluster"
+  if [ -n "$(cfg verify_exclusive)" ] && [ -z "$(cfg exclusive)" ]; then
+    fail config.verify_exclusive "set, but exclusive names nothing — no lock would guard it" "add \`- exclusive: <what is shared>\`, or drop verify_exclusive"
   fi
+  S="$(cfg schedules)"
+  for w in $S; do
+    case "$w" in tick | audit | none) ;; *) fail config.schedules "'$w' is not tick, audit or none" "list the ones wanted, e.g. \`- schedules: tick audit\`" ;; esac
+  done
+  ok config.schedules "${S:-unset — tick audit}"
 
-  u="$(unknown_in "$CONFIG" "$KNOWN")"
+  r="$(for k in $RETIRED; do [ -n "$(cfg "$k")" ] && echo "$k"; done | tr '\n' ' ' | sed -E 's/ $//')"
+  [ -z "$r" ] || fail config.retired "retired key(s): $r" "migrate them — CHANGELOG.md → 3.0.0"
+
+  u="$(unknown_in "$CONFIG" "$KNOWN $RETIRED")"
   [ -z "$u" ] && ok config.keys "every bullet is a known key" ||
     fail config.keys "unknown key(s): $u — no script reads them" \
       "rename to a key CLAUDE.md → Runtime configuration lists, or rewrite as prose under a heading"
@@ -227,8 +228,13 @@ if [ "$STRUCTURE" = 1 ]; then
       fail state.TICK "$bad line(s) run-state.sh did not write" "remove them; the log is append-only through run-state.sh"
   fi
 
-  names="$(sed -n '/^schedules:/,$s/^  - name: //p' "$HOME/kit.yaml" 2>/dev/null | tr '\n' ' ' | sed -E 's/ $//')"
-  warn schedules "only MCP can list them — check with list_schedules that these exist: ${names:-none in kit.yaml}"
+  # `schedules` names the wanted ones by role, tick and audit; missing, both
+  on=" $(cfg schedules | grep . || echo tick audit) "; en=""; dis=""
+  for n in $(sed -n '/^schedules:/,$s/^  - name: //p' "$HOME/kit.yaml" 2>/dev/null); do
+    w=tick; case "$n" in *audit*) w=audit ;; esac
+    case "$on" in *" $w "*) en="$en $n" ;; *) dis="$dis $n" ;; esac
+  done
+  warn schedules "only MCP can list them — check with list_schedules: enabled:${en:- none}; disabled:${dis:- none}"
 fi
 
 # -------------------------------------------------------------------- live

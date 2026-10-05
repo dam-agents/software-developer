@@ -13,7 +13,7 @@ to this definition itself.
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
 and a `.git` that concurrent runs change there corrupts — `Stale file handle`,
 `.nfs*` leftovers. The one repository under it is the target's checkout, which
-is safe for the same reason there is one cluster: one run touches it at a time.
+is safe for the same reason as the exclusive lock: one run touches it at a time.
 
 The `.gitignore` at `$HOME` is an allowlist, so `work/` and the home's secrets
 (`.ssh`, `.claude`, `.config`) are invisible to the definition. **Never
