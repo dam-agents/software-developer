@@ -25,7 +25,7 @@ user can decide — never your own work:
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
 | `schedules` | Whether to watch the hand-off label, and run the weekly audit |
-| `slack` | Whether, and to which chat, to post the moments a person acts on |
+| `slack` | Whether, and to which chat, to post the moments a person acts on — and grill issues |
 | `bounds` | What you must never touch |
 
 Tick each with `complete_onboarding_step` as it is answered. Add, rename or drop
@@ -102,7 +102,12 @@ confirming or correcting rather than composing from nothing.
   — ready to merge, needs info, blocked, the weekly audit
   ([`docs/notify.md`](docs/notify.md)) — and ask which chat, the first one
   listed being the agent's bound channel. Record its id as `slack_channel`.
-  Not connected: skip it, and say a Slack channel can be bound in the agent's
+  Say that it also turns on grilling there: anyone in the channel opens
+  `let's grill <n>`, answers the questions in the thread, and approves the
+  sub-issues it files with the hand-off label ([`docs/grill.md`](docs/grill.md)).
+  Look in the repository's skills for one that grills a plan and one that
+  files issues; offer them as `skill_grill` and `skill_file_issue`, or the
+  definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's
   settings later.
 - **Schedules** — two, both held until onboarding completes. Ask whether to
   watch the hand-off label (`tick`: every ten minutes, and how work reaches
@@ -155,6 +160,8 @@ that is not one of them fails verification, because nothing would ever read it:
 - stuck_after_min: 120
 - work_repo: owner/name-work
 - slack_channel: C0123ABCD
+- skill_grill: grill-me
+- skill_file_issue: file-issue
 
 ## Bounds
 
@@ -163,7 +170,8 @@ merge (by default you may not).
 ```
 
 With nothing shared, leave `exclusive` and `verify_exclusive` out; with no
-review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`.
+review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`;
+for the default grill skills, `skill_grill` and `skill_file_issue`.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
 user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;

@@ -107,6 +107,20 @@ is "$RC" 0 "exit"
 has "$OUT" "ok   config.slack_channel — C0123ABCD" "an id"
 done_
 
+CASE="a grill skill is the repository's when named, the default otherwise"; sandbox; onboarded
+verify
+has "$OUT" "ok   harness.skill_grill — unset — the default, .agents/defaults/grill/SKILL.md" "default"
+mkdir -p "$HOME/work/.claude/skills/grill-me" && : > "$HOME/work/.claude/skills/grill-me/SKILL.md"
+echo "- skill_grill: grill-me" >> "$HOME/work/CONFIG.md"
+echo "- skill_file_issue: drop-issue" >> "$HOME/work/CONFIG.md"
+verify
+has "$OUT" "ok   harness.skill_grill — grill-me, the repository's" "named"
+has "$OUT" "FAIL harness.skill_file_issue — 'drop-issue' is not a skill in work/.claude/skills" "a name that is not there"
+sed -i.bak '/^- skill_file_issue:/d' "$HOME/work/CONFIG.md"; rm -r "$HOME/.agents/defaults/file-issue"
+verify
+has "$OUT" "FAIL harness.skill_file_issue — unset, and the default .agents/defaults/file-issue/SKILL.md is missing" "default gone"
+done_
+
 CASE="work_repo is checked when set"; sandbox; onboarded
 echo "- work_repo: acme/widgets-work" >> "$HOME/work/CONFIG.md"
 STUB_REACH=2 verify --live
