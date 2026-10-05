@@ -102,7 +102,7 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
 What the item is decides what you do with it:
 
 1. **A pull request of yours** a run before you could not finish — reviewed,
-   checks failed, approved: babysit it to done ([`docs/babysit.md`](docs/babysit.md)).
+   or checks failed, never approved: babysit it to done ([`docs/babysit.md`](docs/babysit.md)).
 2. **Waiting for the exclusive lock**, now free: take it and carry on.
 3. **Claimed, with no pull request and no run on it** — work that stopped
    halfway. Find how far its branch got and finish it. When a run has died on

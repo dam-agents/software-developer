@@ -169,18 +169,18 @@ ITEMS_JSON="$(for f in "$ITEMS"/*.md; do
     '{($item): {seen: $seen, state: $state, abandoned: ($ab | tonumber? // 0), branch: $branch}}'
 done | jq -s 'add // {}')" || ITEMS_JSON='{}'
 
-# A pull request is babysat until it is approved and green (docs/babysit.md),
-# so it wakes a run for anything that happened to it since a run last started
-# on its item: a review of any kind, approval included, or a check that failed
-# — once, so what the agent could not fix, and an approval it already acted on
-# while the pull request waits for a person to merge it, are not reported every
-# tick. Its item is the issue its body names (`Fixes #<n>`), and an item a live
+# A pull request is babysat until it is approved (docs/babysit.md), so an
+# approved one is never work: it waits for a person, whatever lands on it.
+# Any other wakes a run for what happened to it since a run last started on
+# its item: a review of any kind, or a check that failed — once, so what the
+# agent could not fix is not reported every tick. Its item is the issue its body names (`Fixes #<n>`), and an item a live
 # run holds is left out.
 PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" \
     --arg held "$HELD" --argjson items "$ITEMS_JSON" "$JQ_LOGIN"'
   map(.number as $pr | . + {item: ((.body // "") | capture("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #(?<n>[0-9]+)").n // "pr\($pr)")})
   | map(. + {since: ($items[.item].seen // $since)})
   | map(select(.item as $i | $held | contains(" \($i) ") | not))
+  | map(select(.reviewDecision != "APPROVED"))
   | map(. + {
     reviewed: (([.latestReviews[]? | select((.author.login | login) != ($author | login)) | .submittedAt] | max // "") > .since),
     failed: (.since as $s | [.statusCheckRollup[]?
@@ -191,8 +191,7 @@ PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR
   | map(select(.reviewed or (.failed | length > 0)))
   | .[]
   | "- \(if (.item | startswith("pr")) then .item else "#\(.item)" end) — PR #\(.number) \(.title) — \([
-      (if .reviewed and .reviewDecision == "APPROVED" then "approved" else empty end),
-      (if .reviewed and .reviewDecision != "APPROVED" then "reviewed; resolve every finding and re-request review" else empty end),
+      (if .reviewed then "reviewed; resolve every finding and re-request review" else empty end),
       (if (.failed | length > 0) then "checks failed: \(.failed | join(", "))" else empty end)
     ] | join("; ")) — docs/babysit.md\n  \(.url)"
 ')" || exit 2

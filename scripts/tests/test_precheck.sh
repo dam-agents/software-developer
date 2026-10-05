@@ -120,15 +120,12 @@ STUB_PRS="$OWN" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
 is "$RC" 1 "the agent's own comment is not a review"
 done_
 
-CASE="an approval wakes a run once, not until someone merges"; sandbox
+CASE="an approved pull request is never work, red or reviewed again"; sandbox
 APPROVED='[{"number":40,"title":"Forty","url":"https://gh/pr/40","reviewDecision":"APPROVED","body":"Fixes #4",
-  "latestReviews":[{"author":{"login":"maintainer"},"state":"APPROVED","submittedAt":"2026-09-24T10:05:00Z"}],"statusCheckRollup":[]}]'
+  "latestReviews":[{"author":{"login":"maintainer"},"state":"APPROVED","submittedAt":"2026-09-24T10:05:00Z"}],
+  "statusCheckRollup":[{"name":"test","conclusion":"FAILURE","completedAt":"2026-09-24T10:06:00Z"}]}]'
 STUB_PRS="$APPROVED" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
-is "$RC" 0 "a new approval"
-has "$OUT" "#4 — PR #40 Forty — approved" "says so"
-item 4 state=released seen_at=2026-09-24T10:20:00Z
-STUB_PRS="$APPROVED" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
-is "$RC" 1 "already acted on, waiting for a merge"
+is "$RC" 1 "waits for a person"
 done_
 
 CASE="what waits on a person is not work"; sandbox

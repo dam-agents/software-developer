@@ -280,7 +280,10 @@ cmd_start() {
 # run takes it, and the run that wrote the change answers its review. `wait`
 # is how it waits without leaving the turn: one look a minute, up to WAIT_FOR,
 # and back to the run the moment there is something to do. What counts as new
-# is what came after the run last came back from a wait (round_at).
+# is what came after the run last came back from a wait (round_at). Approved
+# ends the review: a review on an approved pull request is not a round, only
+# a failed check or a conflict is — or a review the REST fallback could not
+# weigh against the decision.
 #
 # Each look reads the pull request, its reviews and its head's checks over REST
 # with the ETags of the look before (lib/github.sh → cget): unchanged is four
@@ -322,7 +325,7 @@ pr_state() {
     | if .state == "MERGED" then "act merged — the pull request is merged: release the issue"
       elif .state == "CLOSED" then "act closed — closed without merging: read why, release the issue"
       elif ($failed | length) > 0 then "act checks failed: \($failed | join(", "))"
-      elif ($new | length) > 0 then "act reviewed by \([$new[].author.login] | unique | join(", ")) (\([$new[].state] | unique | join(", "))): resolve every finding"
+      elif ($new | length) > 0 and (.reviewDecision != "APPROVED" or .approximate) then "act reviewed by \([$new[].author.login] | unique | join(", ")) (\([$new[].state] | unique | join(", "))): resolve every finding"
       elif .mergeable == "CONFLICTING" then "act conflicts with the base branch: rebase"
       elif .reviewDecision == "APPROVED" and $green and .approximate then "wait approved by its reviews and green; GitHub'"'"'s review decision is unreadable (GraphQL), so not yet done"
       elif .reviewDecision == "APPROVED" and $green and .mergeable == "MERGEABLE" then "act done — approved, green and mergeable: release the issue"

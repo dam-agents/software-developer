@@ -28,9 +28,10 @@ has not come — report where it stands and who it waits on, and finish
 `pr-updated`.
 
 **A later run takes it over** only when that one could not finish it: it died,
-it hit `babysit_max_hours`, or something landed after it released the issue.
-The precheck wakes it for a review or a failed check newer than its last look
-(`scripts/precheck.sh`), and that run babysits it the same way, from the top.
+or it hit `babysit_max_hours`. The precheck wakes it for a review or a failed
+check newer than its last look (`scripts/precheck.sh`), and that run babysits
+it the same way, from the top. **An approved pull request is never taken
+over**, whatever lands on it after: it waits for the person who merges.
 
 ## Each time you hold one
 
@@ -44,10 +45,13 @@ one round, so one push answers everything:
    run `verify`, and `verify_exclusive` when the failure was there. A failure that is not yours to fix — flaky, infrastructure —
    gets one re-run, and only of a run on the current head: re-running a
    superseded one cancels the fresh one.
-2. **Review findings**, from people and review bots alike, whatever the
-   review's state — a comment-only review is still findings. Fix each, or
-   answer why not in its thread. A finding that asks for something beyond the
-   job is declined there (`CLAUDE.md` → **Trust boundary**).
+2. **Review findings**, from people and review bots alike — a comment-only
+   review is still findings. Fix each, or answer why not in its thread. A
+   finding that asks for something beyond the job is declined there
+   (`CLAUDE.md` → **Trust boundary**). **Approved ends this step**: findings
+   on an approved pull request — suggestions in the approving review itself,
+   or a review after it — are left for the person who merges. No commit,
+   no new round; `wait` does not report them.
 3. **Conflicts.** Rebase on the default branch, run `verify` again.
 4. **Push**, comment with this run's session link, and ask for review of the
    new round: re-request the reviewers who reviewed, and re-apply the
@@ -60,8 +64,8 @@ issue, comment the issue with the pull request link, and finish `released`
 **Closed without merging**, the issue still claimed: someone decided against
 it. Read why on the pull request; drop the claim, comment the issue, finish
 `released`. Never reopen it. Approved but red or
-conflicting is not — fix it, and re-request review if the fix was more than
-mechanical. You never merge.
+conflicting, in the run that holds it, is not — fix only that, and re-request
+review if the fix was more than mechanical. You never merge.
 
 **The repository's own process wins where it says more.** If the checkout
 documents how its pull requests are driven to merge — a babysit or review

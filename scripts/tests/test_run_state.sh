@@ -211,6 +211,16 @@ STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
 is "$RC" 0 "released"
 done_
 
+CASE="a review on an approved pull request is not a round"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+sleep 1; LATE="[{\"author\":{\"login\":\"guardian\"},\"state\":\"APPROVED\",\"submittedAt\":\"$(date -u -d '+1 minute' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1M +%Y-%m-%dT%H:%M:%SZ)\"}]"
+STUB_PR_VIEW="$(view OPEN APPROVED MERGEABLE "$GREEN" "$LATE")" as sess-a wait 21
+is "$RC" 0 "exit"
+has "$OUT" "done — approved, green and mergeable" "done, not reviewed"
+STUB_PR_VIEW="$(view OPEN APPROVED MERGEABLE "$RUNNING_CHECK" "$LATE")" as sess-a wait 21
+is "$RC" 3 "checks still running: nothing yet"
+done_
+
 CASE="a failed check is something to do"; sandbox; origin_checkout
 as sess-a start 7 feat/7
 FAILING="[{\"name\":\"test\",\"conclusion\":\"FAILURE\",\"completedAt\":\"$(date -u -d '+1 minute' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1M +%Y-%m-%dT%H:%M:%SZ)\"}]"
