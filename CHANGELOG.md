@@ -9,6 +9,16 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 3.1.1 — 2026-10-05
+
+**Approved ends the review.** A review on an approved pull request — the
+suggestions in the approving review, or one that comes after it — no longer
+starts another round: `run-state.sh wait` says done once it is approved, green
+and mergeable, and only a failed check or a conflict brings a run back to it
+(`docs/babysit.md`).
+
+**Upgrade:** nothing.
+
 ## 3.1.0 — 2026-10-05
 
 **Grilling in Slack.** With `slack_channel` set, `let's grill <n>` in that
