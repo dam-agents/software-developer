@@ -9,6 +9,41 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 3.0.0 — 2026-10-05
+
+The definition serves any repository, and assumes no cluster, platform or
+tool. The cluster became **the exclusive lock**: `exclusive` names, in plain
+words, whatever every slot shares and one uses at a time — a cluster, a
+database, a device — and every use of it takes the lock, trying a change out
+as much as testing it. `verify_exclusive` is the check on it a pull request
+must pass. How to set it up, try it and recover it is the repository's to
+document; the definition no longer knows. `run-state.sh cluster` and
+`cluster-done` are `lock` and `unlock`, the outcome `waiting-cluster` is
+`waiting-lock`, and `docs/cluster.md` is `docs/exclusive.md`. `label_review`
+is optional. Both schedules are optional: `schedules` lists the ones the
+operator wants, onboarding asks, and the audit checks them against it.
+
+**Upgrade:**
+
+1. Wait until no run is in flight (`list_schedules` shows the tick idle, or
+   pause it): a run still on 2.x calls `run-state.sh cluster`, which is gone.
+2. In `work/CONFIG.md`, with the operator: with `cluster: required`, write
+   `- exclusive: <what is shared, in plain words>`, and `verify_cluster` as
+   `verify_exclusive`, preceded by the setup from `cluster_install` when it
+   does not set itself up. Then delete `cluster`, `cluster_install`,
+   `cluster_uninstall`, `cluster_delete` and `verify_cluster` — and rewrite
+   any `## Bounds` sentence that names one of them with the command itself.
+   What those commands knew and the repository does not document — how to
+   recover it — is a change to suggest for the repository's own
+   instructions; **operator only**, unless they hand it over as an issue.
+3. Ask the operator which schedules to keep. Write
+   `- schedules: <tick audit | tick | audit | none>`, and with
+   `toggle_schedule` switch each one to match (`list_schedules` first).
+4. `bash "$HOME/scripts/work-backup.sh" persist`, then re-run
+   `bash "$HOME/scripts/verify-onboarding.sh" --live`: it fails a retired key
+   and checks `exclusive`, `verify_exclusive` and `schedules`. Item files
+   still saying `waiting-cluster` are read as `waiting-lock`; leave them.
+
 ## 2.4.0 — 2026-10-05
 
 Slack posts, off by default: with the new, optional `slack_channel` set, a run

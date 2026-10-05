@@ -58,10 +58,10 @@ if [ -z "${PRECHECK_PROBE:-}" ]; then
     echo "Find out what is holding them and report — docs/diagnostic-run.md."
     exit 0
   fi
-  # the cluster's other holder, if any, and whether it is free
-  CLUSTER_FREE=1; [ -d "$LOCKS/cluster" ] && CLUSTER_FREE=0
+  # whether the exclusive lock is free
+  LOCK_FREE=1; [ -d "$LOCKS/exclusive" ] && LOCK_FREE=0
 else
-  CLUSTER_FREE=1
+  LOCK_FREE=1
 fi
 HELD=" $("$STATE" held 2>/dev/null | tr '\n' ' ') "
 
@@ -197,12 +197,13 @@ PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR
     ] | join("; ")) — docs/babysit.md\n  \(.url)"
 ')" || exit 2
 
-# Items a run parked because the cluster was taken: due again once it is free
-CLUSTER_WORK=""
-if [ "$CLUSTER_FREE" = 1 ]; then
-  CLUSTER_WORK="$(printf '%s' "$ITEMS_JSON" | jq -r --arg held "$HELD" '
-    to_entries | map(select(.value.state == "waiting-cluster" and (.key as $i | $held | contains(" \($i) ") | not)))
-    | sort_by(.value.seen) | .[] | "- #\(.key) on \(.value.branch) — run its cluster step"')" || exit 2
+# Items a run parked because the exclusive lock was taken: due again once it is
+# free. `waiting-cluster` is the same state as written before 3.0.0.
+LOCK_WORK=""
+if [ "$LOCK_FREE" = 1 ]; then
+  LOCK_WORK="$(printf '%s' "$ITEMS_JSON" | jq -r --arg held "$HELD" '
+    to_entries | map(select((.value.state | IN("waiting-lock", "waiting-cluster")) and (.key as $i | $held | contains(" \($i) ") | not)))
+    | sort_by(.value.seen) | .[] | "- #\(.key) on \(.value.branch) — run its exclusive step"')" || exit 2
 fi
 
 ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info "$NEEDS_INFO" \
@@ -223,13 +224,13 @@ RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" --arg 
     --argjson items "$ITEMS_JSON" '
   map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))
   | map(select(.number as $i | $held | contains(" \($i) ") | not))
-  | map(select(($items["\(.number)"].state // "") | IN("waiting-cluster", "blocked", "needs-info") | not))
+  | map(select(($items["\(.number)"].state // "") | IN("waiting-lock", "waiting-cluster", "blocked", "needs-info") | not))
   | .[]
   | "- #\(.number) \(.title)\(($items["\(.number)"].abandoned // 0) as $a
       | if $a > 0 then " — a run died on it \($a) time(s)" else "" end)\n  \(.url)"
 ')" || exit 2
 
-[ -z "$PR_WORK" ] && [ -z "$CLUSTER_WORK" ] && [ -z "$ISSUE_WORK" ] && [ -z "$RESUME_WORK" ] && exit 1
+[ -z "$PR_WORK" ] && [ -z "$LOCK_WORK" ] && [ -z "$ISSUE_WORK" ] && [ -z "$RESUME_WORK" ] && exit 1
 
 echo "Repository: $REPO"
 echo "Take the first item below that \`run-state.sh start\` gives you, and that one alone; another run takes the next."
@@ -239,10 +240,10 @@ if [ -n "$PR_WORK" ]; then
   echo "Your open pull requests needing attention:"
   echo "$PR_WORK"
 fi
-if [ -n "$CLUSTER_WORK" ]; then
+if [ -n "$LOCK_WORK" ]; then
   echo
-  echo "Waiting for the cluster, which is free now:"
-  echo "$CLUSTER_WORK"
+  echo "Waiting for the exclusive lock, which is free now:"
+  echo "$LOCK_WORK"
 fi
 if [ -n "$RESUME_WORK" ]; then
   echo

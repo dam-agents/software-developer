@@ -3,8 +3,8 @@ name: implement-issue
 description: >
   Implement one GitHub issue labelled for hand-off in the repository this agent
   develops: decide whether it is ready, claim it, plan, write the change and
-  its tests in the slot run-state.sh gives you, verify it (the cluster step
-  under its lock), and open the pull request. Use for item 4 of the tick in
+  its tests in the slot run-state.sh gives you, verify it (what `exclusive`
+  names only under its lock), and open the pull request. Use for item 4 of the tick in
   CLAUDE.md — "a new issue" — and whenever the operator asks you to implement
   an issue. Not for review rounds on an open pull request (docs/babysit.md).
 ---
@@ -91,30 +91,30 @@ $RS phase "verify"
 ```
 
 Fix what it finds and run it again; never weaken, skip or delete a test to get
-green. When the change can affect what runs on the cluster and `verify_cluster`
-is set:
+green. When the change can affect what `exclusive` names and `verify_exclusive`
+is set — or you want to try the change out on it, at any step:
 
 ```sh
-$RS cluster                    # refused: push, finish waiting-cluster
-$RS phase "verify_cluster"
-<cluster_install>; <verify_cluster>
-$RS cluster-done
+$RS lock                       # refused: push, finish waiting-lock
+$RS phase "verify_exclusive"
+<set it up for your branch, as the repository says>; <verify_exclusive>
+$RS unlock
 ```
 
-[`docs/cluster.md`](../../../docs/cluster.md) for what to do when the cluster
-itself misbehaves.
+[`docs/exclusive.md`](../../../docs/exclusive.md) for what to do when it
+misbehaves.
 
 ## 6. The pull request
 
 ```sh
 git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>" [--label <label_mine>]
-gh pr edit <pr> -R <repo> --add-label <label_review>
+gh pr edit <pr> -R <repo> --add-label <label_review>   # when set
 $RS wait <pr>                  # then babysit, below
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
-`verify_cluster` covered or why it did not run), anything a reviewer should
+`verify_exclusive` covered or why it did not run), anything a reviewer should
 look at first. Then `Fixes #<n>` on its own line, and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
 With `label_mine` set it carries that label from the start: without it, no

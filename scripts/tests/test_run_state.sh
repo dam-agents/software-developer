@@ -72,7 +72,7 @@ as sess-a start 7 feat/7
 STUB_ISSUE='{"labels":[{"name":"agent/failed"}]}' as sess-a finish blocked
 has "$(cat "$HOME/err")" "notify: post this blocked to slack_channel C0123ABCD" "blocked"
 as sess-a start 7 feat/7
-as sess-a finish waiting-cluster
+as sess-a finish waiting-lock
 lacks "$(cat "$HOME/err")" "notify:" "nothing for a person to do"
 done_
 
@@ -123,19 +123,19 @@ STUB_RUNTIME_DOWN=1 state sweep
 [ -d "$SD_LOCKS/slot-1" ] || fail "freed on a guess"
 done_
 
-CASE="one cluster: a second item waits, and a dead holder leaves it dirty"; sandbox; origin_checkout
+CASE="one exclusive lock: a second item waits, and a dead holder leaves it dirty"; sandbox; origin_checkout
 as sess-a start 7 feat/7; as sess-b start 8 feat/8
-as sess-a cluster
+as sess-a lock
 is "$RC" 0 "the first takes it"
-has "$OUT" "cluster: yours." "says so"
-as sess-b cluster
+has "$OUT" "lock: yours." "says so"
+as sess-b lock
 is "$RC" 1 "the second waits"
-is "$(field items/8.md state)" waiting-cluster "recorded"
-RUNNING="sess-b" as sess-b cluster
+is "$(field items/8.md state)" waiting-lock "recorded"
+RUNNING="sess-b" as sess-b lock
 is "$RC" 0 "the holder died: it is freed"
-has "$OUT" "run cluster_uninstall before anything else" "told it is dirty"
+has "$OUT" "bring what exclusive names back to a known state" "told it is dirty"
 as sess-b finish pr-updated
-[ ! -d "$SD_LOCKS/cluster" ] || fail "finish kept the cluster"
+[ ! -d "$SD_LOCKS/exclusive" ] || fail "finish kept the lock"
 done_
 
 CASE="nothing is held without a session id"; sandbox; origin_checkout

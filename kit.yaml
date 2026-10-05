@@ -7,14 +7,13 @@ id: software-developer
 name: Software Developer
 description: >-
   Picks up an issue labelled for implementation, writes the change, runs the
-  repository's own checks and tests against a cluster in its own sandbox,
-  opens a pull request and drives it through review until it is approved.
+  repository's own checks and tests in its own sandbox, opens a pull request and drives it through review until it is approved.
 category: software
 icon: code
 docsUrl: https://github.com/dam-agents/software-developer
 harnesses: [claude-code]
 
-# The verification it runs brings up a cluster in the sandbox, which a pod
+# A repository's checks may need containers, or a local cluster, which a pod
 # cannot host. An install without virtualization leaves this kit out of the
 # catalog entirely rather than offering something it cannot run.
 backend: vm
@@ -31,28 +30,27 @@ resources:
   memory: 16Gi
   storage: 80Gi
   note: >-
-    The sandbox is the cluster node as well as the build host. Sized below the
-    reference dev VM (10 CPU / 20GiB / 200GiB) on the assumption that one
-    container runtime and one image store need less than two. The disk is
-    deliberately under the 100Gi a vm runner claims per owner by default, so
-    the image cache it shares that claim with still has room. Disk is fixed at
-    create — raise it here before installing if either assumption turns out to
-    be wrong, and raise the runner claim with it.
+    Up to three builds side by side, and whatever services the repository's
+    checks start, on one host. The disk is deliberately under the 100Gi a vm
+    runner claims per owner by default, so the image cache it shares that
+    claim with still has room. Disk is fixed at create — raise it here before
+    installing for a repository that needs more, and raise the runner claim
+    with it.
 
-# The cluster and the container runtime are processes in the sandbox: they stop
-# when it does. This agent stays up so its cluster does.
+# Whatever the repository's checks start — a container runtime, a cluster — is
+# a process in the sandbox and stops when it does. This agent stays up so they
+# stay warm between runs.
 hibernationTimeoutMin: 0
 
-# Required. The agent's tools — containers, the cluster, a platform installed on
-# it — call the same services with credentials of their own, or none. Its
+# Required. The agent's tools — builds, containers, whatever they start — call the same services with credentials of their own, or none. Its
 # gateway injects a connection's credential only into requests that name the
 # connection, and sends the rest as they are; egress policy still applies to
 # all of them. A platform that predates the field ignores it.
 requireConnectionAddress: true
 
 env:
-  # Tells a repository's cluster tooling it is already inside a VM, so it drives
-  # the local k3s instead of looking for a VM manager to create one.
+  # Tells a repository's tooling it is already inside a VM, so it need not look
+  # for a VM manager to create one.
   - name: IS_SANDBOX
     value: "1"
   # Tells a repository's tooling it runs in a DAM sandbox, so it can work
@@ -61,7 +59,7 @@ env:
   - name: PLATFORM_SANDBOX
     value: "1"
 
-# The builds and the cluster pull from registries, mirrors and package hosts no
+# The builds pull from registries, mirrors and package hosts no
 # list can enumerate ahead of time. The owner can narrow it after create.
 egressPreset: all
 
@@ -70,6 +68,9 @@ connections:
     required: true
     note: Clones the repository, pushes branches and opens pull requests.
 
+# Both are created with the agent and held until onboarding completes; the
+# operator chooses which stay on (`schedules` in work/CONFIG.md), and
+# onboarding switches the others off.
 schedules:
   # Every ten minutes, around the clock. A cron holds UTC, and at this cadence
   # the hour it lands in is nothing the agent reasons about.
@@ -78,8 +79,8 @@ schedules:
   # side. That is the point — up to `slots` runs work at once, one issue each,
   # each in a worktree of its own — and the precheck is what bounds it: it lets
   # a run through only while a slot is free, and frees the slots of runs the
-  # runtime says are over. The one cluster is serialized by a lock of its own
-  # (docs/runs.md). What a run needs to know about the ones before it is in
+  # runtime says are over. What the slots share is serialized by a lock of
+  # its own (docs/runs.md). What a run needs to know about the ones before it is in
   # the branches, the labels and the pull requests, which survive a session and
   # a rebuilt sandbox alike.
   - name: software-developer-tick-10m

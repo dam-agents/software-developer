@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # run-state.sh — the one writer of the tick's state: which session works on
-# which item, in which slot, and who holds the cluster.
+# which item, in which slot, and who holds the exclusive lock.
 #
 # Up to `slots` runs work at once (default 3), one item each, each in a slot of
 # its own: a worktree of the checkout at work/slots/<k>, kept between runs so
 # its build output stays warm. A run takes an item and a slot when it starts
 # and gives both back when it finishes; the branch, pushed, is what carries the
-# work from one run to the next. The cluster is one, so whatever touches it
-# runs under its own lock, taken for that step alone.
+# work from one run to the next. What `exclusive` names — a cluster, a
+# database, a device — is one, so whatever touches it runs under a lock of its
+# own, taken for those steps alone.
 #
 # The locks are directories under $LOCKS, on tmpfs: mkdir takes one atomically,
-# and a restart — which stops every session and the cluster with it — wipes
+# and a restart — which stops every session, and most shared services — wipes
 # them all. Each holds an `owner` file naming its session and the boot it was
 # taken in. A holder is dead when its boot is over, or when the runtime says
 # its session is not running a turn: a lock never outlives the turn that took
@@ -21,8 +22,8 @@
 #   wait <pr>                 babysit: block up to ~9 minutes until the pull
 #                             request needs the run (exit 0), nothing yet (3),
 #                             or the run has babysat it for babysit_max_hours (4)
-#   cluster                   take the cluster lock, or record waiting for it
-#   cluster-done              give the cluster back
+#   lock                      take the exclusive lock, or record waiting for it
+#   unlock                    give the exclusive lock back
 #   finish <outcome> [pr]     the run's last act, on every way out: refused
 #                             until the work is pushed and reported on GitHub
 #                             (below); then backs work/ up, and with
@@ -377,31 +378,31 @@ cmd_phase() {
   stamp "${1:?phase text}"
 }
 
-cmd_cluster() {
+cmd_lock() {
   local item f
   need_session
   item="$(my_lock item- | sed 's/^item-//')"
   [ -n "$item" ] || { say "this session holds no item — call start first"; exit 1; }
   f="$(item_file "$item")"
   cmd_sweep >/dev/null
-  if take cluster "item=$item"; then
-    if [ -f "$LOCKS/cluster.dirty" ]; then
-      echo "cluster: yours. Its last holder died mid-use: run cluster_uninstall before anything else (docs/cluster.md)."
-      rm -f "$LOCKS/cluster.dirty"
+  if take exclusive "item=$item"; then
+    if [ -f "$LOCKS/exclusive.dirty" ]; then
+      echo "lock: yours. Its last holder died mid-use: bring what exclusive names back to a known state before anything else (docs/exclusive.md)."
+      rm -f "$LOCKS/exclusive.dirty"
     else
-      echo "cluster: yours."
+      echo "lock: yours."
     fi
     write "$f" "$f" "$ITEM_KEYS" state=active "updated_at=$(now)"
-    stamp cluster
+    stamp lock
     return 0
   fi
-  write "$f" "$f" "$ITEM_KEYS" state=waiting-cluster "updated_at=$(now)"
-  say "the cluster is held by session $(kv "$LOCKS/cluster/owner" session) for #$(kv "$LOCKS/cluster/owner" item), at \"$(kv "$LOCKS/cluster/owner" phase)\"."
-  say "Push what you have and finish waiting-cluster: the precheck wakes this item once the cluster is free."
+  write "$f" "$f" "$ITEM_KEYS" state=waiting-lock "updated_at=$(now)"
+  say "the exclusive lock is held by session $(kv "$LOCKS/exclusive/owner" session) for #$(kv "$LOCKS/exclusive/owner" item), at \"$(kv "$LOCKS/exclusive/owner" phase)\"."
+  say "Push what you have and finish waiting-lock: the precheck wakes this item once the lock is free."
   exit 1
 }
 
-cmd_cluster_done() { if [ -d "$LOCKS/cluster" ] && mine "$LOCKS/cluster"; then drop cluster; fi; return 0; }
+cmd_unlock() { if [ -d "$LOCKS/exclusive" ] && mine "$LOCKS/exclusive"; then drop exclusive; fi; return 0; }
 
 # ---------------------------------------------------------------- reports
 # Nobody watches a run: what it did is known only from what it left on GitHub.
@@ -460,7 +461,7 @@ reported() {
 cmd_finish() {
   local outcome="${1:?outcome}" pr="${2:-}" item slot since f state why rc report=""
   case "$outcome" in
-    nothing | pr-opened | pr-updated | released | blocked | waiting-cluster | needs-info) ;;
+    nothing | pr-opened | pr-updated | released | blocked | waiting-lock | needs-info) ;;
     *) say "unknown outcome '$outcome'"; exit 2 ;;
   esac
   item="$(my_lock item- | sed 's/^item-//')"
@@ -496,11 +497,11 @@ cmd_finish() {
          exit 1 ;;
     esac
   fi
-  cmd_cluster_done
+  cmd_unlock
   if [ -n "$item" ]; then
     f="$(item_file "$item")"
     case "$outcome" in
-      waiting-cluster | needs-info | released | blocked) state="$outcome" ;;
+      waiting-lock | needs-info | released | blocked) state="$outcome" ;;
       *) state=parked ;;
     esac
     write "$f" "$f" "$ITEM_KEYS" "state=$state" ${pr:+"pr=$pr"} session=- babysit_since=- round_at=- babysat_out=- "updated_at=$(now)"
@@ -527,7 +528,7 @@ cmd_finish() {
 
 # Frees what dead holders left. A dead slot holder is an abandoned run: logged,
 # and counted on its item, which the precheck then lists as half-done. A dead
-# cluster holder leaves the cluster in whatever state its step reached.
+# lock holder leaves what `exclusive` names in whatever state its step reached.
 cmd_sweep() {
   local l name o item f n
   [ -d "$LOCKS" ] || return 0
@@ -537,7 +538,7 @@ cmd_sweep() {
     dead "$l" || continue
     o="$l/owner"; item="$(kv "$o" item)"
     case "$name" in
-      cluster) touch "$LOCKS/cluster.dirty" ;;
+      exclusive) touch "$LOCKS/exclusive.dirty" ;;
       slot-*)
         if [ -n "$item" ]; then
           f="$(item_file "$item")"; n="$(kv "$f" abandoned)"
@@ -597,7 +598,7 @@ cmd_show() {
     l="${l%/}"; [ -d "$l" ] || continue
     printf '%s: ' "$(basename "$l")"; grep -E '^- ' "$l/owner" 2>/dev/null | tr '\n' ' '; echo
   done
-  [ -f "$LOCKS/cluster.dirty" ] && echo "cluster: dirty — its last holder died mid-use"
+  [ -f "$LOCKS/exclusive.dirty" ] && echo "exclusive: dirty — its last holder died mid-use"
   for l in "$ITEMS"/*.md; do
     [ -f "$l" ] || continue
     printf '#%s: ' "$(basename "$l" .md)"; grep -E '^- ' "$l" | grep -v '^- item:' | tr '\n' ' '; echo
@@ -609,8 +610,8 @@ case "${1:-}" in
   start) shift; cmd_start "$@" ;;
   phase) shift; cmd_phase "$@" ;;
   wait) shift; cmd_wait "$@" ;;
-  cluster) cmd_cluster ;;
-  cluster-done) cmd_cluster_done ;;
+  lock) cmd_lock ;;
+  unlock) cmd_unlock ;;
   finish) shift; cmd_finish "$@" ;;
   sweep) cmd_sweep ;;
   held) cmd_held ;;
@@ -619,7 +620,7 @@ case "${1:-}" in
   diagnosed) cmd_diagnosed ;;
   show) cmd_show ;;
   *)
-    echo "usage: run-state.sh start|phase|wait|cluster|cluster-done|finish|sweep|held|live|quiet|diagnosed|show" >&2
+    echo "usage: run-state.sh start|phase|wait|lock|unlock|finish|sweep|held|live|quiet|diagnosed|show" >&2
     exit 2
     ;;
 esac

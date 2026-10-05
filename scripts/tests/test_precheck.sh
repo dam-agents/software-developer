@@ -80,15 +80,15 @@ lacks "$OUT" "#7 Older" "held"
 has "$OUT" "#8 Newer" "free"
 done_
 
-CASE="an item waiting for the cluster is due once the cluster is free"; sandbox
+CASE="an item waiting for the lock is due once it is free, in the state 3.0.0 renamed too"; sandbox
 item 5 state=waiting-cluster branch=feat/5 "seen_at=$(ago 30)"
-lock cluster session=sess-a item=6
+lock exclusive session=sess-a item=6
 STUB_RUNNING=sess-a STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"}]' precheck
 is "$RC" 1 "still taken, and not resumable either"
-rm -rf "$SD_LOCKS/cluster"
+rm -rf "$SD_LOCKS/exclusive"
 STUB_CLAIMED='[{"number":5,"title":"Five","url":"https://gh/5"}]' precheck
 is "$RC" 0 "free"
-has "$OUT" "#5 on feat/5 — run its cluster step" "listed"
+has "$OUT" "#5 on feat/5 — run its exclusive step" "listed"
 done_
 
 CASE="a claimed issue is resumed only when no pull request names it"; sandbox

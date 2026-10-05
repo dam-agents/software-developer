@@ -38,9 +38,8 @@ Set up during onboarding.
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
-- label_review: code-guardian-review
-- verify: mise run check
-- cluster: none
+- label_review: needs-review
+- verify: make check
 - stuck_after_min: 120
 
 ## Bounds

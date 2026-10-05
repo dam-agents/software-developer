@@ -18,7 +18,8 @@ echo "- lable_review: typo" >> "$HOME/work/CONFIG.md"
 echo "- author: someone-else" >> "$HOME/work/CONFIG.md"
 setcfg repo "https://github.com/acme/widgets"
 setcfg app_url "platform.example.com"
-setcfg cluster required
+echo "- cluster_install: make up" >> "$HOME/work/CONFIG.md"
+echo "- schedules: tick daily" >> "$HOME/work/CONFIG.md"
 verify --config
 is "$RC" 1 "exit"
 has "$OUT" "FAIL config.label_failed — missing — fix:" "missing key"
@@ -26,7 +27,9 @@ has "$OUT" "unknown key(s): lable_review" "typo'd key"
 has "$OUT" "duplicated: author" "duplicate"
 has "$OUT" "is not [host/]owner/name" "repo shape"
 has "$OUT" "app_url — 'platform.example.com' is not a URL" "url shape"
-has "$OUT" "config.cluster_install — missing, and cluster is required" "cluster keys"
+has "$OUT" "FAIL config.retired — retired key(s): cluster_install" "a retired key names its migration"
+has "$OUT" "FAIL config.schedules — 'daily' is not tick, audit or none" "schedule roles"
+lacks "$OUT" "unknown key(s): lable_review cluster_install" "a retired key is not also unknown"
 lacks "$OUT" "Nothing under deploy" "a prose bullet is not a key"
 done_
 
@@ -78,18 +81,18 @@ is "$RC" 1 "exit"
 has "$OUT" "acting as other-bot, but author is 'dev-bot'" "identity mismatch"
 has "$OUT" "FAIL live.push — no push" "push"
 has "$OUT" "warn live.scope — the connection can push to 3 repositories" "scope"
-has "$OUT" "FAIL live.label_review — no label 'code-guardian-review'" "label"
+has "$OUT" "FAIL live.label_review — no label 'needs-review'" "label"
 has "$OUT" "FAIL live.runtime" "runtime down"
 has "$OUT" "FAIL live.label_needs_info — no label 'agent/needs-info'" "default needs-info label"
 done_
 
-CASE="a worktree outside the slots fails; verify_cluster needs a cluster"; sandbox; onboarded
+CASE="a worktree outside the slots fails; verify_exclusive needs exclusive"; sandbox; onboarded
 origin_checkout
 git -C "$HOME/work/widgets" worktree add -q --detach "$HOME/work/widgets-extra"
-echo "- verify_cluster: mise run e2e" >> "$HOME/work/CONFIG.md"
+echo "- verify_exclusive: make e2e" >> "$HOME/work/CONFIG.md"
 verify
 has "$OUT" "FAIL state.worktrees — worktrees outside work/slots" "stray worktree"
-has "$OUT" "FAIL config.verify_cluster — set, but cluster is not required" "verify_cluster"
+has "$OUT" "FAIL config.verify_exclusive — set, but exclusive names nothing" "verify_exclusive"
 done_
 
 CASE="slack_channel is a chat id when set"; sandbox

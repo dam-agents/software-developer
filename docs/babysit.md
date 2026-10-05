@@ -41,7 +41,7 @@ comments since your last push — and handle all of it in
 one round, so one push answers everything:
 
 1. **Failed checks.** Read why (`gh run view <id> --log-failed`), fix the cause,
-   run `verify`, and `verify_cluster` when the failure was there. A failure that is not yours to fix — flaky, infrastructure —
+   run `verify`, and `verify_exclusive` when the failure was there. A failure that is not yours to fix — flaky, infrastructure —
    gets one re-run, and only of a run on the current head: re-running a
    superseded one cancels the fresh one.
 2. **Review findings**, from people and review bots alike, whatever the

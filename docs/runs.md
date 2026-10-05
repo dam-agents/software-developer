@@ -1,4 +1,4 @@
-# Runs, slots and the cluster
+# Runs, slots and the exclusive lock
 
 Read this when `run-state.sh` refuses you, when a slot holds something you did
 not expect, or when the precheck says a run died. The script is the one writer
@@ -15,7 +15,7 @@ apart is three kinds of lock, taken atomically on tmpfs:
 | --- | --- | --- |
 | item `<n>` | `start <n>` | the run — no two runs on one issue |
 | slot `<k>` | `start <n>` | the run — one worktree, one run |
-| cluster | `cluster` | the cluster step alone; `cluster-done` or `finish` gives it back |
+| exclusive | `lock` | the steps on what `exclusive` names; `unlock` or `finish` gives it back |
 
 An item is held until its pull request is done, not until it is opened: the run
 that opens it babysits it with `run-state.sh wait <pr>`
@@ -23,7 +23,7 @@ that opens it babysits it with `run-state.sh wait <pr>`
 
 **A lock never outlives the turn that took it.** A holder is dead when the
 runtime says its session is not running a turn, or when the sandbox restarted
-since it was taken (a restart wipes tmpfs, and stops the cluster with it). The
+since it was taken (a restart wipes tmpfs, and stops what ran in the sandbox). The
 precheck sweeps dead holders before every tick. A runtime that does not answer
 frees nothing: a guess could hand a live run's slot to another.
 
@@ -61,23 +61,25 @@ but a warm slot. The precheck uses it to
 
 - wake a pull request only for a review or failed check newer than `seen_at`,
   whichever run looked at it last;
-- list an item `waiting-cluster` once the cluster is free;
+- list an item `waiting-lock` once the lock is free;
 - say how often a run died on a claimed issue — the second time, release it.
 
-## The cluster
+## The exclusive lock
 
-One cluster serves every slot, and anything that touches it — an install, an
-end-to-end suite, an uninstall — changes what every other branch would see. So:
-`verify` first, in your slot, without the lock; then `run-state.sh cluster`.
+What `exclusive` names serves every slot, and anything that touches it —
+setting it up, trying a change out, a suite run against it — changes what
+every other branch would see. So: `verify` first, in your slot, without the
+lock; then `run-state.sh lock`.
 
-- **Granted:** run `verify_cluster` (and the install it needs) at once, then
-  `run-state.sh cluster-done`. Told the last holder died mid-use: run
-  `cluster_uninstall` first ([cluster.md](cluster.md)).
-- **In the direct session** too: a cluster command run by hand, outside the
+- **Granted:** do what needs it at once — `verify_exclusive`, and whatever
+  trying the change out takes — then `run-state.sh unlock`. Told the last
+  holder died mid-use: bring it back to a known state first
+  ([exclusive.md](exclusive.md)).
+- **In the direct session** too: a command on it run by hand, outside the
   lock, lands under some run's suite.
 - **Refused:** another item holds it. Commit and push what you have, and
-  finish `waiting-cluster`. Do not wait in the turn: a later run picks the item
-  up as soon as the cluster is free.
+  finish `waiting-lock`. Do not wait in the turn: a later run picks the item
+  up as soon as the lock is free.
 
 ## Reports
 
@@ -103,7 +105,7 @@ says `report=unverified`.
 the item stands, what happens next and who acts — the agent on its next run, a
 reviewer, the issue's author. A pull request's own round comment
 ([babysit.md](babysit.md)) is that report. For outcomes that have nothing else
-to post — `waiting-cluster`, `nothing`, a resumed run's progress — keep one
+to post — `waiting-lock`, `nothing`, a resumed run's progress — keep one
 status comment per issue and edit it in place rather than adding a new one:
 its first line `<!-- software-developer:status -->`, then the state and this
 run's link.
