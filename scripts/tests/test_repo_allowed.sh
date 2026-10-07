@@ -12,7 +12,7 @@ is "$(allowed acme/gadgets)" no "a sibling"
 CASE="repos_also: names and owner/*"; sandbox
 echo "- repos_also: Beta/*, gamma/one" >> "$HOME/work/CONFIG.md"
 mkdir -p "$HOME/beta/x"; cd "$HOME"   # a path the pattern must not expand to
-is "$(allowed beta/starter-kits)" yes "any of beta"
+is "$(allowed beta/gadgets)" yes "any of beta"
 is "$(allowed gamma/one)" yes "a named one"
 is "$(allowed gamma/two)" no "an unnamed sibling"
 is "$(allowed evil/beta)" no "the owner as a name"
