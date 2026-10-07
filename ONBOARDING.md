@@ -176,6 +176,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - slack_channel: C0123ABCD
 - skill_grill: grill-me
 - skill_file_issue: file-issue
+- repos_also: owner/*
 
 ## Bounds
 
@@ -187,7 +188,8 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `label_review` and `schedules`. With nothing shared, leave `exclusive` and
 `verify_exclusive` out; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`;
-for the default grill skills, `skill_grill` and `skill_file_issue`.
+for the default grill skills, `skill_grill` and `skill_file_issue`; leave
+`repos_also` out unless the user names more repositories to work on in chat.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
 user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;

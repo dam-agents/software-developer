@@ -9,6 +9,22 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 4.1.0 — 2026-10-07
+
+**More repositories, in the direct session.** A new, optional key,
+`repos_also`: `owner/name` or `owner/*` entries the operator may name for work
+in chat beside `repo` ([`docs/direct-session.md`](docs/direct-session.md) →
+**Another repository**). `scripts/repo-allowed.sh` decides; scheduled runs and
+Slack still act on `repo` alone. Off while missing.
+
+**Upgrade:**
+
+1. Offer `repos_also` to the operator — which other repositories, or which
+   owners' (`owner/*`), they want worked on in chat. Write
+   `- repos_also: <entries>` to `work/CONFIG.md` only on a yes, then
+   `bash "$HOME/scripts/work-backup.sh" persist`.
+2. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
+
 ## 4.0.1 — 2026-10-08
 
 **`label_mine` is this instance's own.** 4.0.0 suggests `agent/$PLATFORM_AGENT_ID`

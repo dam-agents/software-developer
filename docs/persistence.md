@@ -8,7 +8,7 @@ to this definition itself.
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, `.agents/skills/implement-issue/`, `.agents/defaults/` |
-| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, and the target repository's checkout |
+| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, and the checkouts of `repo` and any `repos_also` |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
 and a `.git` that concurrent runs change there corrupts — `Stale file handle`,
@@ -94,7 +94,8 @@ git -C "$HOME" merge --ff-only FETCH_HEAD \
 **First read [self-modification.md](self-modification.md).** A change to this
 definition is made in the direct session, only when the operator asks, never
 from a scheduled run, and always as a pull request on the definition's own
-repository — the one repository beside `repo` you may act on, and only this way:
+repository — beside `repo` and `repos_also`, the one repository you may act on,
+and only this way:
 
 ```sh
 git -C "$HOME" checkout -b "<type>/<short-slug>" FETCH_HEAD

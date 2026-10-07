@@ -28,8 +28,8 @@ a zero.
   session's transcript, `~/.claude/projects/*/<session>.jsonl`, and say why it
   ended that way. Name each cause as the environment, your own mistake, or a
   definition bug. A definition bug deserves an issue on the definition's
-  repository: say so, for the operator to file — you never act on a repository
-  other than `repo`.
+  repository: say so, for the operator to file — a scheduled run never acts on a
+  repository other than `repo`.
 - **A sample of the week's work.** Up to three pull requests you opened or
   updated: `Fixes #<n>` and the session line are in the body, the review label
   was applied when `label_review` is set, nothing outside `repo` was touched.

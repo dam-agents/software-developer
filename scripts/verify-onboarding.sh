@@ -31,7 +31,7 @@ WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url mode label_handoff label_claimed label_failed label_review label_needs_info label_mine
   verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel schedules
-  skill_grill skill_file_issue"
+  skill_grill skill_file_issue repos_also"
 # keys 3.0.0 retired — CHANGELOG.md → 3.0.0 says what each became
 RETIRED="cluster cluster_install cluster_uninstall cluster_delete verify_cluster"
 ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since round_at babysat_out updated_at"
@@ -133,6 +133,11 @@ else
   else
     ok config.schedules "${S:-unset — $(schedules_default)}"
   fi
+
+  for p in $(set -f; cfg repos_also | tr ',' ' '); do
+    case "$p" in */*/* | /* | */) ;; ?*/?*) continue ;; esac
+    fail config.repos_also "'$p' is not owner/name or owner/*" "write e.g. \`- repos_also: owner/*\`"
+  done
 
   r="$(for k in $RETIRED; do [ -n "$(cfg "$k")" ] && echo "$k"; done | tr '\n' ' ' | sed -E 's/ $//')"
   [ -z "$r" ] || fail config.retired "retired key(s): $r" "migrate them — CHANGELOG.md → 3.0.0"

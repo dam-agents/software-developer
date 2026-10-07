@@ -30,3 +30,22 @@ cfg_mode() { case "$(cfg mode | tr '[:upper:]' '[:lower:]')" in autonomous) echo
 # Prepend to a jq program; `login` maps every spelling to one.
 # shellcheck disable=SC2034
 JQ_LOGIN='def login: ascii_downcase | sub("^app/"; "") | sub("\\[bot\\]$"; "");'
+
+# cfg_allows <owner/name> — whether the direct session may act on a repository:
+# `repo` itself, or one `repos_also` names — `owner/name` or `owner/*`, split by
+# spaces or commas, case ignored. Scheduled runs and Slack never ask: theirs is
+# `repo` alone (CLAUDE.md → Hard invariants).
+cfg_allows() {
+  local - want p; set -f   # `owner/*` is a pattern, never a path
+  want="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$want" in ?*/?*) ;; *) return 1 ;; esac
+  for p in "$(cfg repo)" $(cfg repos_also | tr ',' ' '); do
+    p="$(printf '%s' "$p" | tr '[:upper:]' '[:lower:]')"
+    [ -n "$p" ] || continue
+    case "$p" in
+      */\*) case "$want" in "${p%\*}"?*/*) ;; "${p%\*}"?*) return 0 ;; esac ;;
+      *) [ "$want" = "$p" ] && return 0 ;;
+    esac
+  done
+  return 1
+}
