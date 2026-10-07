@@ -104,10 +104,9 @@ What the item is decides what you do with it:
 1. **A pull request of yours** a run before you could not finish — reviewed,
    or checks failed, never approved: babysit it to done ([`docs/babysit.md`](docs/babysit.md)).
 2. **Waiting for the exclusive lock**, now free: take it and carry on.
-3. **Claimed, with no pull request and no run on it** — work that stopped
-   halfway. Find how far its branch got and finish it. When a run has died on
-   it twice, or it cannot be picked up, swap the claim for the failed label and
-   comment why. Never leave it claimed and untouched.
+3. **Claimed by you, with no pull request and no run on it** — work that
+   stopped halfway: finish it from where its branch got. A run died on it
+   twice, or it cannot be picked up: swap the claim for the failed label, say why.
 4. **A new issue** — implement it: the
    [`implement-issue`](.agents/skills/implement-issue/SKILL.md) skill, then
    babysit the pull request in this same run until it is done. You do not merge.
@@ -128,9 +127,10 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   `Written by this agent — <link>`, the link `bash "$HOME/scripts/session-link.sh"`
   prints: the session behind the change. A comment answering a review carries
   it too. No link (`app_url` is missing): open it anyway and say so.
-- **Claim before you work.** Swap the hand-off label for the claimed label
-  before your first commit. Giving up, swap the claim for the failed label *and*
-  comment why: never leave an issue claimed with nothing working on it.
+- **Claim before you work**, before your first commit: the hand-off label off,
+  the claimed label and `label_mine` (when set) on — the claim, dropped as one.
+  Giving up, swap it for the failed label *and* comment why. Another agent's
+  claim or pull request is never yours: `start` refuses it; leave it be.
 - **Nothing here is durable.** The branch, the pull request and the labels are
   the record; a slot is a warm cache. The sandbox can be rebuilt at any time:
   push before you finish, and park nothing in it that is not also in git.

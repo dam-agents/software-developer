@@ -123,7 +123,7 @@ Q='query($q: String!, $owner: String!, $name: String!, $handoff: String!, $claim
     handoff: issues(labels: [$handoff], states: OPEN, first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes { number title url labels(first: 20) { nodes { name } } } }
     claimed: issues(labels: [$claimed], states: OPEN, first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
-      nodes { number title url } } } }'
+      nodes { number title url labels(first: 20) { nodes { name } } } } } }'
 SEARCH="repo:$SLUG is:pr is:open author:$AUTHOR${MINE:+ label:\"$MINE\"}"
 if DATA="$(gh api --hostname "$HOST" graphql -f query="$Q" -f q="$SEARCH" -f owner="${SLUG%%/*}" \
     -f name="${SLUG#*/}" -f handoff="$HANDOFF" -f claimed="$CLAIMED" 2>"$ERR")" &&
@@ -132,7 +132,7 @@ if DATA="$(gh api --hostname "$HOST" graphql -f query="$Q" -f q="$SEARCH" -f own
     statusCheckRollup: [.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]?
       | if .context then {context, state, startedAt: .createdAt} else . end]})' 2>>"$ERR")" &&
   ISSUES="$(printf '%s' "$DATA" | jq -e '.data.repository.handoff.nodes | map(.labels = [.labels.nodes[]?])' 2>>"$ERR")" &&
-  CLAIMED_ISSUES="$(printf '%s' "$DATA" | jq -e '.data.repository.claimed.nodes' 2>>"$ERR")"; then
+  CLAIMED_ISSUES="$(printf '%s' "$DATA" | jq -e '.data.repository.claimed.nodes | map(.labels = [.labels.nodes[]?])' 2>>"$ERR")"; then
   :
 else
   GQL_ERR="$(head -c 300 "$ERR")"
@@ -218,10 +218,13 @@ ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info 
 # there is nothing open to review, so it is named here. The link between issue
 # and pull request is the `Fixes #<n>` line every pull request body carries
 # (CLAUDE.md → "Rules"). How often a run has died on it is said, because the
-# second time it is released rather than tried again.
+# second time it is released rather than tried again. With `label_mine` set, a
+# claim is ours only when it carries that too: agents sharing the login share
+# the claimed label, and another's claim is never ours to finish.
 RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" --arg held "$HELD" \
-    --argjson items "$ITEMS_JSON" '
-  map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))
+    --argjson items "$ITEMS_JSON" --arg mine "$MINE" '
+  map(select($mine == "" or any(.labels[]?; .name == $mine)))
+  | map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))
   | map(select(.number as $i | $held | contains(" \($i) ") | not))
   | map(select(($items["\(.number)"].state // "") | IN("waiting-lock", "waiting-cluster", "blocked", "needs-info") | not))
   | .[]

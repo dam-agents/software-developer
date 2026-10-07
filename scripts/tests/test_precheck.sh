@@ -195,4 +195,17 @@ is "$RC" 2 "exit"
 has "$(cat "$HOME/err")" "nor REST" "says why"
 done_
 
+CASE="label_mine: a claim is ours only with the label beside it"; sandbox
+echo "- label_mine: agent/mine" >> "$HOME/work/CONFIG.md"
+STUB_CLAIMED='[{"number":7,"title":"Seven","url":"https://gh/7","labels":[{"name":"agent/in-progress"},{"name":"agent/mine"}]},
+  {"number":8,"title":"Eight","url":"https://gh/8","labels":[{"name":"agent/in-progress"}]}]'
+STUB_CLAIMED="$STUB_CLAIMED" precheck
+is "$RC" 0 "exit"
+has "$OUT" "#7 Seven" "ours"
+lacks "$OUT" "#8 Eight" "another agent's claim"
+STUB_GRAPHQL_FAIL=1 STUB_CLAIMED="$STUB_CLAIMED" precheck
+has "$OUT" "#7 Seven" "ours, over REST"
+lacks "$OUT" "#8 Eight" "another agent's claim, over REST"
+done_
+
 exit "$FAILED"

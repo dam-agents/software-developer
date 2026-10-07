@@ -37,6 +37,13 @@ removes untracked files there, never ignored ones. It prefers the slot the item
 last used. `finish` detaches a saved slot, so the branch is free for any slot
 next time.
 
+**`start` takes only what is ours.** Before any lock or slot, it reads the
+item on GitHub and exits `1` when another agent has it: a claim without
+`label_mine` (when set), or an open pull request naming the issue that is not
+ours — another author's, or without `label_mine`. A `pr<n>` item must be ours
+the same way. GitHub unreadable, it refuses too. Leave such an
+item untouched — no comment — and take the next.
+
 **`start` never throws work away.** It exits `3`, and keeps the locks, when:
 
 - the slot holds uncommitted changes or commits no remote has — a run that died
@@ -94,7 +101,8 @@ It reads, never writes:
   request, written or edited since this run started, carrying this run's
   session id — the link from `session-link.sh` does; without `app_url`, write
   `Session <id>`.
-- **`needs-info`, `blocked`, `released`:** the claimed label is off the issue;
+- **`needs-info`, `blocked`, `released`:** the claim is off the issue — the
+  claimed label, and `label_mine` when set;
   `needs-info` carries `label_needs_info`, `blocked` the failed label.
 
 Refused, it says what is missing: post it, then `finish` again. GitHub that

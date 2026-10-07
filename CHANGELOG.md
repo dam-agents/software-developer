@@ -9,6 +9,25 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 3.2.0 — 2026-10-07
+
+**Another agent's work is never yours.** Agents sharing a login share the
+claimed label, so a claim of yours now carries `label_mine` beside it, and the
+two are dropped together. The precheck lists a claimed issue as unfinished
+work only when it carries `label_mine` too, and `run-state.sh start` refuses
+an item another agent has — its claim, or an open pull request naming the
+issue that is not yours — before it takes a lock or a slot. `finish` with
+`released`, `blocked` or `needs-info` checks `label_mine` is off the issue
+as well.
+
+**Upgrade:**
+
+1. With `label_mine` set: for every open issue carrying `label_claimed` that is
+   this instance's — its item in `work/items/` and its branch, or a pull
+   request of yours naming it — add `label_mine` to the issue. One that is not
+   yours is left alone. Ask the operator about any you cannot tell.
+2. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
+
 ## 3.1.1 — 2026-10-05
 
 **Approved ends the review.** A review on an approved pull request — the
