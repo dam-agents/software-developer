@@ -54,7 +54,10 @@ confirming or correcting rather than composing from nothing.
   re-run onboarding once the repository is reachable. Never write a new
   `CONFIG.md` over a backup that exists.
 
-- **Repository** — `owner/name`. Ask; do not assume.
+- **Repository** — `owner/name`. Ask; do not assume. The issues all come
+  from it; ask too whether their work may need changes in other repositories
+  — `owner/name` each, or `owner/*` for all of an owner's — and record those
+  as `repos_also` ([`docs/runs.md`](docs/runs.md) → **Other repositories**).
 - **Mode** — `autonomous`: watch GitHub every ten minutes, implement what
   carries the hand-off label and babysit pull requests, unattended.
   `interactive`: a developer to work with in chat — work starts only when the
@@ -189,7 +192,7 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `verify_exclusive` out; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`;
 for the default grill skills, `skill_grill` and `skill_file_issue`; leave
-`repos_also` out unless the user names more repositories to work on in chat.
+`repos_also` out when the work never leaves `repo`.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
 user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;

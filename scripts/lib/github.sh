@@ -45,6 +45,7 @@ JQ_REST_PR='
       elif index("APPROVED") then "APPROVED" else "REVIEW_REQUIRED" end) as $decision
   | {
     number: .pull.number, title: .pull.title, url: .pull.html_url, body: (.pull.body // ""),
+    repo: .pull.base.repo.full_name,
     state: (if .pull.merged_at then "MERGED" elif .pull.state == "closed" then "CLOSED" else "OPEN" end),
     mergeable: (if .pull.mergeable == true then "MERGEABLE" elif .pull.mergeable == false then "CONFLICTING" else "UNKNOWN" end),
     headRefOid: .pull.head.sha,

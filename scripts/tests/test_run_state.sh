@@ -314,6 +314,61 @@ is "$RC" 1 "releasing drops agent/mine too"
 has "$(cat "$HOME/err")" "still carries agent/mine" "says what"
 done_
 
+# kits_origin — beta/kits as a bare repository the stub's `gh repo clone` reads
+kits_origin() {
+  local seed; seed="$(mktemp -d)"
+  mkdir -p "$HOME/beta"; git init -q --bare -b main "$HOME/beta/kits.git"
+  git init -q -b main "$seed/s" && echo kits > "$seed/s/README.md" && git -C "$seed/s" add -A
+  gitc -C "$seed/s" commit -qm init && git -C "$seed/s" push -q "$HOME/beta/kits.git" main; rm -rf "$seed"
+  echo "- repos_also: beta/*" >> "$HOME/work/CONFIG.md"
+}
+
+CASE="also: another repository beside the slot, on its branch, only as repos_also allows"; sandbox; origin_checkout; kits_origin
+as sess-a also beta/kits
+is "$RC" 1 "no slot yet"
+as sess-a start 7 feat/7
+as sess-a also gamma/kits
+is "$RC" 1 "not allowed"
+has "$(cat "$HOME/err")" "neither \`repo\` nor named by \`repos_also\`" "says why"
+as sess-a also beta/kits
+is "$RC" 0 "exit"
+has "$OUT" "also beta/kits: $HOME/work/also/kits/1 on feat/7" "where"
+is "$(git -C "$HOME/work/also/kits/1" rev-parse --abbrev-ref HEAD)" feat/7 "on the slot's branch"
+as sess-a also beta/kits
+is "$RC" 0 "again is the same worktree"
+echo change > "$HOME/work/also/kits/1/change.txt"
+echo "- babysat_out: yes" >> "$HOME/work/items/7.md"
+as sess-a finish pr-updated
+is "$RC" 1 "unpushed there"
+has "$(cat "$HOME/err")" "also/kits/1 has uncommitted changes" "says where"
+rm "$HOME/work/also/kits/1/change.txt"
+as sess-a finish pr-updated
+is "$RC" 0 "finished"
+is "$(git -C "$HOME/work/also/kits/1" rev-parse --abbrev-ref HEAD)" HEAD "lets go of the branch"
+done_
+
+CASE="several pull requests: Fixes on one, Part of on the others, and wait waits for all"; sandbox; origin_checkout
+as sess-a start 7 feat/7
+echo "- babysat_out: yes" >> "$HOME/work/items/7.md"
+STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"Fixes #7 sess-a"}' as sess-a finish pr-opened 21 beta/kits#30
+is "$RC" 1 "a bare #7 elsewhere is that repository's"
+has "$(cat "$HOME/err")" "pull request beta/kits#30 does not say Fixes or Part of acme/widgets#7" "says what"
+STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"Part of acme/widgets#7 sess-a"}' as sess-a finish pr-opened 21 beta/kits#30
+is "$RC" 1 "nothing closes the issue"
+has "$(cat "$HOME/err")" "none of them says Fixes #7" "says so"
+sed -i '/babysat_out/d' "$HOME/work/items/7.md"
+STUB_PR_VIEWS="$(view OPEN APPROVED MERGEABLE "$GREEN")
+$(view OPEN REVIEW_REQUIRED MERGEABLE "$RUNNING_CHECK")" as sess-a wait 21 beta/kits#30
+is "$RC" 3 "one approved is not done"
+has "$OUT" "beta/kits#30: checks running" "names the one it waits on"
+is "$(field items/7.md pr)" "21 beta/kits#30" "remembers both"
+STUB_PR_VIEW="$(view OPEN APPROVED MERGEABLE "$GREEN")" as sess-a wait 21 beta/kits#30
+is "$RC" 0 "all approved"
+has "$OUT" "done — every pull request is approved" "done"
+as sess-a wait 21 kits#x
+is "$RC" 2 "a malformed ref"
+done_
+
 CASE="interactive: the operator holds the pull request, so opening it ends the run"; sandbox; origin_checkout
 sed -i.bak 's/^- mode: .*/- mode: interactive/' "$HOME/work/CONFIG.md"
 as sess-a start 7 feat/7

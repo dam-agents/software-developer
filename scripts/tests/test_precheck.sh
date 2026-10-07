@@ -120,6 +120,24 @@ STUB_PRS="$OWN" PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
 is "$RC" 1 "the agent's own comment is not a review"
 done_
 
+CASE="repos_also: one search covers them, and a pull request there wakes its issue of repo"; sandbox
+echo "- repos_also: beta/*, gamma/one" >> "$HOME/work/CONFIG.md"
+KITS='[{"number":30,"repo":"beta/kits","title":"Kits","url":"https://gh/beta/kits/pull/30","reviewDecision":"REVIEW_REQUIRED",
+  "body":"Part of acme/widgets#3","statusCheckRollup":[],
+  "latestReviews":[{"author":{"login":"guardian"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}]},
+  {"number":31,"repo":"beta/kits","title":"Own issue","url":"https://gh/beta/kits/pull/31","reviewDecision":"REVIEW_REQUIRED",
+  "body":"Fixes #4","statusCheckRollup":[],
+  "latestReviews":[{"author":{"login":"guardian"},"state":"COMMENTED","submittedAt":"2026-09-24T10:05:00Z"}]}]'
+STUB_PRS="$KITS" STUB_CLAIMED='[{"number":3,"title":"Three","url":"https://gh/3"},{"number":4,"title":"Four","url":"https://gh/4"}]' \
+  PLATFORM_LAST_RUN_AT=2026-09-24T10:00:00Z precheck
+is "$RC" 0 "exit"
+has "$(cat "$HOME/gh.calls")" "q=repo:acme/widgets org:beta repo:gamma/one is:pr" "one search, every scope"
+has "$OUT" "#3 — PR beta/kits#30 Kits — reviewed" "wakes the issue of repo it is part of"
+lacks "$OUT" "Own issue" "Fixes #4 there is that repository's own issue"
+lacks "$OUT" "#3 Three" "#3 has its pull request, elsewhere"
+has "$OUT" "#4 Four" "#4 has none"
+done_
+
 CASE="an approved pull request is never work, red or reviewed again"; sandbox
 APPROVED='[{"number":40,"title":"Forty","url":"https://gh/pr/40","reviewDecision":"APPROVED","body":"Fixes #4",
   "latestReviews":[{"author":{"login":"maintainer"},"state":"APPROVED","submittedAt":"2026-09-24T10:05:00Z"}],

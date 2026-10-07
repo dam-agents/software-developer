@@ -11,8 +11,12 @@ it keeps the item, so no other run takes it, and the context that wrote the
 change answers its review. Waiting goes through one command:
 
 ```sh
-bash "$HOME/scripts/run-state.sh" wait <pr>
+bash "$HOME/scripts/run-state.sh" wait <pr>...
 ```
+
+An item with pull requests in more than one repository waits on them all
+([runs.md](runs.md) → **Other repositories**): `wait` names the one that needs
+you, and says done only once every one is done or merged.
 
 It looks at the pull request once a minute for up to nine minutes — an
 unchanged one costs no API budget (`scripts/lib/github.sh`) — and comes

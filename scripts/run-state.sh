@@ -18,13 +18,17 @@
 # it. A runtime that does not answer frees nothing.
 #
 #   start <item> [branch]     take the item and a slot, put the slot on branch
+#   also <owner/name>         a worktree of another repository `repos_also`
+#                             allows, beside the slot and on its branch
 #   phase <text>              before each long step: what, and since when
-#   wait <pr>                 babysit: block up to ~9 minutes until the pull
-#                             request needs the run (exit 0), nothing yet (3),
-#                             or the run has babysat it for babysit_max_hours (4)
+#   wait <pr>...              babysit: block up to ~9 minutes until one of the
+#                             item's pull requests needs the run (exit 0),
+#                             nothing yet (3), or the run has babysat them for
+#                             babysit_max_hours (4); a pr is #<n> in `repo`,
+#                             <owner/name>#<n> elsewhere
 #   lock                      take the exclusive lock, or record waiting for it
 #   unlock                    give the exclusive lock back
-#   finish <outcome> [pr]     the run's last act, on every way out: refused
+#   finish <outcome> [pr]...  the run's last act, on every way out: refused
 #                             until the work is pushed and reported on GitHub
 #                             (below); then backs work/ up, and with
 #                             slack_channel set says what to post (notify:)
@@ -164,9 +168,10 @@ checkout() {
   [ -n "$repo" ] && [ -e "$CO/.git" ] || { say "no checkout at work/${repo##*/} — clone it first (CLAUDE.md → Runtime configuration)"; return 1; }
 }
 
-default_branch() {
-  git -C "$CO" rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's#^origin/##' | grep . ||
-    git -C "$CO" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\).*#\1#p' | grep . ||
+default_branch() {   # default_branch [checkout]
+  local co="${1:-$CO}"
+  git -C "$co" rev-parse --abbrev-ref origin/HEAD 2>/dev/null | sed 's#^origin/##' | grep . ||
+    git -C "$co" ls-remote --symref origin HEAD 2>/dev/null | sed -n 's#^ref: refs/heads/\([^[:space:]]*\).*#\1#p' | grep . ||
     echo main
 }
 
@@ -179,22 +184,24 @@ unsaved() {
   return 0
 }
 
-# prepare <slot> <branch> — the slot on <branch>: the remote's tip when it has
+# prepare <slot> <branch> [checkout base] — the slot on <branch>: the remote's tip when it has
 # one, else new from the default branch. Ignored files — the build output —
 # stay; untracked ones go, so nothing strays into the next item's commit.
 # 1 failed · 3 something unsaved is in the way, and the run is to save it.
+# Another repository's worktrees are <base>/<slot> of its own checkout (also).
 prepare() {
-  local k="$1" b="$2" d="$SLOTDIR/$1" why other dflt
-  mkdir -p "$SLOTDIR"
-  git -C "$CO" fetch -q --prune origin 2>/dev/null || { say "git fetch failed in work/${CO##*/}"; return 1; }
-  dflt="$(default_branch)"
+  local k="$1" b="$2" co="${3:-$CO}" base="${4:-$SLOTDIR}" d why other dflt
+  d="$base/$k"
+  mkdir -p "$base"
+  git -C "$co" fetch -q --prune origin 2>/dev/null || { say "git fetch failed in ${co#"$WORK"/}"; return 1; }
+  dflt="$(default_branch "$co")"
   # the checkout itself stays on the default branch, kept current: its skills
   # are the ones every run loads (scripts/harness/claude-code/install.sh)
-  if [ "$(git -C "$CO" symbolic-ref -q --short HEAD)" = "$dflt" ] && [ -z "$(unsaved "$CO")" ]; then
-    git -C "$CO" merge -q --ff-only "origin/$dflt" 2>/dev/null || true
+  if [ "$(git -C "$co" symbolic-ref -q --short HEAD)" = "$dflt" ] && [ -z "$(unsaved "$co")" ]; then
+    git -C "$co" merge -q --ff-only "origin/$dflt" 2>/dev/null || true
   fi
   if [ ! -e "$d/.git" ]; then
-    git -C "$CO" worktree add -q --detach "$d" "origin/$dflt" 2>/dev/null ||
+    git -C "$co" worktree add -q --detach "$d" "origin/$dflt" 2>/dev/null ||
       { say "could not create slot $k at $d"; return 1; }
   fi
   why="$(unsaved "$d")"
@@ -205,7 +212,7 @@ prepare() {
   fi
   # a branch is checked out in one worktree at a time: a free, saved slot that
   # still has it lets go of it
-  for other in "$SLOTDIR"/*; do
+  for other in "$base"/*; do
     [ -d "$other" ] && [ "$other" != "$d" ] || continue
     [ "$(git -C "$other" rev-parse --abbrev-ref HEAD 2>/dev/null)" = "$b" ] || continue
     if [ -n "$(unsaved "$other")" ] || [ -d "$LOCKS/slot-$(basename "$other")" ]; then
@@ -214,14 +221,14 @@ prepare() {
     fi
     git -C "$other" switch -q --detach 2>/dev/null
   done
-  if git -C "$CO" rev-parse -q --verify "refs/remotes/origin/$b" >/dev/null; then
-    if git -C "$CO" rev-parse -q --verify "refs/heads/$b" >/dev/null &&
-       [ -n "$(git -C "$CO" log --oneline "refs/heads/$b" --not --remotes | head -1)" ]; then
+  if git -C "$co" rev-parse -q --verify "refs/remotes/origin/$b" >/dev/null; then
+    if git -C "$co" rev-parse -q --verify "refs/heads/$b" >/dev/null &&
+       [ -n "$(git -C "$co" log --oneline "refs/heads/$b" --not --remotes | head -1)" ]; then
       say "local branch $b has commits not on origin — push them before starting on it."
       return 3
     fi
     git -C "$d" switch -q -C "$b" "origin/$b" || return 1
-  elif git -C "$CO" rev-parse -q --verify "refs/heads/$b" >/dev/null; then
+  elif git -C "$co" rev-parse -q --verify "refs/heads/$b" >/dev/null; then
     git -C "$d" switch -q "$b" || return 1
   else
     git -C "$d" switch -q -c "$b" "origin/$dflt" || return 1
@@ -254,14 +261,27 @@ ours() {
       if [ -z "$why" ]; then
         json="$(gh_get --paginate "repos/$SLUG/pulls?state=open&per_page=100")" || return 2
         json="$(printf '%s' "$json" | jq -s 'add // []')" || return 2
-        why="$(printf '%s' "$json" | jq -r --arg n "$item" --arg a "$author" --arg mine "$mine" "$JQ_LOGIN"'
-          map(select((.body // "") | test("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #\($n)(\\D|$)")))
+        why="$(printf '%s' "$json" | jq -r --arg n "$item" --arg a "$author" --arg mine "$mine" --arg root "$SLUG" "$JQ_LOGIN$JQ_REFS"'
+          map(select(.body | issue_refs($root; $root) | index($n)))
           | map(select(((.user.login | login) == ($a | login) and ($mine == "" or any(.labels[]?; .name == $mine))) | not))
           | first // empty | "pull request #\(.number), not ours, names it"' 2>/dev/null)" || return 2
       fi ;;
   esac
   [ -z "$why" ] && return 0
   echo "$why"; return 1
+}
+
+# Another repository's checkout and worktrees: work/<name>, and its worktree
+# for slot <k> at work/also/<name>/<k>. pr_split <pr> — "<slug> <number>".
+also_dirs() { local d; for d in "$WORK"/also/*/"$1"; do [ -e "$d/.git" ] && echo "$d"; done; return 0; }
+pr_split() {
+  local r="${1#\#}"
+  case "$r" in
+    */*\#*) r="${r%%\#*} ${r##*\#}" ;;
+    *) r="$SLUG $r" ;;
+  esac
+  case "${r##* }" in '' | *[!0-9]*) say "'$1' is not a pull request: #<n>, or <owner/name>#<n>"; return 1 ;; esac
+  echo "$r"
 }
 
 # ------------------------------------------------------------------ verbs
@@ -315,6 +335,31 @@ cmd_start() {
   echo "slot $k: $SLOTDIR/$k on $branch"
 }
 
+# The work comes from an issue of `repo`, and may need changing elsewhere too:
+# one more repository a run takes beside its slot, in a worktree of its own on
+# the slot's branch, made from a checkout cloned the first time.
+cmd_also() {
+  local slug="${1:?owner/name}" k b co name rc
+  need_session
+  k="$(my_lock slot- | sed 's/^slot-//')"
+  [ -n "$k" ] || { say "this session holds no slot — call start first"; exit 1; }
+  slug="$(printf '%s' "$slug" | tr '[:upper:]' '[:lower:]')"
+  [ "$slug" != "$(printf '%s' "$SLUG" | tr '[:upper:]' '[:lower:]')" ] || { echo "$slug is \`repo\`: the slot is $SLOTDIR/$k"; exit 0; }
+  cfg_allows "$slug" || { say "$slug is neither \`repo\` nor named by \`repos_also\` — only the operator adds it, in the direct session."; exit 1; }
+  name="${slug##*/}"; co="$WORK/$name"
+  if [ -e "$co/.git" ]; then
+    git -C "$co" remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]' | grep -q "[/:]$slug\(\.git\)\?$" ||
+      { say "work/$name is a checkout of $(git -C "$co" remote get-url origin 2>/dev/null), not $slug"; exit 1; }
+  else
+    gh repo clone "$HOST/$slug" "$co" -- -q 2>/dev/null || { say "could not clone $slug into work/$name"; exit 1; }
+  fi
+  b="$(git -C "$SLOTDIR/$k" symbolic-ref -q --short HEAD)" || { say "slot $k is on no branch"; exit 1; }
+  prepare "$k" "$b" "$co" "$WORK/also/$name"; rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  stamp "also $slug"
+  echo "also $slug: $WORK/also/$name/$k on $b"
+}
+
 # A run babysits the pull request it opened until it is done — approved, green,
 # mergeable — or cannot be, in its own turn: the item stays held, so no other
 # run takes it, and the run that wrote the change answers its review. `wait`
@@ -332,21 +377,23 @@ cmd_start() {
 # unchanged look. GraphQL refused, the verdict is read off the REST answers,
 # whose decision is approximate, so it never says done.
 #
-# pr_state <pr> <since> <dir> — prints the verdict line, `act …` or `wait …`;
-# 0 read · 2 unreadable
+# pr_state <slug> <pr> <since> <dir> — prints the verdict line, `act …` or
+# `wait …`; 0 read · 2 unreadable
 pr_state() {
-  local json changed=0 sha k verdict
-  if cget "$3" pull "$HOST" "repos/$SLUG/pulls/$1"; then changed=1; else [ $? -eq 1 ] || changed=2; fi
+  local slug="$1" json changed=0 sha k verdict
+  shift
+  mkdir -p "$3"
+  if cget "$3" pull "$HOST" "repos/$slug/pulls/$1"; then changed=1; else [ $? -eq 1 ] || changed=2; fi
   sha="$(jq -r '.head.sha // empty' "$3/pull.json" 2>/dev/null)"
   [ -n "$sha" ] || changed=2
   if [ "$changed" != 2 ]; then
     for k in "reviews pulls/$1/reviews?per_page=100" "checks commits/$sha/check-runs?per_page=100" "status commits/$sha/status"; do
-      if cget "$3" "${k%% *}" "$HOST" "repos/$SLUG/${k#* }"; then changed=1; else [ $? -eq 1 ] || { changed=2; break; }; fi
+      if cget "$3" "${k%% *}" "$HOST" "repos/$slug/${k#* }"; then changed=1; else [ $? -eq 1 ] || { changed=2; break; }; fi
     done
   fi
   if [ "$changed" = 0 ] && [ -s "$3/verdict" ]; then cat "$3/verdict"; return 0; fi
   rm -f "$3/verdict"
-  if json="$(gh pr view "$1" -R "$REPO" --json state,mergeable,reviewDecision,headRefOid,latestReviews,statusCheckRollup 2>/dev/null)"; then
+  if json="$(gh pr view "$1" -R "$HOST/$slug" --json state,mergeable,reviewDecision,headRefOid,latestReviews,statusCheckRollup 2>/dev/null)"; then
     :
   elif [ "$changed" != 2 ]; then
     json="$(jq -n --slurpfile pull "$3/pull.json" --slurpfile reviews "$3/reviews.json" \
@@ -376,36 +423,61 @@ pr_state() {
   case "$verdict" in wait*) printf '%s' "$json" | jq -e '.approximate' >/dev/null 2>&1 || printf '%s\n' "$verdict" > "$3/verdict" ;; esac
 }
 
+# An item's work may be several pull requests, one a repository: wait looks at
+# them all, comes back for the first that needs the run, and says done only
+# once every one is approved, green and mergeable — or merged.
 cmd_wait() {
-  local pr="${1:?pr}" item f since start nowe waited verdict rc=3 last=""
-  pr="${pr#\#}"
+  [ $# -ge 1 ] || { say "usage: wait <pr>..."; exit 2; }
+  local item f since start nowe waited verdict rc=3 last="" ref refs="" labels="" i n done_n act
   need_session
   item="$(my_lock item- | sed 's/^item-//')"
   [ -n "$item" ] || { say "this session holds no item — call start first"; exit 1; }
+  for ref in "$@"; do
+    ref="$(pr_split "$ref")" || exit 2
+    set -- $ref
+    [ "$1" = "$SLUG" ] && refs="$refs $2" || refs="$refs $1#$2"
+  done
+  refs="${refs# }"
   f="$(item_file "$item")"
-  write "$f" "$f" "$ITEM_KEYS" "pr=$pr" "updated_at=$(now)"
+  write "$f" "$f" "$ITEM_KEYS" "pr=$refs" "updated_at=$(now)"
   [ -n "$(kv "$f" babysit_since)" ] || write "$f" "$f" "$ITEM_KEYS" "babysit_since=$(now)" "round_at=$(kv "$LOCKS/item-$item/owner" since)"
   since="$(kv "$f" round_at)"
   start="$(date -u +%s)"
   seen="$(mktemp -d)" || exit 2
   trap 'rm -rf "$seen"' EXIT
+  for ref in $refs; do case "$ref" in *\#*) labels="$labels $ref" ;; *) labels="$labels #$ref" ;; esac; done
+  labels="${labels# }"
   if waited="$(epoch "$(kv "$f" babysit_since)")" && [ $(( (start - waited) / 3600 )) -ge "$MAX_H" ]; then
     write "$f" "$f" "$ITEM_KEYS" babysat_out=yes
-    echo "timeout — babysat #$pr for ${MAX_H}h (babysit_max_hours). Report where it stands and who it waits on, then finish pr-updated: a later run takes it over when something lands."
+    echo "timeout — babysat $labels for ${MAX_H}h (babysit_max_hours). Report where it stands and who it waits on, then finish pr-updated: a later run takes it over when something lands."
     exit 4
   fi
+  n="$(echo $refs | wc -w)"
   while :; do
-    stamp "babysit #$pr: ${last:-looking}"
-    verdict="$(pr_state "$pr" "$since" "$seen")"; rc=$?
-    if [ "$rc" -eq 0 ]; then
+    stamp "babysit $labels: ${last:-looking}"
+    i=0; done_n=0; act=""; last=""
+    for ref in $refs; do
+      i=$((i + 1))
+      # shellcheck disable=SC2046 # "<slug> <n>", checked above
+      set -- $(pr_split "$ref")
+      verdict="$(pr_state "$1" "$2" "$since" "$seen/$i")"; rc=$?
+      [ "$n" -gt 1 ] && ref="$(echo $labels | cut -d' ' -f"$i"): " || ref=""
+      if [ "$rc" -ne 0 ]; then
+        last="${last:+$last; }${ref}GitHub unreadable"
+        continue
+      fi
       case "$verdict" in
-        act*) write "$f" "$f" "$ITEM_KEYS" "round_at=$(now)" "updated_at=$(now)"
-              stamp "babysit #$pr: ${verdict#act }"
-              echo "${verdict#act }"; exit 0 ;;
-        *) last="${verdict#wait }" ;;
+        "act done"* | "act merged"*) done_n=$((done_n + 1)); [ "$n" -gt 1 ] || act="${verdict#act }" ;;
+        act*) [ -n "$act" ] || act="$ref${verdict#act }" ;;
+        *) last="${last:+$last; }$ref${verdict#wait }" ;;
       esac
-    else
-      last="GitHub unreadable"
+    done
+    [ -z "$act" ] && [ "$n" -gt 1 ] && [ "$done_n" -eq "$n" ] &&
+      act="done — every pull request is approved, green and mergeable, or merged: release the issue"
+    if [ -n "$act" ]; then
+      write "$f" "$f" "$ITEM_KEYS" "round_at=$(now)" "updated_at=$(now)"
+      stamp "babysit $labels: $act"
+      echo "$act"; exit 0
     fi
     nowe="$(date -u +%s)"
     [ $(( nowe - start + WAIT_POLL )) -le "$WAIT_FOR" ] || break
@@ -459,31 +531,45 @@ cmd_unlock() { if [ -d "$LOCKS/exclusive" ] && mine "$LOCKS/exclusive"; then dro
 # 2 GitHub could not be read
 gh_get() { gh api --hostname "$HOST" "$@" 2>/dev/null; }
 reported() {
-  local item="$1" outcome="$2" pr="$3" since="$4" n="" author mine t got json labels missing=""
+  local item="$1" outcome="$2" prs="$3" since="$4" n="" author mine t got json labels missing="" ref closes=""
   author="$(cfg author)"; mine="$(cfg label_mine)"
-  case "$item" in pr*) pr="${pr:-${item#pr}}" ;; *) n="$item" ;; esac
+  case "$item" in pr*) prs="${prs:-${item#pr}}" ;; *) n="$item" ;; esac
   if [ "$outcome" = pr-opened ]; then
-    [ -n "$pr" ] || { echo "pr-opened names no pull request: finish pr-opened <pr>"; return 1; }
-    json="$(gh_get "repos/$SLUG/pulls/$pr")" || return 2
-    got="$(printf '%s' "$json" | jq -r --arg me "$ME" --arg n "$n" --arg a "$author" --arg mine "$mine" "$JQ_LOGIN"'
-      [ (if .state == "open" then empty else "is not open" end),
-        (if ($a == "" or (.user.login | login) == ($a | login)) then empty else "was not opened by \($a)" end),
-        (if $mine == "" or any(.labels[]?; .name == $mine) then empty else "does not carry \($mine)" end),
-        (if (.body // "") | contains($me) then empty else "carries no session link" end),
-        (if $n == "" or ((.body // "") | test("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #\($n)(\\D|$)")) then empty
-         else "does not say Fixes #\($n)" end)
-      ] | join(", ")' 2>/dev/null)" || return 2
-    [ -z "$got" ] || missing="pull request #$pr $got"
+    [ -n "$prs" ] || { echo "pr-opened names no pull request: finish pr-opened <pr>..."; return 1; }
+    for ref in $prs; do
+      ref="$(pr_split "$ref")" || return 1
+      set -- $ref
+      json="$(gh_get "repos/$1/pulls/$2")" || return 2
+      got="$(printf '%s' "$json" | jq -r --arg me "$ME" --arg n "$n" --arg a "$author" --arg mine "$mine" \
+          --arg root "$SLUG" --arg here "$1" "$JQ_LOGIN$JQ_REFS"'
+        ($here | ascii_downcase) != ($root | ascii_downcase) as $other
+        | [ (if .state == "open" then empty else "is not open" end),
+          (if ($a == "" or (.user.login | login) == ($a | login)) then empty else "was not opened by \($a)" end),
+          (if $mine == "" or any(.labels[]?; .name == $mine) then empty else "does not carry \($mine)" end),
+          (if (.body // "") | contains($me) then empty else "carries no session link" end),
+          (if $n == "" or (.body | issue_refs($root; $here) | index($n)) then empty
+           elif $other then "does not say Fixes or Part of \($root)#\($n)"
+           else "does not say Fixes #\($n)" end)
+        ] | join(", ")' 2>/dev/null)" || return 2
+      [ "$1" = "$SLUG" ] && t="#$2" || t="$1#$2"
+      [ -z "$got" ] || missing="${missing:+$missing; }pull request $t $got"
+      [ -z "$n" ] || ! printf '%s' "$json" | jq -e --arg n "$n" --arg root "$SLUG" --arg here "$1" \
+        "$JQ_REFS"'.body | closes_refs($root; $here) | index($n)' >/dev/null 2>&1 || closes=1
+    done
+    [ -z "$n" ] || [ -n "$closes" ] ||
+      missing="${missing:+$missing; }none of them says Fixes #$n — the one in $SLUG does, or else one of the others, as Fixes $SLUG#$n"
   else
     got=""
-    for t in $n $pr; do
-      json="$(gh_get "repos/$SLUG/issues/$t/comments?since=$since&per_page=100")" || return 2
+    for t in ${n:+"$n"} $prs; do
+      ref="$(pr_split "$t")" || return 1
+      set -- $ref
+      json="$(gh_get "repos/$1/issues/$2/comments?since=$since&per_page=100")" || return 2
       if printf '%s' "$json" | jq -e --arg me "$ME" --arg a "$author" \
           "$JQ_LOGIN"'any(.[]; ($a == "" or (.user.login | login) == ($a | login)) and ((.body // "") | contains($me)))' >/dev/null 2>&1; then
         got=1; break
       fi
     done
-    [ -n "$got" ] || missing="no comment from this run on #${n:-$pr}${pr:+${n:+ or its pull request #$pr}} — say what you did, and what happens next, with this run's session link"
+    [ -n "$got" ] || missing="no comment from this run on #${n:-$prs}${prs:+${n:+ or its pull request $prs}} — say what you did, and what happens next, with this run's session link"
   fi
   if [ -n "$n" ]; then
     case "$outcome" in
@@ -504,7 +590,7 @@ reported() {
 }
 
 cmd_finish() {
-  local outcome="${1:?outcome}" pr="${2:-}" item slot since f state why rc report=""
+  local outcome="${1:?outcome}" pr="${*:2}" item slot since f state why rc report="" d
   case "$outcome" in
     nothing | pr-opened | pr-updated | released | blocked | waiting-lock | needs-info) ;;
     *) say "unknown outcome '$outcome'"; exit 2 ;;
@@ -515,11 +601,13 @@ cmd_finish() {
   [ -n "$slot" ] && since="$(kv "$LOCKS/slot-$slot/owner" since)"
   [ -z "$since" ] && [ -n "$item" ] && since="$(kv "$LOCKS/item-$item/owner" since)"
   if [ -n "$slot" ]; then
-    why="$(unsaved "$SLOTDIR/$slot")"
-    if [ -n "$why" ]; then
-      say "slot $slot has $why: push it to its branch first — only what is pushed survives this run."
-      exit 1
-    fi
+    for d in "$SLOTDIR/$slot" $(also_dirs "$slot"); do
+      why="$(unsaved "$d")"
+      if [ -n "$why" ]; then
+        say "${d#"$WORK"/} has $why: push it to its branch first — only what is pushed survives this run."
+        exit 1
+      fi
+    done
   fi
   if [ -n "$item" ]; then
     f="$(item_file "$item")"
@@ -555,12 +643,14 @@ cmd_finish() {
     [ -n "$pr" ] || pr="$(kv "$f" pr)"
   fi
   # a saved slot lets go of its branch, so the item's next run may take any slot
-  if [ -n "$slot" ] && [ -z "$(unsaved "$SLOTDIR/$slot")" ]; then
-    git -C "$SLOTDIR/$slot" switch -q --detach 2>/dev/null || true
+  if [ -n "$slot" ]; then
+    for d in "$SLOTDIR/$slot" $(also_dirs "$slot"); do
+      [ -z "$(unsaved "$d")" ] && git -C "$d" switch -q --detach 2>/dev/null || true
+    done
   fi
   [ -n "$item" ] && drop "item-$item"
   [ -n "$slot" ] && drop "slot-$slot"
-  log_line "$outcome" "$ME" "$item" "$slot" "$pr" "$since" "${report# }"
+  log_line "$outcome" "$ME" "$item" "$slot" "$(echo $pr | tr ' ' ,)" "$since" "${report# }"
   # last, so the backup carries this run's TICK.log line
   bash "$HERE/work-backup.sh" persist >&2
   # a moment a person acts on: the agent posts it, a script never does
@@ -655,6 +745,7 @@ cmd_show() {
 
 case "${1:-}" in
   start) shift; cmd_start "$@" ;;
+  also) shift; cmd_also "$@" ;;
   phase) shift; cmd_phase "$@" ;;
   wait) shift; cmd_wait "$@" ;;
   lock) cmd_lock ;;
@@ -667,7 +758,7 @@ case "${1:-}" in
   diagnosed) cmd_diagnosed ;;
   show) cmd_show ;;
   *)
-    echo "usage: run-state.sh start|phase|wait|lock|unlock|finish|sweep|held|live|quiet|diagnosed|show" >&2
+    echo "usage: run-state.sh start|also|phase|wait|lock|unlock|finish|sweep|held|live|quiet|diagnosed|show" >&2
     exit 2
     ;;
 esac

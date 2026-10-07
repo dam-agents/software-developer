@@ -29,13 +29,31 @@ frees nothing: a guess could hand a live run's slot to another.
 
 ## Slots
 
-`work/slots/<k>` are worktrees of the checkout, created on first use and never
+`work/slots/<k>` are worktrees of the checkout (and `work/also/<name>/<k>` of
+another repository's, **Other repositories** below), created on first use and never
 removed: what they keep is the build output, so the next item does not rebuild
 from nothing. `start` puts its slot on the item's branch — the remote's tip
 when there is one, else new from the default branch — and `git clean -fd`
 removes untracked files there, never ignored ones. It prefers the slot the item
 last used. `finish` detaches a saved slot, so the branch is free for any slot
 next time.
+
+## Other repositories
+
+The work always comes from an issue of `repo`, but may need changes in the
+repositories `repos_also` names too — a library, a starter kit. For each one,
+`run-state.sh also <owner/name>` clones it once to `work/<name>` and puts
+`work/also/<name>/<k>` — a worktree of it for your slot — on the slot's
+branch, refusing a repository `repos_also` does not allow. Work there as in the
+slot, with **its** checks — its `AGENTS.md`, `CLAUDE.md` and task runner say
+which; `verify` is `repo`'s — and open a pull request in it carrying
+`label_mine`, which you create there when it is missing (`gh label create`).
+Exactly one of the issue's pull requests closes it — the one in `repo` when
+there is one: `Fixes #<n>` there, `Fixes <repo>#<n>` elsewhere, and `Part of
+<repo>#<n>` on every other. That line is how the precheck pairs each of them
+with the issue. `finish pr-opened <pr>...` takes them all, as `#<n>` and
+`<owner/name>#<n>`, and refuses while a worktree is unpushed; `wait <pr>...`
+babysits them together. A claim's labels stay on the issue of `repo`.
 
 **`start` takes only what is ours.** Before any lock or slot, it reads the
 item on GitHub and exits `1` when another agent has it: a claim without

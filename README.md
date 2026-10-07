@@ -87,6 +87,7 @@ All under `work/`, none of it tracked here:
 | `AGENTS.md`, `VERSION` | onboarding | a pointer to `CLAUDE.md`; the definition version this instance adopted |
 | `items/<n>.md` | `scripts/run-state.sh` | per issue: branch, slot, state, when a run last started on it |
 | `slots/<k>/` | `scripts/run-state.sh` | the worktrees runs work in, kept warm between runs |
+| `also/<name>/<k>/` | `scripts/run-state.sh` | the same, of a repository `repos_also` names |
 | `GATE.md` | the precheck, via `run-state.sh` | when it last let a diagnostic run through |
 | `TICK.log` | `scripts/run-state.sh` | one line per closed run, append-only |
 | `AUDIT.log` | the weekly audit | one line per audit: ok, warn and fail counts |

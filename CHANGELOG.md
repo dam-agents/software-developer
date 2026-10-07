@@ -9,20 +9,29 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
-## 4.1.0 — 2026-10-07
+## 5.0.0 — 2026-10-07
 
-**More repositories, in the direct session.** A new, optional key,
-`repos_also`: `owner/name` or `owner/*` entries the operator may name for work
-in chat beside `repo` ([`docs/direct-session.md`](docs/direct-session.md) →
-**Another repository**). `scripts/repo-allowed.sh` decides; scheduled runs and
-Slack still act on `repo` alone. Off while missing.
+**An issue's work may span repositories.** A new, optional key, `repos_also`:
+`owner/name` or `owner/*` entries, the other repositories an issue of `repo`
+may need changed, in every run ([`docs/runs.md`](docs/runs.md) → **Other
+repositories**). The issues still come from `repo` alone. `run-state.sh also
+<owner/name>` gives the slot a worktree of one, `work/also/<name>/<k>`, cloned
+once to `work/<name>`; `scripts/repo-allowed.sh` says what is allowed. **How a
+pull request names its issue changes**: outside `repo` it says `Fixes
+<repo>#<n>` or `Part of <repo>#<n>`, and exactly one of an issue's pull
+requests closes it. The precheck's one search covers every `repos_also`
+scope; `wait` and `finish pr-opened` take several pull requests, as `#<n>` and
+`<owner/name>#<n>`. Off while `repos_also` is missing: nothing changes for an
+instance that does not set it.
 
 **Upgrade:**
 
-1. Offer `repos_also` to the operator — which other repositories, or which
-   owners' (`owner/*`), they want worked on in chat. Write
-   `- repos_also: <entries>` to `work/CONFIG.md` only on a yes, then
-   `bash "$HOME/scripts/work-backup.sh" persist`.
+1. Offer `repos_also` to the operator: which other repositories, or which
+   owners' (`owner/*`), the issues of `repo` may need changed. Only on a yes,
+   write `- repos_also: <entries>` to `work/CONFIG.md`, then
+   `bash "$HOME/scripts/work-backup.sh" persist`. The connection must reach
+   them: `gh api repos/<owner/name> --jq .permissions.push` is `true` for each
+   named one (operator-only to grant).
 2. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
 
 ## 4.0.1 — 2026-10-08

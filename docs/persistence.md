@@ -8,7 +8,7 @@ to this definition itself.
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, `.agents/skills/implement-issue/`, `.agents/defaults/` |
-| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, and the checkouts of `repo` and any `repos_also` |
+| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, `also/`, and the checkouts of `repo` and any `repos_also` |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
 and a `.git` that concurrent runs change there corrupts — `Stale file handle`,

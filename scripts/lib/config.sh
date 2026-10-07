@@ -31,10 +31,10 @@ cfg_mode() { case "$(cfg mode | tr '[:upper:]' '[:lower:]')" in autonomous) echo
 # shellcheck disable=SC2034
 JQ_LOGIN='def login: ascii_downcase | sub("^app/"; "") | sub("\\[bot\\]$"; "");'
 
-# cfg_allows <owner/name> — whether the direct session may act on a repository:
-# `repo` itself, or one `repos_also` names — `owner/name` or `owner/*`, split by
-# spaces or commas, case ignored. Scheduled runs and Slack never ask: theirs is
-# `repo` alone (CLAUDE.md → Hard invariants).
+# cfg_allows <owner/name> — whether a run may act on a repository: `repo`
+# itself, or one `repos_also` names — `owner/name` or `owner/*`, split by spaces
+# or commas, case ignored. The work always comes from an issue of `repo`; these
+# are where it may also need changing (CLAUDE.md → Hard invariants).
 cfg_allows() {
   local - want p; set -f   # `owner/*` is a pattern, never a path
   want="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
@@ -49,3 +49,16 @@ cfg_allows() {
   done
   return 1
 }
+
+# A pull request names its issue of `repo` with `Fixes #<n>`, or, from another
+# repository, `Fixes <repo>#<n>`; one of several that does not close it says
+# `Part of`. Prepend to a jq program; `.body | issue_ref($root; $here)` is the
+# first issue number a pull request of $here names in $root, or null;
+# `issue_refs` all of them, `closes_refs` those the closing keywords name.
+# shellcheck disable=SC2034
+JQ_REFS='def refs_($root; $here; $kw): [(. // "") | match("(?i)(?:" + $kw + ") ([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#([0-9]+)"; "g")
+    | .captures | {r: (.[0].string // $here), n: .[1].string}
+    | select((.r | ascii_downcase) == ($root | ascii_downcase)) | .n];
+  def closes_refs($root; $here): refs_($root; $here; "fix(?:es|ed)?|close[sd]?|resolve[sd]?");
+  def issue_refs($root; $here): refs_($root; $here; "fix(?:es|ed)?|close[sd]?|resolve[sd]?|part of");
+  def issue_ref($root; $here): issue_refs($root; $here) | first;'

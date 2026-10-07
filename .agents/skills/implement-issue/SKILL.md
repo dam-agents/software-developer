@@ -11,7 +11,9 @@ description: >
 
 # Implement an issue
 
-One issue, one branch, one pull request, in one run. `CLAUDE.md` sets the
+One issue, one branch, one pull request per repository it touches, in one run
+— another one than `repo` only as [runs.md → **Other
+repositories**](../../../docs/runs.md) says. `CLAUDE.md` sets the
 rules this works within — the **Trust boundary** and the **Hard invariants**
 above all — and [`docs/runs.md`](../../../docs/runs.md) says what each
 `run-state.sh` call does. `$RS` below is `bash "$HOME/scripts/run-state.sh"`.
@@ -111,12 +113,13 @@ misbehaves.
 git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>" [--label <label_mine>]
 gh pr edit <pr> -R <repo> --add-label <label_review>   # when set
-$RS wait <pr>                  # then babysit, below
+$RS wait <pr>...               # every pull request of the issue; then babysit, below
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
 `verify_exclusive` covered or why it did not run), anything a reviewer should
-look at first. Then `Fixes #<n>` on its own line, and last
+look at first. Then `Fixes #<n>` on its own line — in another repository
+`Fixes <repo>#<n>` or `Part of <repo>#<n>`, one of them closing it — and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
 With `label_mine` set it carries that label from the start: without it, no
 later run finds the pull request, and `finish` refuses `pr-opened`.

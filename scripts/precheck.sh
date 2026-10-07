@@ -118,7 +118,7 @@ case "$REPO" in */*/*) HOST="${REPO%%/*}"; SLUG="${REPO#*/}" ;; *) HOST=github.c
 # turn that begins by wondering why.
 Q='query($q: String!, $owner: String!, $name: String!, $handoff: String!, $claimed: String!) {
   prs: search(query: $q, type: ISSUE, first: 50) { nodes { ... on PullRequest {
-    number title url body reviewDecision
+    number title url body reviewDecision repository { nameWithOwner }
     latestReviews(first: 100) { nodes { author { login } state submittedAt } }
     commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
       ... on StatusContext { context state createdAt }
@@ -128,10 +128,16 @@ Q='query($q: String!, $owner: String!, $name: String!, $handoff: String!, $claim
       nodes { number title url labels(first: 20) { nodes { name } } } }
     claimed: issues(labels: [$claimed], states: OPEN, first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes { number title url labels(first: 20) { nodes { name } } } } } }'
-SEARCH="repo:$SLUG is:pr is:open author:$AUTHOR${MINE:+ label:\"$MINE\"}"
+# The issues are `repo`'s alone; the pull requests for them may be in any
+# repository `repos_also` names too: one search covers them all, its scope
+# qualifiers OR-ed (`owner/*` searches the owner)
+ALSO="$(set -f; for p in $(cfg repos_also | tr ',' ' '); do case "$p" in */\*) echo "org:${p%/*}" ;; ?*/?*) echo "repo:$p" ;; esac; done | tr '\n' ' ')"
+PR_Q="is:pr is:open author:$AUTHOR${MINE:+ label:\"$MINE\"}"
+SEARCH="repo:$SLUG $ALSO$PR_Q"
 if DATA="$(gh api --hostname "$HOST" graphql -f query="$Q" -f q="$SEARCH" -f owner="${SLUG%%/*}" \
     -f name="${SLUG#*/}" -f handoff="$HANDOFF" -f claimed="$CLAIMED" 2>"$ERR")" &&
-  PRS="$(printf '%s' "$DATA" | jq -e '.data.prs.nodes | map({number, title, url, body, reviewDecision,
+  PRS="$(printf '%s' "$DATA" | jq -e --arg root "$SLUG" '.data.prs.nodes | map({number, title, url, body, reviewDecision,
+    repo: (.repository.nameWithOwner // $root),
     latestReviews: [.latestReviews.nodes[]?],
     statusCheckRollup: [.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[]?
       | if .context then {context, state, startedAt: .createdAt} else . end]})' 2>>"$ERR")" &&
@@ -154,6 +160,19 @@ else
       echo "gh could not read the pull requests on $REPO over REST either; GraphQL said: $GQL_ERR" >&2
       exit 2
     }
+    # the other repositories' over REST's own search, then one by one
+    if [ -n "$ALSO" ]; then
+      OTHERS="$(gh api --hostname "$HOST" -X GET search/issues -f q="$ALSO$PR_Q" -f per_page=50 \
+          --jq '.items[] | "\(.repository_url | sub(".*/repos/"; "")) \(.number)"' 2>/dev/null)" &&
+        OTHERS="$(printf '%s\n' "$OTHERS" | while read -r slug n; do
+          [ -n "$n" ] && [ "$slug" != "$SLUG" ] || continue
+          pull="$(gh api --hostname "$HOST" "repos/$slug/pulls/$n" 2>/dev/null)" && rest_pr "$HOST" "$slug" "$pull" || exit 2
+        done | jq -s .)" &&
+        PRS="$(jq -n --argjson a "$PRS" --argjson b "$OTHERS" '$a + $b')" || {
+          echo "gh could not read the pull requests in repos_also over REST either; GraphQL said: $GQL_ERR" >&2
+          exit 2
+        }
+    fi
     NOTE="${NOTE:+$NOTE
 }GitHub's GraphQL budget would not answer ($(printf '%s' "$GQL_ERR" | tr '\n' ' ' | head -c 160)), so this list was read over REST. Prefer \`gh api\` (REST) to \`gh pr\` / \`gh issue\` this run."
   else
@@ -177,11 +196,16 @@ done | jq -s 'add // {}')" || ITEMS_JSON='{}'
 # approved one is never work: it waits for a person, whatever lands on it.
 # Any other wakes a run for what happened to it since a run last started on
 # its item: a review of any kind, or a check that failed — once, so what the
-# agent could not fix is not reported every tick. Its item is the issue its body names (`Fixes #<n>`), and an item a live
-# run holds is left out.
-PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" \
-    --arg held "$HELD" --argjson items "$ITEMS_JSON" "$JQ_LOGIN"'
-  map(.number as $pr | . + {item: ((.body // "") | capture("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #(?<n>[0-9]+)").n // "pr\($pr)")})
+# agent could not fix is not reported every tick. Its item is the issue of
+# `repo` its body names (`Fixes #<n>`, or `Part of <repo>#<n>` from another
+# repository; config.sh → JQ_REFS), and an item a live run holds is left out.
+# One in another repository that names none is not this instance's work.
+PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR" --arg root "$SLUG" \
+    --arg held "$HELD" --argjson items "$ITEMS_JSON" "$JQ_LOGIN$JQ_REFS"'
+  map(. + {repo: (.repo // $root)} | . + {other: ((.repo | ascii_downcase) != ($root | ascii_downcase))})
+  | map(.number as $pr | .repo as $h | . + {item: ((.body | issue_ref($root; $h)) // (if .other then null else "pr\($pr)" end)),
+      ref: (if .other then "\(.repo)#\(.number)" else "#\(.number)" end)})
+  | map(select(.item))
   | map(. + {since: ($items[.item].seen // $since)})
   | map(select(.item as $i | $held | contains(" \($i) ") | not))
   | map(select(.reviewDecision != "APPROVED"))
@@ -194,7 +218,7 @@ PR_WORK="$(printf '%s' "$PRS" | jq -r --arg since "$SINCE" --arg author "$AUTHOR
   })
   | map(select(.reviewed or (.failed | length > 0)))
   | .[]
-  | "- \(if (.item | startswith("pr")) then .item else "#\(.item)" end) — PR #\(.number) \(.title) — \([
+  | "- \(if (.item | startswith("pr")) then .item else "#\(.item)" end) — PR \(.ref) \(.title) — \([
       (if .reviewed then "reviewed; resolve every finding and re-request review" else empty end),
       (if (.failed | length > 0) then "checks failed: \(.failed | join(", "))" else empty end)
     ] | join("; ")) — docs/babysit.md\n  \(.url)"
@@ -226,9 +250,10 @@ ISSUE_WORK="$(printf '%s' "$ISSUES" | jq -r --arg claimed "$CLAIMED" --arg info 
 # claim is ours only when it carries that too: agents sharing the login share
 # the claimed label, and another's claim is never ours to finish.
 RESUME_WORK="$(printf '%s' "$CLAIMED_ISSUES" | jq -r --argjson prs "$PRS" --arg held "$HELD" \
-    --argjson items "$ITEMS_JSON" --arg mine "$MINE" '
-  map(select($mine == "" or any(.labels[]?; .name == $mine)))
-  | map(select(.number as $n | ($prs | map(.body // "") | any(test("#\($n)(\\D|$)"))) | not))
+    --argjson items "$ITEMS_JSON" --arg mine "$MINE" --arg root "$SLUG" "$JQ_REFS"'
+  ([$prs[] | (.repo // $root) as $h | .body | issue_refs($root; $h)[]]) as $named
+  | map(select($mine == "" or any(.labels[]?; .name == $mine)))
+  | map(select(.number as $n | $named | index("\($n)") | not))
   | map(select(.number as $i | $held | contains(" \($i) ") | not))
   | map(select(($items["\(.number)"].state // "") | IN("waiting-lock", "waiting-cluster", "blocked", "needs-info") | not))
   | .[]

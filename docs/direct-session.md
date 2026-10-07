@@ -19,25 +19,6 @@ from an issue:
   operator approves it, without the hand-off label: a tick would race you for
   it. Then it is the item, as above.
 
-## Another repository
-
-The operator may ask for work on a repository other than `repo`. First
-`bash "$HOME/scripts/repo-allowed.sh" <owner/name>`: refused, decline and name
-the `repos_also` entry that would allow it — only the operator adds one. Allowed,
-the work is as for `repo`, with three differences:
-
-- **No slot, no item.** `run-state.sh` serves `repo` alone: clone into
-  `work/<name>` (once) and branch there, never in a slot. No tick ever touches
-  that checkout, so nothing races you for it.
-- **No labels.** Its labels are not this instance's: no claim, nothing for
-  `finish` to check. An issue still comes first, as above, and the pull request
-  still says `Fixes #<n>` and carries the session link.
-- **Its own checks.** `verify` is `repo`'s: read the repository's `CLAUDE.md`,
-  `AGENTS.md` and task runner for its own, and say which you ran.
-
-The pull request ends as in **Interactive**: give the operator its link; a
-review round happens when they ask for one.
-
 ## Interactive
 
 With `mode: interactive` nothing watches GitHub: no schedule runs, and the

@@ -16,6 +16,7 @@ case "$1 $2" in
     for a in "$@"; do [ "$prev" = "--label" ] && label="$a"; prev="$a"; done
     if [ "$label" = "${STUB_HANDOFF_LABEL:-agent/implement}" ]; then printf '%s' "${STUB_HANDOFF:-[]}"
     else printf '%s' "${STUB_CLAIMED:-[]}"; fi ;;
+  "repo clone") git clone -q "$STUB_DIR/${3#*/}.git" "$4" ;;   # repo clone <host/owner/name> <dir>
   "label list")
     answer "${STUB_LABELS-$(printf 'agent/implement\nagent/in-progress\nagent/failed\nneeds-review\nagent/needs-info')}" ;;
   "api "*)
@@ -40,6 +41,7 @@ case "$1 $2" in
       jq -n --argjson prs "${STUB_PRS:-[]}" --argjson handoff "${STUB_HANDOFF:-[]}" --argjson claimed "${STUB_CLAIMED:-[]}" '
         {data: {
           prs: {nodes: [$prs[] | . + {latestReviews: {nodes: (.latestReviews // [])},
+            repository: (if .repo then {nameWithOwner: .repo} else null end),
             commits: {nodes: [{commit: {statusCheckRollup: {contexts: {nodes: [(.statusCheckRollup // [])[]
               | if .context then {context, state, createdAt: .startedAt} else . end]}}}}]}} | del(.statusCheckRollup)]},
           repository: {handoff: {nodes: [$handoff[] | .labels = {nodes: .labels}]}, claimed: {nodes: [$claimed[] | .labels = {nodes: (.labels // [])}]}}}}' ;;
