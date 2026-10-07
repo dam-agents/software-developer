@@ -120,8 +120,9 @@ else
   fi
   S="$(cfg mode)"
   case "$(printf '%s' "$S" | tr '[:upper:]' '[:lower:]')" in
-    '' | autonomous | interactive) ok config.mode "${S:-unset — autonomous}" ;;
-    *) fail config.mode "'$S' is not autonomous or interactive" "write one of them, or leave it out for autonomous" ;;
+    autonomous | interactive) ok config.mode "$S" ;;
+    '') fail config.mode "missing — read as interactive, so nothing is watched" "add \`- mode: autonomous\` to watch GitHub, or \`- mode: interactive\` (CHANGELOG.md → 4.0.0)" ;;
+    *) fail config.mode "'$S' is not autonomous or interactive — read as interactive" "write one of them" ;;
   esac
   S="$(cfg schedules)"
   for w in $S; do

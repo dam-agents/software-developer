@@ -153,7 +153,7 @@ done_
 
 CASE="interactive: only the claim is labelled, and the tick is refused"; sandbox; onboarded
 sed -i.bak '/^- label_handoff:/d; /^- label_failed:/d' "$HOME/work/CONFIG.md"
-echo "- mode: interactive" >> "$HOME/work/CONFIG.md"
+sed -i.bak 's/^- mode: .*/- mode: interactive/' "$HOME/work/CONFIG.md"
 STUB_LABELS="$(printf 'agent/in-progress\nneeds-review')" verify --live
 is "$RC" 0 "exit"
 has "$OUT" "ok   config.mode — interactive" "mode"
@@ -164,10 +164,15 @@ lacks "$OUT" "needs-info" "no default label demanded"
 echo "- schedules: tick" >> "$HOME/work/CONFIG.md"
 verify --config
 has "$OUT" "FAIL config.schedules — lists tick, but mode is interactive" "tick refused"
+setcfg mode autonomous
+verify --config
+has "$OUT" "FAIL config.label_handoff — missing" "autonomous needs the hand-off label"
 setcfg mode sometimes
 verify --config
 has "$OUT" "FAIL config.mode — 'sometimes'" "mode shape"
-has "$OUT" "FAIL config.label_handoff — missing" "autonomous needs the hand-off label"
+sed -i.bak '/^- mode:/d' "$HOME/work/CONFIG.md"
+verify --config
+has "$OUT" "FAIL config.mode — missing — read as interactive" "mode is required"
 done_
 
 exit "$FAILED"

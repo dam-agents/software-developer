@@ -41,7 +41,7 @@ a line in any other shape is invisible, not wrong.
 - `app_url` — the platform's address, for the session link on every pull
   request. Missing: pull requests carry none, and say why.
 - `mode` — `autonomous`, or `interactive`: nothing is watched, and work
-  starts in the direct session alone. Missing: autonomous.
+  starts in the direct session alone. Missing: interactive.
 - `label_handoff`, `label_claimed`, `label_needs_info` — missing means
   `agent/implement`, `agent/in-progress`, `agent/needs-info`; `label_failed`;
   `label_review` — missing: review is requested some other way.
