@@ -41,9 +41,14 @@ what, and how to build and test it are asked during onboarding and recorded in
 tried out and recovered is that repository's own to document — its
 `CLAUDE.md`, skills or contributing guide — and the agent follows it.
 
-Both schedules are optional: onboarding asks whether to watch the hand-off
-label and whether to run the weekly audit. Without the tick, the agent works
-on an issue when you name it in a chat.
+**Autonomous or interactive.** Onboarding asks first whether the agent
+watches GitHub — implementing what carries the hand-off label and babysitting
+its pull requests, unattended — or works only when you ask it in a chat, as a
+developer you pair with (`mode` in `work/CONFIG.md`,
+[`docs/direct-session.md`](docs/direct-session.md)). Interactive needs no
+schedule and only the labels of a claim. Autonomous, both schedules are still
+optional: onboarding asks whether to watch the hand-off label and whether to
+run the weekly audit.
 
 ## The GitHub connection
 

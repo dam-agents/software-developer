@@ -9,6 +9,31 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 3.3.0 — 2026-10-07
+
+**Autonomous or interactive.** A new key, `mode`: `autonomous`, the default and
+everything until now, or `interactive` — a developer to work with in chat,
+which watches nothing. Interactive, the precheck wakes nothing, both schedules
+are off, only the claim is labelled (`label_claimed`, `label_mine`), and a run
+ends once it opens its pull request: the operator brings it back for review
+rounds. Onboarding asks the mode right after the repository. In either mode, a
+request with no issue is drafted as one and filed once the operator approves
+it ([`docs/direct-session.md`](docs/direct-session.md)), and onboarding
+suggests `agent/$PLATFORM_AGENT_ID` as `label_mine` for every instance, so
+agents from this kit never share it.
+
+**Upgrade:**
+
+1. Nothing changes without `mode` in `work/CONFIG.md`. Offer the operator
+   `- mode: interactive`; on a yes, write it, drop `tick` and `audit` from
+   `schedules`, and switch off `software-developer-tick-10m` and
+   `software-developer-audit-weekly` with `toggle_schedule` (operator-only:
+   the schedules change in the direct session alone).
+2. Without `label_mine`: offer `agent/$PLATFORM_AGENT_ID`, create the label on
+   `repo` on a yes, and put it on every open claim and pull request of this
+   instance's (3.2.0 → Upgrade 1). An existing `label_mine` stays.
+3. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
+
 ## 3.2.0 — 2026-10-07
 
 **Another agent's work is never yours.** Agents sharing a login share the

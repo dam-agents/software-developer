@@ -6,8 +6,10 @@ schemaVersion: v1
 id: software-developer
 name: Software Developer
 description: >-
-  Picks up an issue labelled for implementation, writes the change, runs the
-  repository's own checks and tests in its own sandbox, opens a pull request and drives it through review until it is approved.
+  Picks up an issue labelled for implementation — or one you ask for in chat —
+  writes the change, runs the repository's own checks and tests in its own
+  sandbox, opens a pull request and drives it through review until it is
+  approved. Watching GitHub unattended is a choice made at onboarding.
 category: software
 icon: code
 docsUrl: https://github.com/dam-agents/software-developer
@@ -69,8 +71,8 @@ connections:
     note: Clones the repository, pushes branches and opens pull requests.
 
 # Both are created with the agent and held until onboarding completes; the
-# operator chooses which stay on (`schedules` in work/CONFIG.md), and
-# onboarding switches the others off.
+# operator chooses which stay on (`schedules` in work/CONFIG.md, none with
+# `mode: interactive`), and onboarding switches the others off.
 schedules:
   # Every ten minutes, around the clock. A cron holds UTC, and at this cadence
   # the hour it lands in is nothing the agent reasons about.

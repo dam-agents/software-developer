@@ -29,6 +29,10 @@ LOCKS="${SD_LOCKS:-/dev/shm/software-developer}"
 # declines — so it lets a DIAGNOSTIC run through, which may not build, and
 # whose only job is to say what is stuck. At most one per backoff window,
 # doubling from an hour to a day.
+# An interactive instance watches nothing: work reaches it in the direct
+# session alone (docs/direct-session.md), so no occurrence is ever worth a turn.
+[ "$(cfg_mode)" = interactive ] && exit 1
+
 NOTE=""
 N="$(cfg slots)"; case "$N" in '' | *[!0-9]* | 0) N=3 ;; esac
 

@@ -35,11 +35,13 @@ read before anything else — the only place those answers live. A key is read
 from its `- key: value` bullet, through `scripts/lib/config.sh` in every script;
 a line in any other shape is invisible, not wrong.
 
-- `repo` — `owner/name`. Missing: the checkout's remote, or the precheck says so.
-- `author` — the login you push as: your pull requests are its, and with
-  `label_mine` set, only those that carry it, as every one you open does.
+- `repo` — `owner/name`, checked out at `work/<name>` — missing, clone it
+  first. Missing: the checkout's remote, or the precheck says so.
+- `author` — the login you push as; yours carry `label_mine` too, when set.
 - `app_url` — the platform's address, for the session link on every pull
   request. Missing: pull requests carry none, and say why.
+- `mode` — `autonomous`, or `interactive`: nothing is watched, and work
+  starts in the direct session alone. Missing: autonomous.
 - `label_handoff`, `label_claimed`, `label_needs_info` — missing means
   `agent/implement`, `agent/in-progress`, `agent/needs-info`; `label_failed`;
   `label_review` — missing: review is requested some other way.
@@ -47,7 +49,7 @@ a line in any other shape is invisible, not wrong.
   others. `exclusive` — what every slot shares and one uses at a time, in plain
   words; missing: nothing is. `verify_exclusive` — the check on it a pull
   request must pass; missing: none ([`docs/exclusive.md`](docs/exclusive.md)).
-- `schedules` — `tick`, `audit`, both, or `none`; missing: both.
+- `schedules` — `tick`, `audit`, both, or `none`; missing: both — interactive, none.
 - `slots` — default 3: how many runs work at once, each in its own worktree.
   `babysit_max_hours` — default 4: how long a run babysits its pull request
   before handing it on. `stuck_after_min` — default 120: every slot held and a
@@ -59,13 +61,12 @@ a line in any other shape is invisible, not wrong.
   repository's skills for those; missing: `.agents/defaults/`.
 - What you must never touch: the `## Bounds` section, in plain sentences.
 
-The checkout lives at `work/<name>`; missing, clone it from `repo` before anything else.
-
 ## Run types
 
 | Run | When | Procedure |
 | --- | --- | --- |
-| **The tick** | every ten minutes, when the precheck finds work and a free slot; or the operator names an issue in the direct session | below |
+| **The tick** | every ten minutes, when the precheck finds work and a free slot | below |
+| **Direct session** | the operator asks for work in the chat | [`docs/direct-session.md`](docs/direct-session.md), then the tick's steps |
 | **Diagnostic** | every slot held and a run silent; the prompt opens with **DIAGNOSTIC RUN** | [`docs/diagnostic-run.md`](docs/diagnostic-run.md) |
 | **Weekly audit** | Friday 06:00 UTC, ungated | [`docs/audit.md`](docs/audit.md) |
 | **Slack** | a message in Slack — a grill, or nothing | [`docs/grill.md`](docs/grill.md) |
@@ -73,8 +74,7 @@ The checkout lives at `work/<name>`; missing, clone it from `repo` before anythi
 ## The tick
 
 A scheduled run starts because `scripts/precheck.sh` found work, and **the
-prompt carries its list**: read it rather than running the precheck again. A
-run started any other way has no list, so gather it yourself.
+prompt carries its list**: read it rather than running the precheck again.
 
 **Every run is its own session, and works on one item.** You remember nothing
 of the last run, and other runs may be working beside you, each on an item and

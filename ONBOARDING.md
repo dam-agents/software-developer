@@ -20,11 +20,12 @@ user can decide — never your own work:
 |----|-------|
 | `backup` | Where `work/` is backed up, and whether a backup exists already |
 | `repo` | Which repository to work on |
-| `labels` | Which labels mean hand-off, claimed, failed, review-requested, needs-info |
+| `mode` | Whether to watch GitHub and work unattended, or only when asked in chat |
+| `labels` | Which labels mark a claim as this agent's — and, autonomous, hand-off, failed, review-requested, needs-info |
 | `verify` | How to build, check and test — and what the slots must take turns on |
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
-| `schedules` | Whether to watch the hand-off label, and run the weekly audit |
+| `schedules` | Autonomous: whether to watch the hand-off label, and run the weekly audit |
 | `slack` | Whether, and to which chat, to post the moments a person acts on — and grill issues |
 | `bounds` | What you must never touch |
 
@@ -54,14 +55,28 @@ confirming or correcting rather than composing from nothing.
   `CONFIG.md` over a backup that exists.
 
 - **Repository** — `owner/name`. Ask; do not assume.
-- **Labels** — suggest hand-off `agent/implement`, claimed
-  `agent/in-progress`, failed `agent/failed`, needs-info `agent/needs-info`
-  (an issue too unclear to implement, waiting on its author), and say these
-  are only a convention. Ask whether a label requests review on a pull request
-  — a review bot's trigger, say; if so it is `label_review`, if not leave it
-  out. Whatever they
-  choose, check it exists: `gh label list -R <slug>`. A label you invent is a
-  label nothing ever applies.
+- **Mode** — `autonomous`: watch GitHub every ten minutes, implement what
+  carries the hand-off label and babysit pull requests, unattended.
+  `interactive`: a developer to work with in chat — work starts only when the
+  user asks here, and a pull request is theirs to bring back for its review
+  ([`docs/direct-session.md`](docs/direct-session.md)). Record it as `mode`.
+  Interactive skips the hand-off, failed, needs-info and review labels and the
+  schedules below: both are switched off.
+- **Labels** — every mode claims the issue it works on, so two agents never
+  take one: the claimed label, suggested `agent/in-progress`, and one that
+  marks the claim as this agent's own, `label_mine`. Suggest
+  `agent/$PLATFORM_AGENT_ID` for it — the platform's id of this agent, unique
+  to it — or, with that unset, `agent/<name>-developer`. Every pull request
+  it opens carries it too, and only those are its own: agents sharing a
+  login, a GitHub App's bot above all, tell their work apart by it.
+  Autonomous, also suggest hand-off `agent/implement`, failed `agent/failed`,
+  needs-info `agent/needs-info` (an issue too unclear to implement, waiting
+  on its author), and say these are only a convention. Ask whether a label
+  requests review on a pull request — a review bot's trigger, say; if so it is
+  `label_review`, if not leave it out. Whatever they choose, check it exists:
+  `gh label list -R <slug>`. A label you invent is a label nothing ever
+  applies: offer to create a missing one, `gh label create -R <slug> <label>`,
+  and create it only on a yes.
 - **Verification** — up to three runs work at once, each in a worktree of its
   own. `verify` builds, checks and tests in one worktree alone, and runs in
   every worktree side by side. Always through the repository's own task
@@ -86,9 +101,8 @@ confirming or correcting rather than composing from nothing.
   Tell the user which account it is: if it is their own, the work this agent
   opens will be indistinguishable from theirs. A GitHub App answers neither
   call (403, `false`): its login is `<app>[bot]`, as its pull requests show
-  it, and if other agents act as the same app, agree a label of this agent's
-  own as `label_mine` — every pull request it opens carries it, and only those
-  are its own. Create the label like the others.
+  it — and `label_mine` above is what tells this agent's work from that of
+  every other agent acting as the same app.
 - **Platform address** — the URL they are reading this page at, e.g.
   `https://platform.example.com`. Every pull request you open links back to the
   session that wrote it, and nothing inside the sandbox knows the address it is
@@ -109,7 +123,8 @@ confirming or correcting rather than composing from nothing.
   files issues; offer them as `skill_grill` and `skill_file_issue`, or the
   definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's
   settings later.
-- **Schedules** — two, both held until onboarding completes. Ask whether to
+- **Schedules** — autonomous only; interactive, skip it. Two, both held
+  until onboarding completes. Ask whether to
   watch the hand-off label (`tick`: every ten minutes, and how work reaches
   you unattended) and whether to run the weekly audit (`audit`). Record the
   ones wanted as `schedules`, e.g. `tick audit`, or `none`. Without the tick,
@@ -145,12 +160,13 @@ that is not one of them fails verification, because nothing would ever read it:
 - repo: owner/name
 - author: the-login-you-push-as
 - app_url: https://platform.example.com
+- mode: autonomous
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed
 - label_review: needs-review
 - label_needs_info: agent/needs-info
-- label_mine: agent/acme-developer
+- label_mine: agent/agent-0123456789abcdef
 - verify: <the repository's check-and-test command>
 - exclusive: the local cluster — anything that installs onto it or runs against it
 - verify_exclusive: <its end-to-end command, setup included>
@@ -169,7 +185,9 @@ Plain sentences, one per line: what you must never touch, and whether you may
 merge (by default you may not).
 ```
 
-With nothing shared, leave `exclusive` and `verify_exclusive` out; with no
+Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
+`label_review` and `schedules`. With nothing shared, leave `exclusive` and
+`verify_exclusive` out; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`;
 for the default grill skills, `skill_grill` and `skill_file_issue`.
 
@@ -235,13 +253,15 @@ operator-only fix goes to the user. It warns that only MCP can list schedules:
 check with `list_schedules` that each one it names exists.
 
 Then switch off, with `toggle_schedule`, every schedule `schedules` does not
-list — `list_schedules` first, since it flips whatever state it finds. Then
+list — interactive, both of them — `list_schedules` first, since it flips
+whatever state it finds. Then
 call `mark_onboarding_complete` — only now, with the verification green. It
 releases the schedules. If the user left anything unanswered, leave it
 uncalled and say which step is still open.
 
 Finish with a short summary for the user: the final `work/CONFIG.md`, verbatim;
 which schedules run — the tick every ten minutes, the audit every Friday;
-and that work reaches you by the hand-off label when the tick runs, by name
-in a direct session, pull requests by review comments, and
-changes to how you work only through them, in this chat.
+and how work reaches you: autonomous, by the hand-off label when the tick
+runs and pull requests by review comments; in either mode, by asking in this
+chat ([`docs/direct-session.md`](docs/direct-session.md)), which is also the
+only place how you work changes.

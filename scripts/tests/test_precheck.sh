@@ -208,4 +208,11 @@ has "$OUT" "#7 Seven" "ours, over REST"
 lacks "$OUT" "#8 Eight" "another agent's claim, over REST"
 done_
 
+CASE="interactive: work on GitHub wakes nothing, and nothing is asked of it"; sandbox
+echo "- mode: interactive" >> "$HOME/work/CONFIG.md"
+STUB_HANDOFF="$ISSUE7" precheck
+is "$RC" 1 "exit"
+no_gh
+done_
+
 exit "$FAILED"
