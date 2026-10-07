@@ -51,7 +51,7 @@ never a pause in the turn: nobody is watching.
 
 ```sh
 $RS start <n> <branch>
-gh issue edit <n> -R <repo> --remove-label <handoff> --add-label <claimed>
+gh issue edit <n> -R <repo> --remove-label <handoff> --add-label <claimed>[,<label_mine>]
 ```
 
 `start` first: it is what keeps two runs off one issue, atomically, and a run

@@ -57,8 +57,8 @@ one round, so one push answers everything:
    new round: re-request the reviewers who reviewed, and re-apply the
    review-request label only when nothing re-requests them otherwise.
 
-**Approved, green and mergeable** is finished: drop the claimed label from its
-issue, comment the issue with the pull request link, and finish `released`
+**Approved, green and mergeable** is finished: drop the claim from its issue,
+comment the issue with the pull request link, and finish `released`
 (`finish released <pr>`).
 
 **Closed without merging**, the issue still claimed: someone decided against

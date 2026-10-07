@@ -42,7 +42,7 @@ case "$1 $2" in
           prs: {nodes: [$prs[] | . + {latestReviews: {nodes: (.latestReviews // [])},
             commits: {nodes: [{commit: {statusCheckRollup: {contexts: {nodes: [(.statusCheckRollup // [])[]
               | if .context then {context, state, createdAt: .startedAt} else . end]}}}}]}} | del(.statusCheckRollup)]},
-          repository: {handoff: {nodes: [$handoff[] | .labels = {nodes: .labels}]}, claimed: {nodes: $claimed}}}}' ;;
+          repository: {handoff: {nodes: [$handoff[] | .labels = {nodes: .labels}]}, claimed: {nodes: [$claimed[] | .labels = {nodes: (.labels // [])}]}}}}' ;;
       user) answer "${STUB_LOGIN-dev-bot}" ;;
       installation/repositories*) answer "${STUB_INSTALLATION-}" ;;
       user/repos*) answer "${STUB_REACH-1}" ;;

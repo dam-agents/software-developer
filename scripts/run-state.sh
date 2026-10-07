@@ -229,9 +229,44 @@ prepare() {
   git -C "$d" clean -fdq
 }
 
+# ours <item> — whether the item is this agent's to work on, read off GitHub.
+# Agents that share the login share the claimed label too: with `label_mine`
+# set, a claim is ours only when it carries that beside it, and an issue an
+# open pull request names is ours only when that pull request is. Prints why
+# not; 0 ours · 1 another's · 2 GitHub could not be read
+ours() {
+  local item="$1" author mine json why
+  author="$(cfg author)"; mine="$(cfg label_mine)"
+  [ -n "$author" ] || author="$(gh_get user --jq .login)" || return 2
+  case "$item" in
+    pr*)
+      json="$(gh_get "repos/$SLUG/pulls/${item#pr}")" || return 2
+      why="$(printf '%s' "$json" | jq -r --arg a "$author" --arg mine "$mine" "$JQ_LOGIN"'
+        if (.user.login | login) != ($a | login) then "pull request #\(.number) was opened by \(.user.login)"
+        elif $mine != "" and (any(.labels[]?; .name == $mine) | not) then "pull request #\(.number) does not carry \($mine)"
+        else empty end' 2>/dev/null)" || return 2 ;;
+    *)
+      json="$(gh_get "repos/$SLUG/issues/$item")" || return 2
+      why="$(printf '%s' "$json" | jq -r --arg claimed "$CLAIMED" --arg mine "$mine" '
+        [.labels[]?.name] as $l
+        | if $mine != "" and ($l | index($claimed)) and ($l | index($mine) | not)
+          then "it carries \($claimed) without \($mine): another agent'"'"'s claim" else empty end' 2>/dev/null)" || return 2
+      if [ -z "$why" ]; then
+        json="$(gh_get --paginate "repos/$SLUG/pulls?state=open&per_page=100")" || return 2
+        json="$(printf '%s' "$json" | jq -s 'add // []')" || return 2
+        why="$(printf '%s' "$json" | jq -r --arg n "$item" --arg a "$author" --arg mine "$mine" "$JQ_LOGIN"'
+          map(select((.body // "") | test("(?i)(fix(es|ed)?|close[sd]?|resolve[sd]?) #\($n)(\\D|$)")))
+          | map(select(((.user.login | login) == ($a | login) and ($mine == "" or any(.labels[]?; .name == $mine))) | not))
+          | first // empty | "pull request #\(.number), not ours, names it"' 2>/dev/null)" || return 2
+      fi ;;
+  esac
+  [ -z "$why" ] && return 0
+  echo "$why"; return 1
+}
+
 # ------------------------------------------------------------------ verbs
 cmd_start() {
-  local item="${1:?item: the issue number}" branch="${2:-}" f k last held_by rc
+  local item="${1:?item: the issue number}" branch="${2:-}" f k last held_by rc why
   item="${item#\#}"
   need_session
   f="$(item_file "$item")"
@@ -239,6 +274,11 @@ cmd_start() {
   [ -n "$branch" ] || branch="$(kv "$f" branch)"
   [ -n "$branch" ] || { say "item #$item has no branch yet — give one: start $item <branch>"; exit 2; }
 
+  why="$(ours "$item")"; rc=$?
+  case "$rc" in
+    1) say "#$item is not ours: $why — leave it, and take the next one."; exit 1 ;;
+    2) say "GitHub could not be read, so whose #$item is was not measured — start nothing on it now."; exit 1 ;;
+  esac
   cmd_sweep >/dev/null
   if ! take "item-$item" "item=$item"; then
     held_by="$(kv "$LOCKS/item-$item/owner" session)"
@@ -451,6 +491,8 @@ reported() {
         json="$(gh_get "repos/$SLUG/issues/$n")" || return 2
         labels=" $(printf '%s' "$json" | jq -r '[.labels[]?.name] | join(" ")' 2>/dev/null) "
         case "$labels" in *" $CLAIMED "*) missing="${missing:+$missing; }#$n still carries $CLAIMED" ;; esac
+        # the claim is the pair: giving it up drops both
+        if [ -n "$mine" ]; then case "$labels" in *" $mine "*) missing="${missing:+$missing; }#$n still carries $mine" ;; esac; fi
         case "$outcome" in
           needs-info) case "$labels" in *" $NEEDS_INFO "*) ;; *) missing="${missing:+$missing; }#$n does not carry $NEEDS_INFO" ;; esac ;;
           blocked) case "$labels" in *" $FAILED_LABEL "*) ;; *) missing="${missing:+$missing; }#$n does not carry $FAILED_LABEL" ;; esac ;;

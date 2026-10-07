@@ -4,12 +4,14 @@
 . "$(dirname "$0")/helpers.sh"
 
 # as <session> <verb> … — run-state.sh as that session, every test session
-# running, and a comment from each on GitHub unless the case says otherwise
+# running, a comment from each on GitHub and an issue no one claimed unless the
+# case says otherwise
 DEFAULT_COMMENTS='[{"user":{"login":"dev-bot"},"body":"Done. sess-a sess-b sess-c"}]'
+DEFAULT_ISSUE='{"labels":[]}'
 as() {
   local s="$1"; shift
   CLAUDE_CODE_SESSION_ID="$s" STUB_RUNNING="${RUNNING-sess-a sess-b sess-c}" \
-    STUB_COMMENTS="${STUB_COMMENTS-$DEFAULT_COMMENTS}" SD_WAIT_FOR="${SD_WAIT_FOR:-3}" SD_WAIT_POLL="${SD_WAIT_POLL:-1}" \
+    STUB_COMMENTS="${STUB_COMMENTS-$DEFAULT_COMMENTS}" STUB_ISSUE="${STUB_ISSUE-$DEFAULT_ISSUE}" SD_WAIT_FOR="${SD_WAIT_FOR:-3}" SD_WAIT_POLL="${SD_WAIT_POLL:-1}" \
     state "$@"
 }
 slot() { git -C "$HOME/work/slots/$1" rev-parse --abbrev-ref HEAD 2>/dev/null; }
@@ -285,6 +287,31 @@ has "$(cat "$HOME/err")" "does not carry agent/mine" "says what"
 lacks "$(cat "$HOME/err")" "was not opened by" "the login matched"
 STUB_PULL='{"state":"open","user":{"login":"dev-app[bot]"},"labels":[{"name":"agent/mine"}],"body":"Fixes #7 sess-a"}' as sess-a finish pr-opened 21
 is "$RC" 0 "labelled"
+done_
+
+CASE="start refuses another agent's work: its claim, its pull request, an unreadable issue"; sandbox; origin_checkout
+sed -i.bak 's/^- author: .*/- author: dev-app[bot]/' "$HOME/work/CONFIG.md"
+echo "- label_mine: agent/mine" >> "$HOME/work/CONFIG.md"
+STUB_ISSUE='{"labels":[{"name":"agent/in-progress"}]}' as sess-a start 7 feat/7
+is "$RC" 1 "claimed without agent/mine"
+has "$(cat "$HOME/err")" "another agent's claim" "says why"
+is "$(slot 1)" "" "no slot was touched"
+[ ! -d "$SD_LOCKS/item-7" ] || fail "the item stays free"
+THEIRS='[{"number":99,"user":{"login":"dev-app[bot]"},"labels":[],"body":"Fixes #7"}]'
+STUB_REST_PULLS="$THEIRS" as sess-a start 7 feat/7
+is "$RC" 1 "named by a pull request without agent/mine"
+has "$(cat "$HOME/err")" "pull request #99, not ours" "names it"
+STUB_ISSUE= as sess-a start 7 feat/7
+is "$RC" 1 "unreadable is not ours"
+has "$(cat "$HOME/err")" "was not measured" "says so"
+STUB_PULL='{"number":21,"user":{"login":"dev-app[bot]"},"labels":[]}' as sess-a start pr21 feat/x
+is "$RC" 1 "a pull request item without agent/mine"
+MINE='[{"number":98,"user":{"login":"dev-app[bot]"},"labels":[{"name":"agent/mine"}],"body":"Fixes #7"}]'
+STUB_REST_PULLS="$MINE" STUB_ISSUE='{"labels":[{"name":"agent/in-progress"},{"name":"agent/mine"}]}' as sess-a start 7 feat/7
+is "$RC" 0 "our claim and our pull request"
+STUB_ISSUE='{"labels":[{"name":"agent/mine"}]}' as sess-a finish released
+is "$RC" 1 "releasing drops agent/mine too"
+has "$(cat "$HOME/err")" "still carries agent/mine" "says what"
 done_
 
 exit "$FAILED"
