@@ -526,7 +526,9 @@ cmd_finish() {
     [ -n "$pr" ] || pr="$(kv "$f" pr)"
     case "$outcome" in
       pr-opened | pr-updated | nothing)
-        if [ -n "$pr" ] && [ "$(kv "$f" babysat_out)" != yes ]; then
+        # interactive, the operator holds the pull request: no later run would
+        # take it over, so it is theirs to bring back (docs/direct-session.md)
+        if [ -n "$pr" ] && [ "$(kv "$f" babysat_out)" != yes ] && [ "$(cfg_mode)" != interactive ]; then
           say "#$item has pull request #$pr, and a run keeps its pull request until it is done:"
           say "babysit it — bash \"\$HOME/scripts/run-state.sh\" wait $pr — and finish released once it is approved, green and mergeable,"
           say "blocked when it cannot get there, or pr-updated once wait says babysit_max_hours is up (docs/babysit.md)."

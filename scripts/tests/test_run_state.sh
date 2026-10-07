@@ -314,4 +314,13 @@ is "$RC" 1 "releasing drops agent/mine too"
 has "$(cat "$HOME/err")" "still carries agent/mine" "says what"
 done_
 
+CASE="interactive: the operator holds the pull request, so opening it ends the run"; sandbox; origin_checkout
+sed -i.bak 's/^- mode: .*/- mode: interactive/' "$HOME/work/CONFIG.md"
+as sess-a start 7 feat/7
+STUB_PULL='{"state":"open","user":{"login":"dev-bot"},"body":"Fixes #7 sess-a"}' as sess-a finish pr-opened 21
+is "$RC" 0 "no babysitting asked"
+[ ! -d "$SD_LOCKS/item-7" ] || fail "kept the item"
+is "$(field items/7.md pr)" 21 "the pull request is recorded"
+done_
+
 exit "$FAILED"

@@ -35,6 +35,7 @@ Set up during onboarding.
 - repo: acme/widgets
 - author: dev-bot
 - app_url: https://platform.example.com
+- mode: autonomous
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress
 - label_failed: agent/failed

@@ -45,7 +45,8 @@ comment, and named in your turn's output.
 
 A step in one of its skills that waits for a person — "get explicit approval",
 "ask the user" — is a question on the issue here (the needs-info route below),
-never a pause in the turn: nobody is watching.
+never a pause in the turn: nobody is watching. In the direct session the
+operator is, and both go to them ([`docs/direct-session.md`](../../../docs/direct-session.md)).
 
 ## 2. Start and claim
 
@@ -123,7 +124,8 @@ Then **babysit it in this run** until it is done: `$RS wait <pr>`, handle what
 it comes back with, push, `wait` again — [`docs/babysit.md`](../../../docs/babysit.md).
 The run ends `released` once it is approved, green and mergeable, `blocked`
 when it cannot get there, or `pr-updated` when `wait` says `babysit_max_hours`
-is up. Opening the pull request is not the end of the run.
+is up. Opening the pull request is not the end of the run — except with
+`mode: interactive`, where it is ([`docs/direct-session.md`](../../../docs/direct-session.md)).
 
 ## When it goes wrong
 

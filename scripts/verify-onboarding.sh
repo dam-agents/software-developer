@@ -29,7 +29,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
-KNOWN="repo author app_url label_handoff label_claimed label_failed label_review label_needs_info label_mine
+KNOWN="repo author app_url mode label_handoff label_claimed label_failed label_review label_needs_info label_mine
   verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel schedules
   skill_grill skill_file_issue"
 # keys 3.0.0 retired — CHANGELOG.md → 3.0.0 says what each became
@@ -38,6 +38,7 @@ ITEM_KEYS="item state branch slot pr session seen_at abandoned babysit_since rou
 GATE_KEYS="diagnosed_at diagnoses"
 
 CHECKS=0; FAILS=0; WARNS=0
+schedules_default() { [ "$MODE" = interactive ] && echo none || echo tick audit; }
 ok()   { CHECKS=$((CHECKS + 1)); printf 'ok   %s — %s\n' "$1" "$2"; }
 fail() { CHECKS=$((CHECKS + 1)); FAILS=$((FAILS + 1)); printf 'FAIL %s — %s — fix: %s\n' "$1" "$2" "$3"; }
 warn() { WARNS=$((WARNS + 1)); printf 'warn %s — %s\n' "$1" "$2"; }
@@ -56,6 +57,7 @@ unknown_in() {
   done | sort -u | tr '\n' ' ' | sed -E 's/ $//'
 }
 
+MODE="$(cfg_mode)"
 REPO="$(cfg repo)"
 case "$REPO" in */*/*) HOST="${REPO%%/*}"; SLUG="${REPO#*/}" ;; *) HOST=github.com; SLUG="$REPO" ;; esac
 WORK_REPO="$(cfg work_repo)"
@@ -66,7 +68,11 @@ CFG_FIX="ONBOARDING.md → 3. Write it down"
 if [ ! -f "$CONFIG" ]; then
   fail config "work/CONFIG.md is missing" "write it — $CFG_FIX"
 else
-  for k in repo author app_url label_handoff label_claimed label_failed verify; do
+  # interactive, nothing hands work off or fails it unattended: only the claim
+  # is labelled (docs/direct-session.md)
+  need="repo author app_url label_claimed verify"
+  [ "$MODE" = interactive ] || need="$need label_handoff label_failed"
+  for k in $need; do
     if [ -n "$(cfg "$k")" ]; then ok "config.$k" "$(cfg "$k")"
     else fail "config.$k" "missing" "add \`- $k: <value>\` — $CFG_FIX"; fi
   done
@@ -112,11 +118,21 @@ else
   if [ -n "$(cfg verify_exclusive)" ] && [ -z "$(cfg exclusive)" ]; then
     fail config.verify_exclusive "set, but exclusive names nothing — no lock would guard it" "add \`- exclusive: <what is shared>\`, or drop verify_exclusive"
   fi
+  S="$(cfg mode)"
+  case "$(printf '%s' "$S" | tr '[:upper:]' '[:lower:]')" in
+    autonomous | interactive) ok config.mode "$S" ;;
+    '') fail config.mode "missing — read as interactive, so nothing is watched" "add \`- mode: autonomous\` to watch GitHub, or \`- mode: interactive\` (CHANGELOG.md → 4.0.0)" ;;
+    *) fail config.mode "'$S' is not autonomous or interactive — read as interactive" "write one of them" ;;
+  esac
   S="$(cfg schedules)"
   for w in $S; do
     case "$w" in tick | audit | none) ;; *) fail config.schedules "'$w' is not tick, audit or none" "list the ones wanted, e.g. \`- schedules: tick audit\`" ;; esac
   done
-  ok config.schedules "${S:-unset — tick audit}"
+  if [ "$MODE" = interactive ] && case " $S " in *" tick "*) true ;; *) false ;; esac; then
+    fail config.schedules "lists tick, but mode is interactive — nothing it finds is ever worked on" "drop tick, or set \`- mode: autonomous\`"
+  else
+    ok config.schedules "${S:-unset — $(schedules_default)}"
+  fi
 
   r="$(for k in $RETIRED; do [ -n "$(cfg "$k")" ] && echo "$k"; done | tr '\n' ' ' | sed -E 's/ $//')"
   [ -z "$r" ] || fail config.retired "retired key(s): $r" "migrate them — CHANGELOG.md → 3.0.0"
@@ -241,8 +257,9 @@ if [ "$STRUCTURE" = 1 ]; then
       fail state.TICK "$bad line(s) run-state.sh did not write" "remove them; the log is append-only through run-state.sh"
   fi
 
-  # `schedules` names the wanted ones by role, tick and audit; missing, both
-  on=" $(cfg schedules | grep . || echo tick audit) "; en=""; dis=""
+  # `schedules` names the wanted ones by role, tick and audit; missing, both —
+  # or, interactive, none
+  on=" $(cfg schedules | grep . || schedules_default) "; en=""; dis=""
   for n in $(sed -n '/^schedules:/,$s/^  - name: //p' "$HOME/kit.yaml" 2>/dev/null); do
     w=tick; case "$n" in *audit*) w=audit ;; esac
     case "$on" in *" $w "*) en="$en $n" ;; *) dis="$dis $n" ;; esac
@@ -299,7 +316,7 @@ if [ "$LIVE" = 1 ]; then
     else
       for k in label_handoff label_claimed label_failed label_review label_needs_info label_mine; do
         l="$(cfg "$k")"
-        [ "$k" = label_needs_info ] && l="${l:-agent/needs-info}"
+        [ "$k" = label_needs_info ] && [ "$MODE" != interactive ] && l="${l:-agent/needs-info}"
         [ -n "$l" ] || continue
         printf '%s\n' "$have" | grep -qxF "$l" && ok "live.$k" "$l exists" ||
           fail "live.$k" "no label '$l' on $REPO — nothing will ever apply it" "create it, or correct the key"
@@ -314,18 +331,22 @@ if [ "$LIVE" = 1 ]; then
     fail live.runtime "no answer from \$PLATFORM_RUNTIME_URL/api/trpc/sessions.list — no dead run's slot is ever freed" "operator-only: report it; the runtime serves this for every agent"
   fi
 
-  start=$SECONDS
-  (cd "$WORK" && PRECHECK_PROBE=1 bash "$HERE/precheck.sh" >/dev/null 2>"$WORK/.verify-precheck.err")
-  rc=$?; took=$((SECONDS - start))
-  why="$(tail -c 300 "$WORK/.verify-precheck.err" 2>/dev/null | tr '\n' ' ')"; rm -f "$WORK/.verify-precheck.err"
-  case "$rc" in
-    0 | 1) ;;
-    *) fail live.precheck "exit $rc — a broken precheck fails open, and every tick pays for a turn${why:+: $why}" "fix what it printed, then re-run" ;;
-  esac
-  if [ "$rc" -le 1 ]; then
-    if [ "$took" -ge 120 ]; then fail live.precheck "took ${took}s — past the two-minute deadline it fails open" "report it; the GitHub queries are too slow"
-    elif [ "$took" -ge 90 ]; then warn live.precheck "took ${took}s — close to the two-minute deadline"
-    else ok live.precheck "exit $rc in ${took}s"; fi
+  if [ "$MODE" = interactive ]; then
+    ok live.precheck "interactive — it wakes nothing, so there is no detection to prove"
+  else
+    start=$SECONDS
+    (cd "$WORK" && PRECHECK_PROBE=1 bash "$HERE/precheck.sh" >/dev/null 2>"$WORK/.verify-precheck.err")
+    rc=$?; took=$((SECONDS - start))
+    why="$(tail -c 300 "$WORK/.verify-precheck.err" 2>/dev/null | tr '\n' ' ')"; rm -f "$WORK/.verify-precheck.err"
+    case "$rc" in
+      0 | 1) ;;
+      *) fail live.precheck "exit $rc — a broken precheck fails open, and every tick pays for a turn${why:+: $why}" "fix what it printed, then re-run" ;;
+    esac
+    if [ "$rc" -le 1 ]; then
+      if [ "$took" -ge 120 ]; then fail live.precheck "took ${took}s — past the two-minute deadline it fails open" "report it; the GitHub queries are too slow"
+      elif [ "$took" -ge 90 ]; then warn live.precheck "took ${took}s — close to the two-minute deadline"
+      else ok live.precheck "exit $rc in ${took}s"; fi
+    fi
   fi
 fi
 
