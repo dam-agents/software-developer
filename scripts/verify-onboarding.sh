@@ -140,9 +140,9 @@ else
   if [ -n "${PLATFORM_AGENT_ID:-}" ]; then
     own="agent/$PLATFORM_AGENT_ID"
     if [ -z "$S" ]; then
-      warn config.label_mine "unset — a claim of yours cannot be told from another agent's on the same login: set \`- label_mine: $own\` and create the label (CHANGELOG.md → 4.0.1)"
+      fail config.label_mine "unset — a claim of yours cannot be told from another agent's on the same login" "set \`- label_mine: $own\` and create the label (CHANGELOG.md → 4.0.1)"
     elif [ "$S" != "$own" ]; then
-      warn config.label_mine "'$S' is not this instance's own $own — an agent sharing it takes your claims and pull requests for its own: set \`- label_mine: $own\` (CHANGELOG.md → 4.0.1)"
+      fail config.label_mine "'$S' is not this instance's own $own — an agent sharing it takes your claims and pull requests for its own" "set \`- label_mine: $own\` (CHANGELOG.md → 4.0.1)"
     else
       ok config.label_mine "$S"
     fi

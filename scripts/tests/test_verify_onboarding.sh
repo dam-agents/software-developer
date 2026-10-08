@@ -153,13 +153,13 @@ done_
 
 CASE="label_mine is this instance's own agent/<id>, never a shared one"; sandbox
 PLATFORM_AGENT_ID=agent-0123 verify --config
-is "$RC" 0 "a missing label_mine only warns"
-has "$OUT" "warn config.label_mine — unset" "missing"
+is "$RC" 1 "a missing label_mine fails"
+has "$OUT" "FAIL config.label_mine — unset" "missing"
 has "$OUT" "set \`- label_mine: agent/agent-0123\`" "names the own label"
 echo "- label_mine: agent/shared" >> "$HOME/work/CONFIG.md"
 PLATFORM_AGENT_ID=agent-0123 verify --config
-is "$RC" 0 "a shared label_mine only warns"
-has "$OUT" "warn config.label_mine — 'agent/shared' is not this instance's own agent/agent-0123" "shared"
+is "$RC" 1 "a shared label_mine fails"
+has "$OUT" "FAIL config.label_mine — 'agent/shared' is not this instance's own agent/agent-0123" "shared"
 setcfg label_mine agent/agent-0123
 PLATFORM_AGENT_ID=agent-0123 verify --config
 has "$OUT" "ok   config.label_mine — agent/agent-0123" "own"

@@ -63,12 +63,10 @@ confirming or correcting rather than composing from nothing.
   Interactive skips the hand-off, failed, needs-info and review labels and the
   schedules below: both are switched off.
 - **Labels** — every mode claims the issue it works on, so two agents never
-  take one: the claimed label, suggested `agent/in-progress`, and one that
-  marks the claim as this agent's own, `label_mine`. Suggest
-  `agent/$PLATFORM_AGENT_ID` for it — the platform's id of this agent, unique
-  to it — or, with that unset, `agent/<name>-developer`. Every pull request
-  it opens carries it too, and only those are its own: agents sharing a
-  login, a GitHub App's bot above all, tell their work apart by it.
+  take one: the claimed label, suggested `agent/in-progress`. Do not ask about
+  `label_mine`: write `- label_mine: agent/$PLATFORM_AGENT_ID` yourself and
+  create that label. It marks this agent's claims and pull requests as its
+  own, and no other agent may share it.
   Autonomous, also suggest hand-off `agent/implement`, failed `agent/failed`,
   needs-info `agent/needs-info` (an issue too unclear to implement, waiting
   on its author), and say these are only a convention. Ask whether a label

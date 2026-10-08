@@ -15,13 +15,13 @@ direct session.
 at onboarding, but its upgrade kept an existing `label_mine` — and instances
 that shared one read each other's claims and pull requests as their own: a
 scheduled instance took over an interactive one's work. `verify-onboarding.sh`
-now warns, as `config.label_mine`, when `label_mine` is missing or is not
-`agent/$PLATFORM_AGENT_ID`.
+now fails, as `config.label_mine`, when `label_mine` is missing or is not
+`agent/$PLATFORM_AGENT_ID`, and onboarding writes it without asking.
 
 **Upgrade:**
 
-1. When `label_mine` is not `agent/$PLATFORM_AGENT_ID`: offer to switch it. On
-   a yes, create the label on `repo`, write it to `work/CONFIG.md`, and move it
+1. When `label_mine` is not `agent/$PLATFORM_AGENT_ID`: switch it, without
+   asking. Create the label on `repo`, write it to `work/CONFIG.md`, and move it
    onto every open claim and pull request of this instance's (3.2.0 → Upgrade
    1), taking the old label off those only.
 2. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
