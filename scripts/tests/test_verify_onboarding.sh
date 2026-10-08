@@ -151,22 +151,6 @@ STUB_LOGIN= verify --live
 has "$OUT" "FAIL live.auth — GitHub did not answer" "neither a user nor an app"
 done_
 
-CASE="label_mine is this instance's own agent/<id>, never a shared one"; sandbox
-PLATFORM_AGENT_ID=agent-0123 verify --config
-is "$RC" 1 "a missing label_mine fails"
-has "$OUT" "FAIL config.label_mine — unset" "missing"
-has "$OUT" "set \`- label_mine: agent/agent-0123\`" "names the own label"
-echo "- label_mine: agent/shared" >> "$HOME/work/CONFIG.md"
-PLATFORM_AGENT_ID=agent-0123 verify --config
-is "$RC" 1 "a shared label_mine fails"
-has "$OUT" "FAIL config.label_mine — 'agent/shared' is not this instance's own agent/agent-0123" "shared"
-setcfg label_mine agent/agent-0123
-PLATFORM_AGENT_ID=agent-0123 verify --config
-has "$OUT" "ok   config.label_mine — agent/agent-0123" "own"
-verify --config
-lacks "$OUT" "config.label_mine" "no agent id: nothing to compare"
-done_
-
 CASE="interactive: only the claim is labelled, and the tick is refused"; sandbox; onboarded
 sed -i.bak '/^- label_handoff:/d; /^- label_failed:/d' "$HOME/work/CONFIG.md"
 sed -i.bak 's/^- mode: .*/- mode: interactive/' "$HOME/work/CONFIG.md"

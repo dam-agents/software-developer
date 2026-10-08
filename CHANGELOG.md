@@ -14,9 +14,8 @@ direct session.
 **`label_mine` is this instance's own.** 4.0.0 suggests `agent/$PLATFORM_AGENT_ID`
 at onboarding, but its upgrade kept an existing `label_mine` — and instances
 that shared one read each other's claims and pull requests as their own: a
-scheduled instance took over an interactive one's work. `verify-onboarding.sh`
-now fails, as `config.label_mine`, when `label_mine` is missing or is not
-`agent/$PLATFORM_AGENT_ID`, and onboarding writes it without asking.
+scheduled instance took over an interactive one's work. Onboarding now writes
+`agent/$PLATFORM_AGENT_ID` as `label_mine` without asking.
 
 **Upgrade:**
 

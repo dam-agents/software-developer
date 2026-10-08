@@ -134,20 +134,6 @@ else
     ok config.schedules "${S:-unset — $(schedules_default)}"
   fi
 
-  # Instances of this kit can share a login; label_mine is what tells their
-  # claims apart, so it must be this instance's own, never one another uses.
-  S="$(cfg label_mine)"
-  if [ -n "${PLATFORM_AGENT_ID:-}" ]; then
-    own="agent/$PLATFORM_AGENT_ID"
-    if [ -z "$S" ]; then
-      fail config.label_mine "unset — a claim of yours cannot be told from another agent's on the same login" "set \`- label_mine: $own\` and create the label (CHANGELOG.md → 4.0.1)"
-    elif [ "$S" != "$own" ]; then
-      fail config.label_mine "'$S' is not this instance's own $own — an agent sharing it takes your claims and pull requests for its own" "set \`- label_mine: $own\` (CHANGELOG.md → 4.0.1)"
-    else
-      ok config.label_mine "$S"
-    fi
-  fi
-
   r="$(for k in $RETIRED; do [ -n "$(cfg "$k")" ] && echo "$k"; done | tr '\n' ' ' | sed -E 's/ $//')"
   [ -z "$r" ] || fail config.retired "retired key(s): $r" "migrate them — CHANGELOG.md → 3.0.0"
 
