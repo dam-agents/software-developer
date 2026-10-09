@@ -542,7 +542,7 @@ reported() {
       json="$(gh_get "repos/$1/pulls/$2")" || return 2
       got="$(printf '%s' "$json" | jq -r --arg me "$ME" --arg n "$n" --arg a "$author" --arg mine "$mine" \
           --arg root "$SLUG" --arg here "$1" "$JQ_LOGIN$JQ_REFS"'
-        ($here | ascii_downcase) != ($root | ascii_downcase) as $other
+        (($here | ascii_downcase) != ($root | ascii_downcase)) as $other
         | [ (if .state == "open" then empty else "is not open" end),
           (if ($a == "" or (.user.login | login) == ($a | login)) then empty else "was not opened by \($a)" end),
           (if $mine == "" or any(.labels[]?; .name == $mine) then empty else "does not carry \($mine)" end),
