@@ -23,6 +23,7 @@ case "$(command -v jq)" in
   */shims/*) real="$(unshimmed jq)" && ln -s "$real" "$TOOLS/jq" ;;
 esac
 export PATH="$TESTS/bin:$TOOLS:$PATH"
+. "$SCRIPTS/lib/config.sh"   # the PATH every script runs with
 
 # sandbox — a fresh $HOME with a configured work/ and an empty stub trace
 sandbox() {

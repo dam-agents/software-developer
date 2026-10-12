@@ -34,4 +34,10 @@ for n in $(sed -n '/^schedules:/,$s/^  - name: //p' "$ROOT/kit.yaml"); do
   grep -q "\`$n\`" "$ROOT/docs/audit.md" || fail "docs/audit.md does not name $n"
 done
 
+CASE="config.sh puts mise shims after real binaries, keeping the rest in order"
+got="$(PATH="/a:/x/mise/shims:/b:/usr/bin:/bin" bash -c '. "$1"; printf %s "$PATH"' _ "$SCRIPTS/lib/config.sh")"
+is "$got" "/a:/b:/usr/bin:/bin:/x/mise/shims" "shims last"
+got="$(PATH="/a:/usr/bin:/bin" bash -c '. "$1"; printf %s "$PATH"' _ "$SCRIPTS/lib/config.sh")"
+is "$got" "/a:/usr/bin:/bin" "no shims, untouched"
+
 exit "$FAILED"

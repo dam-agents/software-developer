@@ -30,7 +30,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HOME/work"
 CONFIG="$WORK/CONFIG.md"
 KNOWN="repo author app_url mode label_handoff label_claimed label_failed label_review label_needs_info label_mine
-  verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel schedules
+  verify exclusive verify_exclusive slots babysit_max_hours stuck_after_min work_repo slack_channel slack_handoff schedules
   skill_grill skill_file_issue repos_also"
 # keys 3.0.0 retired — CHANGELOG.md → 3.0.0 says what each became
 RETIRED="cluster cluster_install cluster_uninstall cluster_delete verify_cluster"
@@ -97,6 +97,13 @@ else
   else
     ok config.slack_channel "$SLACK — that Slack reaches it, only describe_channel can tell"
   fi
+  S="$(cfg slack_handoff)"
+  case "$S" in
+    '' | anyone | people | off)
+      if [ -z "$SLACK" ]; then [ -z "$S" ] || warn config.slack_handoff "set, but slack_channel is not — nobody can hand off"
+      else ok config.slack_handoff "${S:-anyone} may hand off an issue from Slack (docs/grill.md → Hand-off)"; fi ;;
+    *) fail config.slack_handoff "'$S' is not anyone, people or off" "write one of them, or leave it out for anyone" ;;
+  esac
   APP="$(cfg app_url)"
   if [ -n "$APP" ] && ! printf '%s' "$APP" | grep -qE '^https?://[^[:space:]]+$'; then
     fail config.app_url "'$APP' is not a URL" "the address from the browser, e.g. https://platform.example.com"
