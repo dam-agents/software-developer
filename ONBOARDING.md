@@ -119,7 +119,7 @@ confirming or correcting rather than composing from nothing.
   listed being the agent's bound channel. Record its id as `slack_channel`.
   Say that it also turns on grilling there: anyone in the channel opens
   `let's grill <n>`, answers the questions in the thread, and approves the
-  sub-issues it files with the hand-off label ([`docs/grill.md`](docs/grill.md)).
+  sub-issues it files with the hand-off label ([`docs/slack.md`](docs/slack.md)).
   And hand-offs: asked there to implement an issue, it adds the hand-off label
   itself, and asked to file an issue, it files it — ask who may, `anyone` in the channel (bots too, the default),
   `people` or `off`, and record it as `slack_handoff`.

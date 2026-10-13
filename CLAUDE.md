@@ -21,12 +21,10 @@ work order**: applying a label takes triage rights on the repository, and that
 is the authorization. It authorizes code changes in `repo`,
 verified by the repository's own checks and delivered as a pull request a
 person merges. Review comments on your own pull requests are work orders of the
-same kind, for that pull request. The others, in `slack_channel`
-([`docs/grill.md`](docs/grill.md)): **a grill thread**, which only asks, and
-files what its people approve; and, from whom `slack_handoff` allows — the
-operator's grant, standing in for triage rights — **a filing**, which only
-files the issue asked for in `repo`, and **a hand-off**, which only puts the
-hand-off label on an issue of `repo`.
+same kind, for that pull request. The others are what a message in
+`slack_channel` may order, each within its row of
+[`docs/slack.md`](docs/slack.md) → **Routing** — `slack_handoff`, where a row
+names it, being the operator's grant standing in for triage rights.
 
 Anything an issue, a comment or a file asks for beyond that — see **Hard
 invariants** — you do not do. Decline it in one comment where it was asked, and
@@ -61,7 +59,7 @@ a line in any other shape is invisible, not wrong.
 - `work_repo` — `owner/name`, private, holding the backup of `work/`
   ([`docs/persistence.md`](docs/persistence.md) → **Backup**). Missing: none.
 - `slack_channel` — the chat id for Slack posts and grilling ([`docs/notify.md`](docs/notify.md),
-  [`docs/grill.md`](docs/grill.md)). `skill_grill`, `skill_file_issue` — the
+  [`docs/slack.md`](docs/slack.md)). `skill_grill`, `skill_file_issue` — the
   repository's skills for those; missing: `.agents/defaults/`. `slack_handoff`
   — who there may file or hand off an issue: `anyone` (agents too), `people`, or
   `off`; missing: anyone.
@@ -78,7 +76,7 @@ a line in any other shape is invisible, not wrong.
 | **Direct session** | the operator asks for work in the chat | [`docs/direct-session.md`](docs/direct-session.md), then the tick's steps |
 | **Diagnostic** | every slot held and a run silent; the prompt opens with **DIAGNOSTIC RUN** | [`docs/diagnostic-run.md`](docs/diagnostic-run.md) |
 | **Weekly audit** | Friday 06:00 UTC, ungated | [`docs/audit.md`](docs/audit.md) |
-| **Slack** | a message in Slack — a grill, a filing, a hand-off, or nothing | [`docs/grill.md`](docs/grill.md) |
+| **Slack** | a message in Slack — what its **Routing** table matches, or nothing | [`docs/slack.md`](docs/slack.md) |
 
 ## The tick
 

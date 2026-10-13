@@ -14,7 +14,7 @@ direct session.
 **Filing from Slack.** Asked in `slack_channel` to file an issue of `repo`, or
 to fix something no open issue covers, the agent files it in the same turn —
 with `label_handoff` when the work was asked for — rather than declining
-([`docs/grill.md`](docs/grill.md) → **Filing**). Who may is `slack_handoff`,
+([`docs/slack.md`](docs/slack.md) → **Filing**). Who may is `slack_handoff`,
 as for a hand-off; no new key.
 
 **Self-improvement as a pull request** ([`docs/self-modification.md`](docs/self-modification.md)). Asked in Slack, or by the operator, to
@@ -23,6 +23,10 @@ repository directly — no issue, no hand-off label — from a clone of its own,
 never `$HOME` ([`docs/persistence.md`](docs/persistence.md) → **Evolving the
 definition**). It still never merges, and the Hard invariants, `work/CONFIG.md`
 and the schedules still change only with the operator.
+
+**One Slack page.** `docs/grill.md` is now [`docs/slack.md`](docs/slack.md):
+a **Routing** table at the top says what each message may order and who may
+ask, then one section each for the grill, the hand-off and filing.
 
 **Long commands in the background.** `CLAUDE.md` → **Rules**: checks, builds,
 test suites and `run-state.sh wait` run as the harness's own background task
@@ -38,7 +42,7 @@ while the run does other work, never in the foreground and never detached.
 
 **Hand-off from Slack.** Asked in `slack_channel` to implement an issue of
 `repo`, the agent puts `label_handoff` on it itself, comments who asked, and
-the tick picks it up ([`docs/grill.md`](docs/grill.md) → **Hand-off**). A new
+the tick picks it up ([`docs/slack.md`](docs/slack.md) → **Hand-off**). A new
 key, `slack_handoff`, says who may: `anyone` in the channel, bots and other
 agents included — **the default when it is missing** — `people`, or `off`.
 Nothing changes for an instance without `slack_channel`.
@@ -161,7 +165,7 @@ into sub-issues, and once the thread plainly approves it, they are filed under
 #`<n>` with the hand-off label, and the decisions go on #`<n>`. Anyone in the
 channel may grill. A grill thread is the one work order besides the hand-off
 label (`CLAUDE.md` → **Trust boundary**). It may only read, ask, and file what
-it approved: no code, no other label, no other repository (`docs/grill.md`).
+it approved: no code, no other label, no other repository (`docs/slack.md`).
 
 The questions and drafts follow the repository's own skills when
 `skill_grill` and `skill_file_issue` name them. Otherwise they follow the

@@ -105,6 +105,12 @@ that looks like it does.
 
 ## 8. Change process
 
+- **Never edit the checkout in `$HOME`.** It is the definition you are running
+  on: `CLAUDE.md` and everything it loads would change under the session, and
+  the harness refuses those edits anyway. Every change is made in a clone of
+  its own in a separate directory ([persistence.md](persistence.md) →
+  **Evolving the definition**), and `$HOME` only takes it by **Update**, once
+  merged.
 - **First check the version** (`docs/persistence.md` → **Definition version &
   upgrade**); a stale checkout or an unapplied migration goes to the operator
   before any edit.

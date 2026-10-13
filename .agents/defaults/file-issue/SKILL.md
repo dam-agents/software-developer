@@ -1,6 +1,6 @@
 ---
 name: file-issue
-description: The definition's default for turning a grilled issue into sub-issues, used when work/CONFIG.md names no `skill_file_issue`. Draft each sub-issue so one pull request can implement it unattended; files only after approval in the thread; a single issue asked for in Slack uses the body shape alone. Read from docs/grill.md, which sets the limits.
+description: The definition's default for turning a grilled issue into sub-issues, used when work/CONFIG.md names no `skill_file_issue`. Draft each sub-issue so one pull request can implement it unattended; files only after approval in the thread; a single issue asked for in Slack uses the body shape alone. Read from docs/slack.md, which sets the limits.
 ---
 
 # Draft sub-issues

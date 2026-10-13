@@ -72,7 +72,7 @@ blocked, the weekly audit ([`docs/notify.md`](docs/notify.md)).
 It also grills there: open `let's grill <n>` in the channel, answer its
 questions in the thread, and approve the breakdown; it files the sub-issues
 under #`<n>` with the hand-off label, and the tick implements them
-([`docs/grill.md`](docs/grill.md)). Anyone in the channel can grill, so bind
+([`docs/slack.md`](docs/slack.md)). Anyone in the channel can grill, so bind
 one only trusted people are in. The questions and drafts follow the
 repository's own skills when `skill_grill` and `skill_file_issue` name them,
 and the definition's defaults in `.agents/defaults/` otherwise.
