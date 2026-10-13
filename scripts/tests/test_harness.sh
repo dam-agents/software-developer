@@ -13,6 +13,7 @@ is "$OUT" "" "silent"
 done_
 
 CASE="a session holding an item is kept going, three times"; sandbox
+export STUB_RUNNING=sess-a
 lock item-7 session=sess-a item=7 phase=verify
 stop sess-a
 is "$RC" 2 "first"
@@ -23,6 +24,21 @@ is "$RC" 2 "third"
 has "$OUT" "This is the last block" "the way out"
 stop sess-a
 is "$RC" 0 "then it lets the stop through; the precheck finds the run dead"
+done_
+
+CASE="the direct session stops freely, even holding an item"; sandbox
+export STUB_RUNNING=sess-a STUB_CHATS=sess-a
+lock item-7 session=sess-a item=7 phase=verify
+stop sess-a
+is "$RC" 0 "exit"
+is "$OUT" "" "silent"
+done_
+
+CASE="a runtime that does not answer holds the run as before"; sandbox
+export STUB_RUNTIME_DOWN=1
+lock item-7 session=sess-a item=7
+stop sess-a
+is "$RC" 2 "held"
 done_
 
 CASE="garbage in never blocks"; sandbox

@@ -102,8 +102,8 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
   `released`, `blocked`, `waiting-lock` or `needs-info`. It refuses until the
   slot is pushed and this run's report is on the issue or its pull request
   ([`docs/runs.md`](docs/runs.md) → **Reports**); then it frees the item and the
-  slot, and backs `work/` up. A `Stop` hook keeps the turn from ending before
-  it. A run that ends without it anyway is found dead by the next precheck, and
+  slot, and backs `work/` up. A `Stop` hook keeps an unattended run's turn
+  from ending before it. A run that ends without it anyway is found dead by the next precheck, and
   its item handed on as half-done — say so in your report when you resume one.
 - **Resumed after a restart** (`<turn-interrupted>`): `start` your item again.
 

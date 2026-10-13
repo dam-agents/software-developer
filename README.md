@@ -23,7 +23,8 @@ through review.
 - [`scripts/work-backup.sh`](scripts/work-backup.sh) — backs `work/` up to a
   private repository of its own, and restores it on a fresh volume.
 - [`scripts/harness/claude-code/`](scripts/harness/claude-code/) — the `Stop`
-  hook that keeps a run from ending its turn while it still holds an issue,
+  hook that keeps an unattended run from ending its turn while it still holds
+  an issue (the direct session stops freely),
   and the installer that registers it and links the skills: the bundled ones,
   and the repository's own at `work/.claude/skills`.
 - [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an

@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.3.1 — 2026-10-13
+
+**The Stop hook holds unattended runs only.** A session the runtime reports as
+the direct chat (`regular`) ends its turn freely while it holds an item — to
+wait for the operator, or for a background task's notification. Scheduled and
+Slack runs, and any session when the runtime does not answer, are held as
+before.
+
+Its locks wait for it meanwhile: the sweep frees an idle direct session's
+locks only two hours after it took them, so a tick cannot take its item while
+it waits; `finish` frees them sooner.
+
+**Upgrade:** none — the hook and `run-state.sh` take
+effect at **Update**.
+
 ## 5.3.0 — 2026-10-13
 
 **Slack posts thread per issue** ([`docs/notify.md`](docs/notify.md) → **One

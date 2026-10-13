@@ -56,6 +56,7 @@ ME="${CLAUDE_CODE_SESSION_ID:-}"
 BOOT="${SD_BOOT_ID:-$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)}"
 
 N="$(cfg slots)"; case "$N" in '' | *[!0-9]* | 0) N=3 ;; esac
+DIRECT_STALE_MIN=120
 STUCK_MIN="$(cfg stuck_after_min)"; case "$STUCK_MIN" in '' | *[!0-9]*) STUCK_MIN=120 ;; esac
 MAX_H="$(cfg babysit_max_hours)"; case "$MAX_H" in '' | *[!0-9]*) MAX_H=4 ;; esac
 WAIT_FOR="${SD_WAIT_FOR:-540}"     # seconds a wait blocks: under the 10-minute tool limit
@@ -89,23 +90,31 @@ write() {
 }
 
 # alive <session> — 0 running a turn · 1 not running, or unknown to the runtime
-# · 2 the runtime did not answer
+# · 2 the runtime did not answer · 3 not running, and the direct chat
 alive() {
   local out
   out="$(curl -fsS --max-time 5 --get \
     --data-urlencode "input={\"sessionId\":\"$1\"}" \
     "${PLATFORM_RUNTIME_URL:-}/api/trpc/sessions.list" 2>/dev/null)" || return 2
-  out="$(printf '%s' "$out" | jq -r '.result.data.sessions | if type == "array" then (.[0].running // false) else "unknown" end' 2>/dev/null)"
-  case "$out" in true) return 0 ;; false) return 1 ;; *) return 2 ;; esac
+  out="$(printf '%s' "$out" | jq -r '.result.data.sessions | if type != "array" then "unknown"
+    elif .[0].running == true then true elif .[0].type == "regular" then "chat" else false end' 2>/dev/null)"
+  case "$out" in true) return 0 ;; false) return 1 ;; chat) return 3 ;; *) return 2 ;; esac
 }
 
 # dead <lock> — its holder is provably gone: no turn running. A lock taken
 # before a restart is no exception: a resumed turn still holds it.
+# The direct chat ends its turns between the operator's messages, and to wait
+# for a background task, so its lock is stale only once taken DIRECT_STALE_MIN
+# ago; it gives it back itself with `finish` before then.
 # A lock with no owner yet is being taken, unless it has been so for a minute.
 dead() {
-  local o="$1/owner"
+  local o="$1/owner" rc t
   if [ ! -f "$o" ]; then [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]; return; fi
-  alive "$(kv "$o" session)"; [ $? -eq 1 ]
+  alive "$(kv "$o" session)"; rc=$?
+  [ "$rc" -eq 1 ] && return 0
+  [ "$rc" -eq 3 ] || return 1
+  t="$(epoch "$(kv "$o" since)")" || return 0
+  [ $(( ($(date -u +%s) - t) / 60 )) -ge "$DIRECT_STALE_MIN" ]
 }
 
 mine() { [ -n "$ME" ] && [ "$(kv "$1/owner" session 2>/dev/null)" = "$ME" ]; }

@@ -138,6 +138,18 @@ STUB_RUNTIME_DOWN=1 state sweep
 [ -d "$SD_LOCKS/slot-1" ] || fail "freed on a guess"
 done_
 
+CASE="an idle direct session keeps its locks for two hours"; sandbox
+lock slot-1 session=sess-c item=7 slot=1 "since=$(ago 119)"
+lock item-7 session=sess-c item=7 slot=1 "since=$(ago 119)"
+lock slot-2 session=sess-d item=8 slot=2 "since=$(ago 121)"
+lock slot-3 session=sess-e item=9 slot=3 "since=$(ago 300)"
+STUB_CHATS="sess-c sess-d sess-e" STUB_RUNNING=sess-e state sweep
+[ -d "$SD_LOCKS/slot-1" ] && [ -d "$SD_LOCKS/item-7" ] || fail "freed a direct session waiting on its operator"
+[ ! -d "$SD_LOCKS/slot-2" ] || fail "a stale direct session's lock stayed"
+[ -d "$SD_LOCKS/slot-3" ] || fail "freed a direct session running a turn"
+is "$OUT" "#8" "names the stale item"
+done_
+
 CASE="one exclusive lock: a second item waits, and a dead holder leaves it dirty"; sandbox; origin_checkout
 as sess-a start 7 feat/7; as sess-b start 8 feat/8
 as sess-a lock
