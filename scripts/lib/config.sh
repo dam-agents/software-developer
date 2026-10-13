@@ -9,6 +9,17 @@
 # colon is the value, so a URL survives. Backticks and trailing whitespace are
 # stripped.
 
+# WORKAROUND (environment, not this definition): the image puts mise's shim
+# directory ahead of /usr/bin, holding shims for coreutils no active tool
+# provides, so every `tr` or `sed` starts mise before it falls through, ~0.1 s
+# a call. Shims go last: a real binary wins, a tool only a shim has still runs.
+case ":$PATH:" in
+  *:*/mise/shims:*)
+    _p=""; _s=""; _IFS="$IFS"; IFS=:
+    for _d in $PATH; do case "$_d" in */mise/shims) _s="$_s:$_d" ;; *) _p="$_p:$_d" ;; esac; done
+    IFS="$_IFS"; PATH="${_p#:}$_s"; export PATH; unset _p _s _d _IFS ;;
+esac
+
 # kv <file> <key>
 kv() {
   [ -f "$1" ] || return 0

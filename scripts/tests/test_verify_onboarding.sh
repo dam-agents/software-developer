@@ -110,6 +110,19 @@ is "$RC" 0 "exit"
 has "$OUT" "ok   config.slack_channel — C0123ABCD" "an id"
 done_
 
+CASE="slack_handoff is anyone when missing, and one of three when set"; sandbox
+echo "- slack_channel: C0123ABCD" >> "$HOME/work/CONFIG.md"
+verify --config
+has "$OUT" "ok   config.slack_handoff — anyone may hand off" "default"
+echo "- slack_handoff: everybody" >> "$HOME/work/CONFIG.md"
+verify --config
+has "$OUT" "FAIL config.slack_handoff — 'everybody' is not anyone, people or off" "a bad value"
+setcfg slack_handoff people
+verify --config
+is "$RC" 0 "exit"
+has "$OUT" "ok   config.slack_handoff — people may hand off" "people"
+done_
+
 CASE="a grill skill is the repository's when named, the default otherwise"; sandbox; onboarded
 verify
 has "$OUT" "ok   harness.skill_grill — unset — the default, .agents/defaults/grill/SKILL.md" "default"

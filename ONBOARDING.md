@@ -26,7 +26,7 @@ user can decide — never your own work:
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
 | `schedules` | Autonomous: whether to watch the hand-off label, and run the weekly audit |
-| `slack` | Whether, and to which chat, to post the moments a person acts on — and grill issues |
+| `slack` | Whether, and to which chat, to post the moments a person acts on — and grill and hand off issues |
 | `bounds` | What you must never touch |
 
 Tick each with `complete_onboarding_step` as it is answered. Add, rename or drop
@@ -120,6 +120,9 @@ confirming or correcting rather than composing from nothing.
   Say that it also turns on grilling there: anyone in the channel opens
   `let's grill <n>`, answers the questions in the thread, and approves the
   sub-issues it files with the hand-off label ([`docs/grill.md`](docs/grill.md)).
+  And hand-offs: asked there to implement an issue, it adds the hand-off label
+  itself — ask who may, `anyone` in the channel (bots too, the default),
+  `people` or `off`, and record it as `slack_handoff`.
   Look in the repository's skills for one that grills a plan and one that
   files issues; offer them as `skill_grill` and `skill_file_issue`, or the
   definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's
@@ -177,6 +180,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - stuck_after_min: 120
 - work_repo: owner/name-work
 - slack_channel: C0123ABCD
+- slack_handoff: anyone
 - skill_grill: grill-me
 - skill_file_issue: file-issue
 - repos_also: owner/*
@@ -190,7 +194,7 @@ merge (by default you may not).
 Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `label_review` and `schedules`. With nothing shared, leave `exclusive` and
 `verify_exclusive` out; with no
-review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`;
+review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel` and `slack_handoff`;
 for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
 

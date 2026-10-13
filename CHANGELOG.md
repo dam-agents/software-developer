@@ -9,6 +9,23 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.1.0 — 2026-10-12
+
+**Hand-off from Slack.** Asked in `slack_channel` to implement an issue of
+`repo`, the agent puts `label_handoff` on it itself, comments who asked, and
+the tick picks it up ([`docs/grill.md`](docs/grill.md) → **Hand-off**). A new
+key, `slack_handoff`, says who may: `anyone` in the channel, bots and other
+agents included — **the default when it is missing** — `people`, or `off`.
+Nothing changes for an instance without `slack_channel`.
+
+**Upgrade:**
+
+1. With `slack_channel` set, tell the operator that anyone in the channel can
+   now hand off an issue, and ask whether to keep that. Only on an answer of
+   `people` or `off`, write `- slack_handoff: <it>` to `work/CONFIG.md`, then
+   `bash "$HOME/scripts/work-backup.sh" persist`.
+2. `bash "$HOME/scripts/verify-onboarding.sh" --live`.
+
 ## 5.0.0 — 2026-10-07
 
 **An issue's work may span repositories.** A new, optional key, `repos_also`:

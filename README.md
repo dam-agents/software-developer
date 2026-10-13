@@ -77,6 +77,11 @@ one only trusted people are in. The questions and drafts follow the
 repository's own skills when `skill_grill` and `skill_file_issue` name them,
 and the definition's defaults in `.agents/defaults/` otherwise.
 
+And it takes hand-offs there: ask it to implement an issue of the repository,
+and it puts the hand-off label on it for the tick, as a person with triage
+rights would. `slack_handoff` says who may: `anyone` in the channel, bots and
+other agents too (the default), `people` only, or `off`.
+
 ## What it keeps on the instance
 
 All under `work/`, none of it tracked here:
