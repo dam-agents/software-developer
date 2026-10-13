@@ -531,6 +531,28 @@ cmd_unlock() { if [ -d "$LOCKS/exclusive" ] && mine "$LOCKS/exclusive"; then dro
 # reported <item> <outcome> <pr> <since> — 0 reported · 1 missing, printed ·
 # 2 GitHub could not be read
 gh_get() { gh api --hostname "$HOST" "$@" 2>/dev/null; }
+
+# slack_thread <item> <prs> <chat> — the ts of the Slack thread the item's
+# posts go to: the last `<!-- slack-thread: <chat> <ts> -->` that `author` left
+# in the body or a comment of the issue or its pull requests in `repo`
+# (docs/notify.md). None, or GitHub unreadable: nothing, and the post goes top-level.
+slack_thread() {
+  local item="$1" prs="$2" chat="$3" author t ref json ts="" got
+  author="$(cfg author)"
+  case "$item" in pr*) prs="${prs:-${item#pr}}"; item="" ;; esac
+  for t in ${item:+"$item"} $prs; do
+    ref="$(pr_split "$t" 2>/dev/null)" || continue
+    set -- $ref
+    [ "$1" = "$SLUG" ] || continue
+    json="$( { gh_get "repos/$1/issues/$2"; gh_get --paginate "repos/$1/issues/$2/comments?per_page=100"; } | jq -s '[.[] | if type == "array" then .[] else . end]' 2>/dev/null)" || continue
+    got="$(printf '%s' "$json" | jq -r --arg a "$author" --arg chat "$chat" "$JQ_LOGIN"'
+      [.[] | select($a == "" or ((.user.login // "") | login) == ($a | login)) | {created_at, body: (.body // "")}]
+      | sort_by(.created_at) | map(.body | [scan("<!-- slack-thread: ([A-Z0-9]+) ([0-9]+\\.[0-9]+) -->")] | map(select(.[0] == $chat) | .[1]) | last // empty)
+      | last // empty' 2>/dev/null)"
+    [ -n "$got" ] && ts="$got"
+  done
+  printf '%s' "$ts"
+}
 reported() {
   local item="$1" outcome="$2" prs="$3" since="$4" n="" author mine t got json labels missing="" ref closes=""
   author="$(cfg author)"; mine="$(cfg label_mine)"
@@ -655,10 +677,18 @@ cmd_finish() {
   # last, so the backup carries this run's TICK.log line
   bash "$HERE/work-backup.sh" persist >&2
   # a moment a person acts on: the agent posts it, a script never does
-  if [ -n "$(cfg slack_channel)" ]; then
+  local chat where ts
+  chat="$(cfg slack_channel)"
+  if [ -n "$chat" ]; then
     case "$outcome" in
-      released) [ -z "$pr" ] || say "notify: if #$pr is still open, post that it is ready to merge to slack_channel $(cfg slack_channel) (docs/notify.md)" ;;
-      needs-info | blocked) say "notify: post this $outcome to slack_channel $(cfg slack_channel) (docs/notify.md)" ;;
+      released | needs-info | blocked)
+        ts="$(slack_thread "$item" "$pr" "$chat")"
+        if [ -n "$ts" ]; then where="as a reply in thread $ts of slack_channel $chat"
+        else where="to slack_channel $chat, and record its thread"; fi ;;
+    esac
+    case "$outcome" in
+      released) [ -z "$pr" ] || say "notify: if #$pr is still open, post that it is ready to merge $where (docs/notify.md)" ;;
+      needs-info | blocked) say "notify: post this $outcome $where (docs/notify.md)" ;;
     esac
   fi
   return 0

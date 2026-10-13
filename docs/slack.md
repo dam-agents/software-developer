@@ -30,7 +30,10 @@ you may do. The Hard invariants hold as everywhere.
 
 **Every name** in a body or comment comes from `describe_channel_users`, and
 every body or comment ends `Written by this agent — <link>` from
-`session-link.sh`. **Every labelled reply** says the tick picks it up within
+`session-link.sh`. Every issue body or comment a hand-off, a filing or a grill
+writes on the issue carries, on a line before it,
+`<!-- slack-thread: <slack_channel> <threadTs> -->` — the thread this turn
+answers, where the issue's posts go next ([notify.md](notify.md)). **Every labelled reply** says the tick picks it up within
 about ten minutes — with `tick` not in `schedules`, that nothing does until a
 person runs it in a direct session.
 
