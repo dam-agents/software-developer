@@ -97,6 +97,7 @@ All under `work/`, none of it tracked here:
 | `items/<n>.md` | `scripts/run-state.sh` | per issue: branch, slot, state, when a run last started on it |
 | `slots/<k>/` | `scripts/run-state.sh` | the worktrees runs work in, kept warm between runs |
 | `also/<name>/<k>/` | `scripts/run-state.sh` | the same, of a repository `repos_also` names |
+| `locks/` | `scripts/run-state.sh` | the item, slot and exclusive locks of live runs |
 | `GATE.md` | the precheck, via `run-state.sh` | when it last let a diagnostic run through |
 | `TICK.log` | `scripts/run-state.sh` | one line per closed run, append-only |
 | `AUDIT.log` | the weekly audit | one line per audit: ok, warn and fail counts |
@@ -104,4 +105,4 @@ All under `work/`, none of it tracked here:
 `CONFIG.md`, `AGENTS.md`, `VERSION` and the two logs are backed up to a
 private repository of their own when `work_repo` names one; the rest is
 rebuilt from GitHub — [`docs/persistence.md`](docs/persistence.md). The locks
-live on tmpfs, outside `work/`, and a restart frees them.
+are never backed up, and survive a restart: a resumed turn keeps them.

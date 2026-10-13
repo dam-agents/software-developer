@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.2.1 — 2026-10-13
+
+**Locks survive a restart.** They move from tmpfs to `work/locks`, and a lock
+taken before a restart is freed only when the runtime says its session is not
+running a turn. The platform resumes an interrupted turn, so the run it resumes
+keeps its item and slot instead of finding them handed to another run.
+
+**Upgrade:**
+
+1. In the direct session, while `bash "$HOME/scripts/run-state.sh" live`
+   prints `0`, update. Locks still on `/dev/shm/software-developer` are not
+   read any more. Remove that directory. A run started before the update
+   keeps its claim on GitHub only, and the precheck lists it as claimed with
+   no run.
+
 ## 5.2.0 — 2026-10-13
 
 **Filing from Slack.** Asked in `slack_channel` to file an issue of `repo`, or

@@ -9,7 +9,7 @@ of this state; this page says what it does, so you can tell what it told you.
 Each tick starts a fresh session whenever the precheck finds work and a free
 slot, so up to `slots` runs (default 3) work at once, one item each. Nothing
 queues them: the platform runs fresh sessions concurrently. What keeps them
-apart is three kinds of lock, taken atomically on tmpfs:
+apart is three kinds of lock, taken atomically in `work/locks`:
 
 | Lock | Taken by | Held for |
 | --- | --- | --- |
@@ -21,10 +21,11 @@ An item is held until its pull request is done, not until it is opened: the run
 that opens it babysits it with `run-state.sh wait <pr>`
 ([babysit.md](babysit.md)), and that is why it keeps its slot meanwhile.
 
-**A lock never outlives the turn that took it.** A holder is dead when the
-runtime says its session is not running a turn, or when the sandbox restarted
-since it was taken (a restart wipes tmpfs, and stops what ran in the sandbox). The
-precheck sweeps dead holders before every tick. A runtime that does not answer
+**A lock never outlives the turn that took it, nor dies before it.** A holder
+is dead when the runtime says its session is not running a turn. A restart is
+no proof: the locks live on the home volume and survive it, and the platform
+resumes the interrupted turn, which still holds them. The precheck sweeps dead
+holders before every tick. A runtime that does not answer
 frees nothing: a guess could hand a live run's slot to another.
 
 ## Slots

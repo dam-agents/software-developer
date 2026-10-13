@@ -109,11 +109,14 @@ lock slot-1 session=sess-x item=7 slot=1 "since=$(ago 30)" phase=building "phase
 lock item-7 session=sess-x item=7 slot=1
 lock slot-2 session=sess-y item=8 slot=2 boot=boot-0
 lock slot-3 session=sess-z item=9 slot=3
-STUB_RUNNING="sess-z" state sweep
+lock slot-4 session=sess-r item=10 slot=4 boot=boot-0
+lock item-10 session=sess-r item=10 slot=4 boot=boot-0
+STUB_RUNNING="sess-z sess-r" state sweep
 is "$OUT" "$(printf '#7\n#8')" "names the abandoned items"
 [ ! -d "$SD_LOCKS/slot-1" ] && [ ! -d "$SD_LOCKS/item-7" ] || fail "a dead session's locks stayed"
-[ ! -d "$SD_LOCKS/slot-2" ] || fail "a lock from an earlier boot stayed"
+[ ! -d "$SD_LOCKS/slot-2" ] || fail "a lock from an earlier boot, its session gone, stayed"
 [ -d "$SD_LOCKS/slot-3" ] || fail "freed a live run's slot"
+[ -d "$SD_LOCKS/slot-4" ] && [ -d "$SD_LOCKS/item-10" ] || fail "freed a turn resumed after a restart"
 is "$(field items/7.md abandoned)" 1 "counted"
 is "$(field items/7.md state)" abandoned "state"
 has "$(cat "$HOME/work/TICK.log")" "abandoned session=sess-x issue=7 slot=1" "logged"

@@ -16,7 +16,7 @@ GATE="$HOME/work/GATE.md"
 ITEMS="$HOME/work/items"
 SINCE="${PLATFORM_LAST_RUN_AT:-}"
 
-LOCKS="${SD_LOCKS:-/dev/shm/software-developer}"
+LOCKS="${SD_LOCKS:-$HOME/work/locks}"
 
 # Up to `slots` runs at once, one item each (scripts/run-state.sh). Nothing is
 # claimed here: a run takes its item and its slot itself, atomically, so two

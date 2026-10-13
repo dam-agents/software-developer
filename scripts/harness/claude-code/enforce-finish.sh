@@ -12,7 +12,7 @@
 # breaks a run. Registered by install.sh beside it.
 set -u
 MAX_BLOCKS=3
-LOCKS="${SD_LOCKS:-/dev/shm/software-developer}"
+LOCKS="${SD_LOCKS:-$HOME/work/locks}"
 
 INPUT="$(cat 2>/dev/null || true)"
 command -v jq >/dev/null 2>&1 || exit 0
