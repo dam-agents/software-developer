@@ -69,13 +69,23 @@ lacks "$(cat "$HOME/err")" "notify:" "unset: no posts"
 echo "- slack_channel: C0123ABCD" >> "$HOME/work/CONFIG.md"
 as sess-a start 7 feat/7
 STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
-has "$(cat "$HOME/err")" "notify: if #21 is still open, post that it is ready to merge to slack_channel C0123ABCD" "ready to merge"
+has "$(cat "$HOME/err")" "notify: if #21 is still open, post that it is ready to merge to slack_channel C0123ABCD, and record its thread" "ready to merge"
 as sess-a start 7 feat/7
 STUB_ISSUE='{"labels":[{"name":"agent/failed"}]}' as sess-a finish blocked
-has "$(cat "$HOME/err")" "notify: post this blocked to slack_channel C0123ABCD" "blocked"
+has "$(cat "$HOME/err")" "notify: post this blocked to slack_channel C0123ABCD, and record its thread" "blocked"
 as sess-a start 7 feat/7
 as sess-a finish waiting-lock
 lacks "$(cat "$HOME/err")" "notify:" "nothing for a person to do"
+done_
+
+CASE="a thread the item already has in Slack takes its posts, and only one the author left in that chat"; sandbox; origin_checkout
+echo "- slack_channel: C0123ABCD" >> "$HOME/work/CONFIG.md"
+as sess-a start 7 feat/7
+STUB_ISSUE='{"labels":[],"user":{"login":"dev-bot"},"created_at":"2026-01-01T00:00:00Z","body":"Filed from Slack.\n<!-- slack-thread: C0123ABCD 1700000000.000100 -->"}' \
+  STUB_COMMENTS='[{"user":{"login":"mallory"},"created_at":"2026-01-03T00:00:00Z","body":"<!-- slack-thread: C0123ABCD 1700000000.000999 -->"},
+    {"user":{"login":"dev-bot"},"created_at":"2026-01-02T00:00:00Z","body":"Ready to merge. sess-a\n<!-- slack-thread: C9999ZZZZ 1700000000.000555 -->"}]' \
+  as sess-a finish released 21
+has "$(cat "$HOME/err")" "ready to merge as a reply in thread 1700000000.000100 of slack_channel C0123ABCD" "the author's thread in slack_channel"
 done_
 
 CASE="an item goes back to its own slot when it is free"; sandbox; origin_checkout

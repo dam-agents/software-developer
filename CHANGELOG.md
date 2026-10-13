@@ -9,6 +9,17 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.3.0 — 2026-10-13
+
+**Slack posts thread per issue** ([`docs/notify.md`](docs/notify.md) → **One
+thread per issue**). A hand-off, filing or grill records its Slack thread on
+the issue as `<!-- slack-thread: <chat> <ts> -->`, and so does an issue's
+first top-level post. `run-state.sh finish` finds it, and the issue's next posts
+reply there instead of opening a new top-level message. No new key.
+
+**Upgrade:** nothing. Issues handed off before this version have no recorded
+thread: their next post goes top-level and records its own.
+
 ## 5.2.1 — 2026-10-13
 
 **Locks survive a restart.** They move from tmpfs to `work/locks`, and a lock
