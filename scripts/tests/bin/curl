@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stub curl: the runtime. sessions.list answers from STUB_RUNNING (the session
-# ids running a turn); /api/status from STUB_STATUS. STUB_RUNTIME_DOWN=1 is a
+# ids running a turn) and STUB_CHATS (the direct sessions; any other is a
+# schedule_cron); /api/status from STUB_STATUS. STUB_RUNTIME_DOWN=1 is a
 # runtime that does not answer.
 [ -z "${STUB_RUNTIME_DOWN:-}" ] || exit 7
 url=""; sid=""
@@ -12,10 +13,11 @@ for a in "$@"; do
 done
 case "$url" in
   */api/trpc/sessions.list*)
-    case " ${STUB_RUNNING:-} " in
-      *" $sid "*) printf '{"result":{"data":{"sessions":[{"sessionId":"%s","running":true}]}}}' "$sid" ;;
-      *) printf '{"result":{"data":{"sessions":[]}}}' ;;
-    esac ;;
+    type=schedule_cron; case " ${STUB_CHATS:-} " in *" $sid "*) type=regular ;; esac
+    running=false; case " ${STUB_RUNNING:-} " in *" $sid "*) running=true ;; esac
+    if [ "$running" = true ] || [ "$type" = regular ]; then
+      printf '{"result":{"data":{"sessions":[{"sessionId":"%s","running":%s,"type":"%s"}]}}}' "$sid" "$running" "$type"
+    else printf '{"result":{"data":{"sessions":[]}}}'; fi ;;
   */api/status) [ -n "${STUB_STATUS:-}" ] || exit 7; printf '%s' "$STUB_STATUS" ;;
   *) exit 7 ;;
 esac

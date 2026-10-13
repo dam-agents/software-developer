@@ -24,7 +24,10 @@ that opens it babysits it with `run-state.sh wait <pr>`
 **A lock never outlives the turn that took it, nor dies before it.** A holder
 is dead when the runtime says its session is not running a turn. A restart is
 no proof: the locks live on the home volume and survive it, and the platform
-resumes the interrupted turn, which still holds them. The precheck sweeps dead
+resumes the interrupted turn, which still holds them. The direct session is the
+one exception: it ends its turns between the operator's messages and to wait
+for a background task, so its locks are stale only two hours after it took
+them — `finish` gives them back sooner. The precheck sweeps dead
 holders before every tick. A runtime that does not answer
 frees nothing: a guess could hand a live run's slot to another.
 
