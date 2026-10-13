@@ -10,12 +10,13 @@
 # database, a device — is one, so whatever touches it runs under a lock of its
 # own, taken for those steps alone.
 #
-# The locks are directories under $LOCKS, on tmpfs: mkdir takes one atomically,
-# and a restart — which stops every session, and most shared services — wipes
-# them all. Each holds an `owner` file naming its session and the boot it was
-# taken in. A holder is dead when its boot is over, or when the runtime says
-# its session is not running a turn: a lock never outlives the turn that took
-# it. A runtime that does not answer frees nothing.
+# The locks are directories under $LOCKS, in work/ on the home volume: mkdir
+# takes one atomically, and they outlive a restart, because the platform resumes
+# an interrupted turn and its run carries on holding them. Each holds an `owner`
+# file naming its session and the boot it was taken in. A holder is dead only
+# when the runtime says its session is not running a turn — a restart alone is
+# no proof: a lock never outlives the turn that took it, nor dies before it. A
+# runtime that does not answer frees nothing.
 #
 #   start <item> [branch]     take the item and a slot, put the slot on branch
 #   also <owner/name>         a worktree of another repository `repos_also`
@@ -50,7 +51,7 @@ ITEMS="$WORK/items"
 SLOTDIR="$WORK/slots"
 GATE="$WORK/GATE.md"
 LOG="$WORK/TICK.log"
-LOCKS="${SD_LOCKS:-/dev/shm/software-developer}"
+LOCKS="${SD_LOCKS:-$WORK/locks}"
 ME="${CLAUDE_CODE_SESSION_ID:-}"
 BOOT="${SD_BOOT_ID:-$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)}"
 
@@ -98,12 +99,12 @@ alive() {
   case "$out" in true) return 0 ;; false) return 1 ;; *) return 2 ;; esac
 }
 
-# dead <lock> — its holder is provably gone: another boot, or no turn running.
+# dead <lock> — its holder is provably gone: no turn running. A lock taken
+# before a restart is no exception: a resumed turn still holds it.
 # A lock with no owner yet is being taken, unless it has been so for a minute.
 dead() {
   local o="$1/owner"
   if [ ! -f "$o" ]; then [ -n "$(find "$1" -maxdepth 0 -mmin +1 2>/dev/null)" ]; return; fi
-  [ "$(kv "$o" boot)" = "$BOOT" ] || return 0
   alive "$(kv "$o" session)"; [ $? -eq 1 ]
 }
 
