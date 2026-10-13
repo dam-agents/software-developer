@@ -24,6 +24,10 @@ never `$HOME` ([`docs/persistence.md`](docs/persistence.md) → **Evolving the
 definition**). It still never merges, and the Hard invariants, `work/CONFIG.md`
 and the schedules still change only with the operator.
 
+**Long commands in the background.** `CLAUDE.md` → **Rules**: checks, builds,
+test suites and `run-state.sh wait` run as the harness's own background task
+while the run does other work, never in the foreground and never detached.
+
 **Upgrade:**
 
 1. With `slack_channel` set, tell the operator that whoever `slack_handoff`

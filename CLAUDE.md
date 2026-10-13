@@ -131,6 +131,12 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   or a step only a person can take, is reported there and finished `blocked`.
   Never end a turn asking, summarizing or promising to continue.
 - **Never leave work running behind you**: a build detached with `nohup`, `setsid` or `&` outlives its locks.
+- **Long commands run in the background, and you work meanwhile**: `verify`,
+  `verify_exclusive`, a build, a test suite, `run-state.sh wait` — start each as
+  the harness's own background task (Claude Code: `run_in_background`), then
+  review the diff, draft the pull request body, read what comes next, and act on
+  its result when it arrives. Never change what it is testing while it runs,
+  and hold any lock it needs until it returns.
 - **Every pull request body carries two lines.** `Fixes #<n>`, on its own line
   (in another repository `Fixes <repo>#<n>`, or `Part of <repo>#<n>` when
   another of the issue's pull requests closes it):
