@@ -9,6 +9,27 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.2.0 — 2026-10-13
+
+**Filing from Slack.** Asked in `slack_channel` to file an issue of `repo`, or
+to fix something no open issue covers, the agent files it in the same turn —
+with `label_handoff` when the work was asked for — rather than declining
+([`docs/grill.md`](docs/grill.md) → **Filing**). Who may is `slack_handoff`,
+as for a hand-off; no new key.
+
+**Self-improvement as a pull request.** Asked in Slack, or by the operator, to
+change how it works, the agent opens a pull request on the definition's own
+repository directly — no issue, no hand-off label — from a clone of its own,
+never `$HOME` ([`docs/persistence.md`](docs/persistence.md) → **Evolving the
+definition**). It still never merges, and the Hard invariants, `work/CONFIG.md`
+and the schedules still change only with the operator.
+
+**Upgrade:**
+
+1. With `slack_channel` set, tell the operator that whoever `slack_handoff`
+   allows can now have issues filed, and definition pull requests opened, from
+   Slack. Nothing to write.
+
 ## 5.1.0 — 2026-10-12
 
 **Hand-off from Slack.** Asked in `slack_channel` to implement an issue of
