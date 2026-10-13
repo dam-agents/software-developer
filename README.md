@@ -72,15 +72,19 @@ blocked, the weekly audit ([`docs/notify.md`](docs/notify.md)).
 It also grills there: open `let's grill <n>` in the channel, answer its
 questions in the thread, and approve the breakdown; it files the sub-issues
 under #`<n>` with the hand-off label, and the tick implements them
-([`docs/grill.md`](docs/grill.md)). Anyone in the channel can grill, so bind
+([`docs/slack.md`](docs/slack.md)). Anyone in the channel can grill, so bind
 one only trusted people are in. The questions and drafts follow the
 repository's own skills when `skill_grill` and `skill_file_issue` name them,
 and the definition's defaults in `.agents/defaults/` otherwise.
 
 And it takes hand-offs there: ask it to implement an issue of the repository,
 and it puts the hand-off label on it for the tick, as a person with triage
-rights would. `slack_handoff` says who may: `anyone` in the channel, bots and
-other agents too (the default), `people` only, or `off`.
+rights would. And it files issues there: ask it to file one, or to fix
+something no issue covers, and it files it at once — with the hand-off label
+when you asked for the work. `slack_handoff` says who may do either: `anyone`
+in the channel, bots and other agents too (the default), `people` only, or
+`off`. Asked there to change how it works, it opens a pull request on this
+repository directly; a person merges it.
 
 ## What it keeps on the instance
 

@@ -1,6 +1,6 @@
 ---
 name: grill
-description: The definition's default for grilling an issue in a Slack thread, used when work/CONFIG.md names no `skill_grill`. Interview the people in the thread about the issue until every decision it needs is made, one question at a time, each with your recommended answer. Read from docs/grill.md, which sets the limits.
+description: The definition's default for grilling an issue in a Slack thread, used when work/CONFIG.md names no `skill_grill`. Interview the people in the thread about the issue until every decision it needs is made, one question at a time, each with your recommended answer. Read from docs/slack.md, which sets the limits.
 ---
 
 # Grill an issue
@@ -23,4 +23,4 @@ every decision it leaves open, and get each one made.
    the repository's own vocabulary: say so, plainly, before moving on.
 5. **Done** when nothing open is left that changes what gets built, or when
    the people say so. Post the decisions, one line each, and move on to the
-   breakdown (`docs/grill.md` → **Breakdown**).
+   breakdown (`docs/slack.md` → **Grill**).

@@ -101,7 +101,7 @@ else
   case "$S" in
     '' | anyone | people | off)
       if [ -z "$SLACK" ]; then [ -z "$S" ] || warn config.slack_handoff "set, but slack_channel is not — nobody can hand off"
-      else ok config.slack_handoff "${S:-anyone} may hand off an issue from Slack (docs/grill.md → Hand-off)"; fi ;;
+      else ok config.slack_handoff "${S:-anyone} may hand off an issue from Slack (docs/slack.md → Routing)"; fi ;;
     *) fail config.slack_handoff "'$S' is not anyone, people or off" "write one of them, or leave it out for anyone" ;;
   esac
   APP="$(cfg app_url)"

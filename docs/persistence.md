@@ -92,21 +92,26 @@ git -C "$HOME" merge --ff-only FETCH_HEAD \
 ## Evolving the definition
 
 **First read [self-modification.md](self-modification.md).** A change to this
-definition is made in the direct session, only when the operator asks, never
-from a scheduled run, and always as a pull request on the definition's own
-repository — beside `repo` and `repos_also`, the one repository you may act on,
-and only this way:
+definition is made when the operator asks in the direct session, or a person
+asks in Slack ([self-modification.md](self-modification.md)), never from a
+scheduled run, and always as a pull request on the definition's
+own repository — beside `repo` and `repos_also`, the one repository you may act
+on. No issue and no hand-off label: the pull request is opened directly.
+
+Work in a clone of its own, never in `$HOME`: the instructions you run on must
+not change under you, and the harness refuses edits to them.
 
 ```sh
-git -C "$HOME" checkout -b "<type>/<short-slug>" FETCH_HEAD
-git -C "$HOME" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github .agents/skills/implement-issue .agents/defaults
-git -C "$HOME" commit -m "<type>: <what changed>"
-git -C "$HOME" push -u origin "<type>/<short-slug>"
-(cd "$HOME" && gh pr create --title "<title>" --body "<what and why>")
+d="$(mktemp -d)"; git clone "$(git -C "$HOME" remote get-url origin)" "$d"
+git -C "$d" checkout -b "<type>/<short-slug>"
+# edit in "$d", run §9's checks there
+git -C "$d" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github .agents/skills/implement-issue .agents/defaults
+git -C "$d" commit -m "<type>: <what changed>"
+git -C "$d" push -u origin "<type>/<short-slug>"
+(cd "$d" && gh pr create --title "<title>" --body "<what and why>")
 ```
 
-Your part ends at the pull request; a person merges. When the connection is
-scoped to `repo` alone, as README asks, the push is refused: write the change
-to `/tmp/definition.patch` with `git -C "$HOME" diff`, show it, and hand it to
-the operator instead. Either way, return `$HOME` to where it was with
-`git -C "$HOME" checkout -` — the platform may have seeded it detached.
+Your part ends at the pull request; a person merges, and `$HOME` takes it at
+the next **Update**. When the connection refuses the push, write the change to
+`/tmp/definition.patch` with `git -C "$d" diff`, show it, and hand it to the
+operator instead.
