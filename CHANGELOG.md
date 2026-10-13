@@ -17,7 +17,7 @@ with `label_handoff` when the work was asked for — rather than declining
 ([`docs/grill.md`](docs/grill.md) → **Filing**). Who may is `slack_handoff`,
 as for a hand-off; no new key.
 
-**Self-improvement as a pull request.** Asked in Slack, or by the operator, to
+**Self-improvement as a pull request** ([`docs/self-modification.md`](docs/self-modification.md)). Asked in Slack, or by the operator, to
 change how it works, the agent opens a pull request on the definition's own
 repository directly — no issue, no hand-off label — from a clone of its own,
 never `$HOME` ([`docs/persistence.md`](docs/persistence.md) → **Evolving the

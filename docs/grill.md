@@ -27,7 +27,7 @@ invariants hold as everywhere.
 Any other Slack message: if it is aimed at you and asks you to implement, do or
 start an issue of `repo`, it is a hand-off (below); to file an issue, or to fix
 or do something no open issue covers, it is a filing (below); to change how
-you yourself work, a self-improvement (below). Aimed at you
+you yourself work, [self-modification.md](self-modification.md). Aimed at you
 otherwise, one reply — from Slack you grill, `let's grill <n>`, file issues
 and take hand-offs — and not aimed at you, `no_reply_needed`.
 
@@ -51,17 +51,6 @@ question and the end of the turn; the answer files it.
    `--label <label_handoff>` when the message asks for the work — "fix", "do
    it", "implement", the label by name — not only for the issue.
 4. **Reply** in the thread with the link; labelled, as a hand-off's step 5.
-
-## Self-improvement
-
-Asked to change how you work — this definition's instructions, docs, scripts or
-skills — from whom `slack_handoff` allows (a hand-off's step 1): open the pull
-request on the definition's repository in the same turn, directly, no issue and
-no label ([persistence.md](persistence.md) → **Evolving the definition**, which
-says how, and [self-modification.md](self-modification.md), whose rules hold in
-full). The Hard invariants, `work/CONFIG.md` and the schedules stay out of it:
-those change with the operator alone. Reply with the link; it applies once a
-person merges it and the operator updates.
 
 ## Hand-off
 

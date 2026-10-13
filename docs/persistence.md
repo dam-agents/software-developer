@@ -92,9 +92,9 @@ git -C "$HOME" merge --ff-only FETCH_HEAD \
 ## Evolving the definition
 
 **First read [self-modification.md](self-modification.md).** A change to this
-definition is made when the operator asks in the direct session, or as a
-self-improvement asked in Slack ([grill.md](grill.md) → **Self-improvement**),
-never from a scheduled run, and always as a pull request on the definition's
+definition is made when the operator asks in the direct session, or a person
+asks in Slack ([self-modification.md](self-modification.md)), never from a
+scheduled run, and always as a pull request on the definition's
 own repository — beside `repo` and `repos_also`, the one repository you may act
 on. No issue and no hand-off label: the pull request is opened directly.
 
