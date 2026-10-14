@@ -342,7 +342,40 @@ cmd_start() {
   # the babysit clock is this run's own: a run that resumes the item starts it again
   write "$f" "$f" "$ITEM_KEYS" "item=$item" state=active "branch=$branch" "slot=$k" \
     "session=$ME" "seen_at=$(now)" babysit_since=- round_at=- babysat_out=- "updated_at=$(now)"
+  prune_free "$k"
   echo "slot $k: $SLOTDIR/$k on $branch"
+}
+
+# free_gb — whole GiB free on the disk work/ is on; nothing when it cannot be read
+free_gb() {
+  [ -n "${SD_FREE_GB:-}" ] && { echo "$SD_FREE_GB"; return 0; }
+  local _ _ _ kb _
+  read -r _ _ _ kb _ < <(df -Pk "$WORK" 2>/dev/null | tail -n 1)
+  case "$kb" in '' | *[!0-9]*) return 0 ;; esac
+  echo $((kb / 1048576))
+}
+
+# prune_free <my slot> — with `prune` set and the disk below `prune_below_gb`,
+# `prune` runs in the checkout and in every other slot no run holds, each slot
+# taken for it so no run starts there meanwhile. A held slot's build output is
+# its run's, and the run's own slot is about to be used: neither is touched.
+prune_free() {
+  local cmd min free j
+  cmd="$(cfg prune)"; [ -n "$cmd" ] || return 0
+  min="$(cfg prune_below_gb)"; case "$min" in '' | *[!0-9]*) min=20 ;; esac
+  free="$(free_gb)"
+  [ -n "$free" ] || { say "free disk was not measured — prune skipped"; return 0; }
+  [ "$free" -lt "$min" ] || return 0
+  say "${free} GiB free, under $min — pruning the checkout and the free slots"
+  (cd "$CO" && bash -c "$cmd") >/dev/null 2>&1 || say "prune failed in the checkout"
+  for j in $(seq 1 "$N"); do
+    [ "$j" = "$1" ] && continue
+    [ -d "$SLOTDIR/$j" ] || continue
+    take "slot-$j" "slot=$j" || continue
+    (cd "$SLOTDIR/$j" && bash -c "$cmd") >/dev/null 2>&1 || say "prune failed in slot $j"
+    drop "slot-$j"
+  done
+  say "$(free_gb) GiB free after the prune"
 }
 
 # The work comes from an issue of `repo`, and may need changing elsewhere too:

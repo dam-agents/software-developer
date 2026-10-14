@@ -178,6 +178,8 @@ that is not one of them fails verification, because nothing would ever read it:
 - slots: 3
 - babysit_max_hours: 4
 - stuck_after_min: 120
+- prune: <what deletes a checkout's rebuildable build output>
+- prune_below_gb: 20
 - work_repo: owner/name-work
 - slack_channel: C0123ABCD
 - slack_handoff: anyone
@@ -196,7 +198,8 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `verify_exclusive` out; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel` and `slack_handoff`;
 for the default grill skills, `skill_grill` and `skill_file_issue`; leave
-`repos_also` out when the work never leaves `repo`.
+`repos_also` out when the work never leaves `repo`; leave `prune` and
+`prune_below_gb` out when builds leave little behind.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
 user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;

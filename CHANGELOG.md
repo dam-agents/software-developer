@@ -9,6 +9,18 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.4.0 — 2026-10-14
+
+**Build output is pruned when the disk runs low** ([`docs/runs.md`](docs/runs.md)
+→ **Slots**). Two new keys, both optional: `prune`, the command that deletes a
+checkout's rebuildable build output, and `prune_below_gb`, default 20. When
+`run-state.sh start` finds less free than that, it runs `prune` in the checkout
+and in every slot no run holds. Without `prune` nothing changes.
+
+**Upgrade:** operator-only, optional — to enable it, add `- prune: <command>`
+(and `- prune_below_gb: <GiB>` for another threshold) to `work/CONFIG.md`, then
+re-run `bash scripts/verify-onboarding.sh`.
+
 ## 5.3.1 — 2026-10-13
 
 **The Stop hook holds unattended runs only.** A session the runtime reports as
