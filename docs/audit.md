@@ -4,6 +4,9 @@ Every Friday, ungated. Read-only toward GitHub and repair-free: it says what is
 wrong and whose move it is, and fixes nothing. It is not a work run — do not
 build, claim, or call `run-state.sh start`.
 
+First title the session, best-effort, with `rename_session`:
+`Audit agent health <UTC date>` (`Audit agent health 2026-10-09`).
+
 ## 1. The deterministic checks
 
 Run `bash "$HOME/scripts/audit.sh"`. It runs `verify-onboarding.sh --live`
