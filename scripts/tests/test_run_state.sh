@@ -394,6 +394,30 @@ as sess-a wait 21 kits#x
 is "$RC" 2 "a malformed ref"
 done_
 
+CASE="low on disk, start prunes the checkout and the free slots, never a held one"; sandbox; origin_checkout
+echo "- prune: rm -rf dist" >> "$HOME/work/CONFIG.md"
+RUNNING="sess-a sess-b sess-c sess-d"
+as sess-a start 7 feat/7; as sess-b start 8 feat/8; as sess-d start 10 feat/10
+STUB_ISSUE='{"labels":[]}' as sess-a finish released 21
+STUB_COMMENTS='[{"user":{"login":"dev-bot"},"body":"Done. sess-d"}]' STUB_ISSUE='{"labels":[]}' as sess-d finish released 23
+built() { local d; for d in widgets slots/2 slots/3; do mkdir -p "$HOME/work/$d/dist"; echo built > "$HOME/work/$d/dist/out"; done; }
+built
+SD_FREE_GB=50 as sess-c start 9 feat/9
+is "$(slot 1)" feat/9 "takes the first free slot"
+[ -e "$HOME/work/slots/3/dist" ] || fail "pruned with room to spare"
+STUB_ISSUE='{"labels":[]}' as sess-c finish released 22
+built; mkdir -p "$HOME/work/slots/1/dist"
+SD_FREE_GB=5 as sess-c start 9 feat/9
+is "$RC" 0 "exit"
+has "$(cat "$HOME/err")" "5 GiB free, under 20" "says why"
+[ ! -e "$HOME/work/widgets/dist" ] || fail "the checkout kept its build output"
+[ ! -e "$HOME/work/slots/3/dist" ] || fail "a free slot kept its build output"
+[ -e "$HOME/work/slots/1/dist" ] || fail "pruned its own slot"
+[ -e "$HOME/work/slots/2/dist" ] || fail "pruned a held slot"
+is "$(ls "$SD_LOCKS" | tr '\n' ' ')" "item-8 item-9 slot-1 slot-2 " "only the runs' own locks"
+unset RUNNING
+done_
+
 CASE="interactive: the operator holds the pull request, so opening it ends the run"; sandbox; origin_checkout
 sed -i.bak 's/^- mode: .*/- mode: interactive/' "$HOME/work/CONFIG.md"
 as sess-a start 7 feat/7
