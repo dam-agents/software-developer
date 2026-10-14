@@ -93,6 +93,10 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
   first item of the list. It takes the item and a slot, puts the slot on the
   branch, and prints where it is: work there and nowhere else. Refused, take
   the next item; none left, finish `nothing`.
+- **Then, in a scheduled run, title the session** with `rename_session`, as
+  `<Verb> <object>`: `Implement #<n>` for a new issue, `Resume #<n>` for one
+  stopped halfway or waiting for the lock, `Babysit PR #<pr>` for a pull
+  request. Best-effort: a missing or failing call leaves the title as it is.
 - **Another repository** the item needs: `run-state.sh also <owner/name>`.
 - **Before each long step:** `run-state.sh phase "<what>"`.
 - **What `exclusive` names** is one, shared by every slot: touch it only

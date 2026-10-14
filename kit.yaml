@@ -73,6 +73,9 @@ connections:
 # Both are created with the agent and held until onboarding completes; the
 # operator chooses which stay on (`schedules` in work/CONFIG.md, none with
 # `mode: interactive`), and onboarding switches the others off.
+# The kit schema has no `sessionTitle` field yet: each run titles its own
+# session (CLAUDE.md → The tick). Once it does, declare `Run the developer
+# tick` and `Audit agent health` here.
 schedules:
   # Every ten minutes, around the clock. A cron holds UTC, and at this cadence
   # the hour it lands in is nothing the agent reasons about.

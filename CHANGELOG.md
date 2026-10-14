@@ -9,6 +9,17 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.4.0 — 2026-10-14
+
+**Every scheduled session carries a title that says what it does**, as
+`<Verb> <object>`: a tick renames its session with `rename_session` once
+`start` gives it its item (`Implement #123`, `Resume #123`, `Babysit PR #456`),
+the audit to `Audit agent health <UTC date>`, a diagnostic run to
+`Diagnose stuck runs <UTC date> <HH:MM>`. Best-effort: on a platform without
+`rename_session` the title stays as it was.
+
+**Upgrade:** none — docs are re-read per run.
+
 ## 5.3.1 — 2026-10-13
 
 **The Stop hook holds unattended runs only.** A session the runtime reports as
