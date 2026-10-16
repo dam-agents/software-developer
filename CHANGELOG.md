@@ -11,10 +11,9 @@ direct session.
 
 ## 5.4.1 — 2026-10-16
 
-**A scheduled or Slack session the operator types into counts as attended**,
-like the direct chat: the Stop hook lets its turns end, and the sweep keeps an
-idle one's locks for two hours. Attended is a person's message in the session's
-history after the prompt that started it (`scripts/lib/runtime.sh`).
+**A Slack session counts as attended**, like the direct chat: a person is
+present there. The Stop hook lets its turns end, and the sweep keeps an idle
+one's locks for two hours. Scheduled runs are held and reaped as before.
 
 **Upgrade:** none — the hook and `run-state.sh` take effect at **Update**.
 

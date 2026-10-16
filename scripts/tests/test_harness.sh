@@ -34,17 +34,11 @@ is "$RC" 0 "exit"
 is "$OUT" "" "silent"
 done_
 
-CASE="a scheduled session the operator typed into stops freely"; sandbox
+CASE="a Slack session stops freely, even holding an item"; sandbox
 lock item-7 session=sess-a item=7 phase=verify
-STUB_JOINED=sess-a stop sess-a
+STUB_SLACK=sess-a stop sess-a
 is "$RC" 0 "exit"
 is "$OUT" "" "silent"
-done_
-
-CASE="a scheduled session with only injected messages is held"; sandbox
-lock item-7 session=sess-a item=7 phase=verify
-STUB_INJECTED=sess-a stop sess-a
-is "$RC" 2 "held"
 done_
 
 CASE="a runtime that does not answer holds the run as before"; sandbox
