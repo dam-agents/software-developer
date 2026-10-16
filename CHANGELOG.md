@@ -9,6 +9,14 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.4.1 — 2026-10-16
+
+**A Slack session counts as attended**, like the direct chat: a person is
+present there. The Stop hook lets its turns end, and the sweep keeps an idle
+one's locks for two hours. Scheduled runs are held and reaped as before.
+
+**Upgrade:** none — the hook and `run-state.sh` take effect at **Update**.
+
 ## 5.4.0 — 2026-10-14
 
 **Every scheduled session carries a title that says what it does**, as

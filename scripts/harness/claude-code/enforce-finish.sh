@@ -11,10 +11,11 @@
 # hands its item on. Anything unexpected exits 0: this hook may never be what
 # breaks a run. Registered by install.sh beside it.
 #
-# Only an unattended run is held: the direct session has its operator watching,
-# and ends its turn to wait for them or for a background task's notification.
-# A session the runtime confirms as a chat (`regular`) stops freely; any other
-# type, or a runtime that does not answer, is held as before.
+# Only an unattended run is held: the direct session and a Slack session have a
+# person present, and end their turn to wait for them or for a background
+# task's notification. A session the runtime confirms as `regular` or
+# `channel_slack` stops freely; any other type, or a runtime that does not
+# answer, is held as before.
 set -u
 MAX_BLOCKS=3
 LOCKS="${SD_LOCKS:-$HOME/work/locks}"
@@ -34,7 +35,7 @@ done
 type="$(curl -fsS --max-time 5 --get --data-urlencode "input={\"sessionId\":\"$sid\"}" \
   "${PLATFORM_RUNTIME_URL:-}/api/trpc/sessions.list" 2>/dev/null |
   jq -r '.result.data.sessions[0].type // empty' 2>/dev/null)"
-[ "$type" = regular ] && exit 0
+case "$type" in regular | channel_slack) exit 0 ;; esac
 
 item="$(kv "$lock/owner" item)"; phase="$(kv "$lock/owner" phase)"
 n="$(cat "$lock/stop_blocks" 2>/dev/null)"; case "$n" in '' | *[!0-9]*) n=0 ;; esac

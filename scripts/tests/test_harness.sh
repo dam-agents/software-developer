@@ -34,6 +34,13 @@ is "$RC" 0 "exit"
 is "$OUT" "" "silent"
 done_
 
+CASE="a Slack session stops freely, even holding an item"; sandbox
+lock item-7 session=sess-a item=7 phase=verify
+STUB_SLACK=sess-a stop sess-a
+is "$RC" 0 "exit"
+is "$OUT" "" "silent"
+done_
+
 CASE="a runtime that does not answer holds the run as before"; sandbox
 export STUB_RUNTIME_DOWN=1
 lock item-7 session=sess-a item=7
