@@ -11,10 +11,11 @@
 # hands its item on. Anything unexpected exits 0: this hook may never be what
 # breaks a run. Registered by install.sh beside it.
 #
-# Only an unattended run is held: the direct session has its operator watching,
-# and ends its turn to wait for them or for a background task's notification.
-# A session the runtime confirms as a chat (`regular`) stops freely; any other
-# type, or a runtime that does not answer, is held as before.
+# Only an unattended run is held: an attended session has its operator
+# watching, and ends its turn to wait for them or for a background task's
+# notification. A session the runtime confirms as attended (lib/runtime.sh —
+# the direct chat, or one the operator typed into) stops freely; any other, or
+# a runtime that does not answer, is held as before.
 set -u
 MAX_BLOCKS=3
 LOCKS="${SD_LOCKS:-$HOME/work/locks}"
@@ -23,7 +24,8 @@ INPUT="$(cat 2>/dev/null || true)"
 command -v jq >/dev/null 2>&1 || exit 0
 sid="$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null)"
 [ -n "$sid" ] || exit 0
-. "$(cd "$(dirname "$0")/../.." && pwd)/lib/config.sh" 2>/dev/null || exit 0
+LIB="$(cd "$(dirname "$0")/../.." && pwd)/lib"
+. "$LIB/config.sh" 2>/dev/null && . "$LIB/runtime.sh" 2>/dev/null || exit 0
 
 lock=""
 for l in "$LOCKS"/item-*; do
@@ -31,10 +33,7 @@ for l in "$LOCKS"/item-*; do
 done
 [ -n "$lock" ] || exit 0
 
-type="$(curl -fsS --max-time 5 --get --data-urlencode "input={\"sessionId\":\"$sid\"}" \
-  "${PLATFORM_RUNTIME_URL:-}/api/trpc/sessions.list" 2>/dev/null |
-  jq -r '.result.data.sessions[0].type // empty' 2>/dev/null)"
-[ "$type" = regular ] && exit 0
+s="$(session "$sid")" && [ -n "$s" ] && attended "$sid" "${s#* }" && exit 0
 
 item="$(kv "$lock/owner" item)"; phase="$(kv "$lock/owner" phase)"
 n="$(cat "$lock/stop_blocks" 2>/dev/null)"; case "$n" in '' | *[!0-9]*) n=0 ;; esac

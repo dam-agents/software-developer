@@ -9,6 +9,15 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 5.4.1 — 2026-10-16
+
+**A scheduled or Slack session the operator types into counts as attended**,
+like the direct chat: the Stop hook lets its turns end, and the sweep keeps an
+idle one's locks for two hours. Attended is a person's message in the session's
+history after the prompt that started it (`scripts/lib/runtime.sh`).
+
+**Upgrade:** none — the hook and `run-state.sh` take effect at **Update**.
+
 ## 5.4.0 — 2026-10-14
 
 **Every scheduled session carries a title that says what it does**, as

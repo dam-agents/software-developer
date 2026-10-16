@@ -45,6 +45,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 . "$HERE/lib/config.sh"
 . "$HERE/lib/time.sh"
 . "$HERE/lib/github.sh"
+. "$HERE/lib/runtime.sh"
 
 WORK="$HOME/work"
 ITEMS="$WORK/items"
@@ -90,22 +91,22 @@ write() {
 }
 
 # alive <session> — 0 running a turn · 1 not running, or unknown to the runtime
-# · 2 the runtime did not answer · 3 not running, and the direct chat
+# · 2 the runtime did not answer · 3 not running, and attended (lib/runtime.sh)
 alive() {
-  local out
-  out="$(curl -fsS --max-time 5 --get \
-    --data-urlencode "input={\"sessionId\":\"$1\"}" \
-    "${PLATFORM_RUNTIME_URL:-}/api/trpc/sessions.list" 2>/dev/null)" || return 2
-  out="$(printf '%s' "$out" | jq -r '.result.data.sessions | if type != "array" then "unknown"
-    elif .[0].running == true then true elif .[0].type == "regular" then "chat" else false end' 2>/dev/null)"
-  case "$out" in true) return 0 ;; false) return 1 ;; chat) return 3 ;; *) return 2 ;; esac
+  local s
+  s="$(session "$1")" || return 2
+  case "$s" in
+    "true "*) return 0 ;;
+    "false "*) attended "$1" "${s#false }" && return 3; return 1 ;;
+    *) return 1 ;;
+  esac
 }
 
 # dead <lock> — its holder is provably gone: no turn running. A lock taken
 # before a restart is no exception: a resumed turn still holds it.
-# The direct chat ends its turns between the operator's messages, and to wait
-# for a background task, so its lock is stale only once taken DIRECT_STALE_MIN
-# ago; it gives it back itself with `finish` before then.
+# An attended session ends its turns between the operator's messages, and to
+# wait for a background task, so its lock is stale only once taken
+# DIRECT_STALE_MIN ago; it gives it back itself with `finish` before then.
 # A lock with no owner yet is being taken, unless it has been so for a minute.
 dead() {
   local o="$1/owner" rc t

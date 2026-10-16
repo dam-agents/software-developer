@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Stub curl: the runtime. sessions.list answers from STUB_RUNNING (the session
 # ids running a turn) and STUB_CHATS (the direct sessions; any other is a
-# schedule_cron); /api/status from STUB_STATUS. STUB_RUNTIME_DOWN=1 is a
+# schedule_cron); sessions.history from STUB_JOINED (sessions the operator
+# typed into after the prompt) and STUB_INJECTED (sessions with only injected
+# messages after it); /api/status from STUB_STATUS. STUB_RUNTIME_DOWN=1 is a
 # runtime that does not answer.
 [ -z "${STUB_RUNTIME_DOWN:-}" ] || exit 7
 url=""; sid=""
@@ -15,9 +17,16 @@ case "$url" in
   */api/trpc/sessions.list*)
     type=schedule_cron; case " ${STUB_CHATS:-} " in *" $sid "*) type=regular ;; esac
     running=false; case " ${STUB_RUNNING:-} " in *" $sid "*) running=true ;; esac
-    if [ "$running" = true ] || [ "$type" = regular ]; then
+    known=""; case " ${STUB_JOINED:-} ${STUB_INJECTED:-} " in *" $sid "*) known=1 ;; esac
+    if [ "$running" = true ] || [ "$type" = regular ] || [ -n "$known" ]; then
       printf '{"result":{"data":{"sessions":[{"sessionId":"%s","running":%s,"type":"%s"}]}}}' "$sid" "$running" "$type"
     else printf '{"result":{"data":{"sessions":[]}}}'; fi ;;
+  */api/trpc/sessions.history*)
+    f() { jq -cn --arg id "$1" --arg t "$2" '{params: {update: {sessionUpdate: "user_message_chunk", messageId: $id, content: {text: $t}}}} | tojson'; }
+    frames="$(f m0 'Run the developer tick')"
+    case " ${STUB_INJECTED:-} " in *" $sid "*) frames="$frames,$(f m1 '<turn-interrupted> cut')" ;; esac
+    case " ${STUB_JOINED:-} " in *" $sid "*) frames="$frames,$(f m2 'why was the label refused?')" ;; esac
+    printf '{"result":{"data":{"frames":[%s],"truncated":false}}}' "$frames" ;;
   */api/status) [ -n "${STUB_STATUS:-}" ] || exit 7; printf '%s' "$STUB_STATUS" ;;
   *) exit 7 ;;
 esac

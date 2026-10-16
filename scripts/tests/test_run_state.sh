@@ -150,6 +150,14 @@ STUB_CHATS="sess-c sess-d sess-e" STUB_RUNNING=sess-e state sweep
 is "$OUT" "#8" "names the stale item"
 done_
 
+CASE="an idle scheduled session the operator typed into keeps its locks; one with only injected messages does not"; sandbox
+lock slot-1 session=sess-c item=7 slot=1 "since=$(ago 30)"
+lock slot-2 session=sess-d item=8 slot=2 "since=$(ago 30)"
+STUB_JOINED=sess-c STUB_INJECTED=sess-d state sweep
+[ -d "$SD_LOCKS/slot-1" ] || fail "freed a session its operator is in"
+[ ! -d "$SD_LOCKS/slot-2" ] || fail "kept an unattended idle session's lock"
+done_
+
 CASE="one exclusive lock: a second item waits, and a dead holder leaves it dirty"; sandbox; origin_checkout
 as sess-a start 7 feat/7; as sess-b start 8 feat/8
 as sess-a lock
