@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.2.0 — 2026-10-20
+
+**The control room** ([`app/README.md`](app/README.md) → **The control room**):
+a page for the operator that shows the instance's state at a glance. It reads
+through a local read-only API, `bin/sd control-room`, and is published as a
+private interactive artifact. It shows parked items and what watches each one,
+and how this week's resumes went. Optional: nothing runs it unless the operator
+starts it.
+
+**Upgrade:** none. To use it, in the direct session: start
+`nohup bin/sd control-room …` as a helper daemon, build the page with
+`bin/sd control-room-page <file>`, and publish it with
+`create_artifact(interactive: true)`. It needs Node 22.5+ for `node:sqlite`; the
+app already needs 22.18.
+
 ## 6.1.0 — 2026-10-20
 
 **A run carries its pull request to the merge, parked while a person moves**

@@ -4,6 +4,7 @@
 
 import { audit } from "./developer/audit.ts";
 import { workBackup } from "./developer/backup.ts";
+import { controlRoom, controlRoomPage } from "./developer/control-room.ts";
 import { enforceFinish, install, repoAllowed, sessionLink } from "./developer/harness.ts";
 import { precheck } from "./developer/precheck.ts";
 import { runState } from "./developer/run-state.ts";
@@ -24,4 +25,6 @@ export const commands: Readonly<Record<string, Command>> = {
   "repo-allowed": repoAllowed,
   "hook-stop": enforceFinish,
   install,
+  "control-room": controlRoom,
+  "control-room-page": controlRoomPage,
 };
