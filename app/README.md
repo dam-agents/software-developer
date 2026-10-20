@@ -19,10 +19,36 @@ newer; `bin/sd` finds it on `PATH`, or where mise keeps it.
 | Path | Holds |
 | --- | --- |
 | `src/factory/` | What every kit shares: `CONFIG.md` and the `- key: value` files, the locks, the runtime, GitHub through `gh`, git, a verifier's report, the definition validator. Nothing here names this kit. |
-| `src/developer/` | This kit: `run-state`, `precheck`, `verify`, `audit`, `work-backup`, the Stop hook and the installer. |
+| `src/developer/` | This kit: `run-state`, `precheck`, `verify`, `audit`, `work-backup`, the Stop hook and the installer, and the `control-room` API. |
+| `control-room/` | The control-room page and the item state machine it draws (**The control room**, below). |
 | `src/registry.ts` | Every command, by the name `bin/sd` takes. |
 | `src/cli.ts` | The entry point: builds the real context and runs a command. |
 | `test/` | `node:test` suites, one per command, against fakes of the runtime, GitHub and the clock in a sandboxed `$HOME`. |
+
+## The control room
+
+One page with the instance's state: what each slot does, which items are held
+or parked and what watches them, where each pull request stands, what is
+queued, how resumes went, and the alarms. It runs as a private **interactive
+artifact** beside the operator's chat. The page calls `platform.request`, and
+the platform carries each call to this API on `127.0.0.1:5555`. No model runs
+for a read.
+
+```sh
+nohup bin/sd control-room > /tmp/control-room.log 2>&1 &   # a helper daemon: never platform-keep it
+bin/sd control-room-page /tmp/control-room.html             # the page, a snapshot built in, for create_artifact(interactive: true)
+bin/sd control-room --once                                  # one snapshot, as JSON
+```
+
+`GET /state` reads the locks, `items/`, the slots, `TICK.log` and the runtime
+fresh on every call, and GitHub in one GraphQL request at most once a minute
+(`POST /refresh` reads it now). The API is read-only toward run-state.
+`POST /sweep` is run-state's own sweep, which frees only locks whose holder the
+runtime proves gone. Acknowledgements and alarm history are in
+`work/control-room.db` (`node:sqlite`). That file is a cache: deleting it loses
+only the history. Buttons that need judgment — Rebase, Round, Take — send a
+prompt into the chat, so each one is a model turn. Opened anywhere else, the
+page shows the snapshot built into it.
 
 ## Rules the code keeps
 
