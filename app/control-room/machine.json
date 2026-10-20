@@ -1,0 +1,179 @@
+{
+ "states": [
+  {
+   "id": "queued",
+   "label": "Queued",
+   "zone": "feed",
+   "holds": "no locks",
+   "from": "queue"
+  },
+  {
+   "id": "working",
+   "label": "Working",
+   "zone": "reactor",
+   "holds": "item · slot",
+   "stages": [
+    "working",
+    "item-lock"
+   ]
+  },
+  {
+   "id": "verifying",
+   "label": "Verifying",
+   "zone": "reactor",
+   "holds": "item · slot · exclusive",
+   "stages": [
+    "verifying"
+   ]
+  },
+  {
+   "id": "waiting-lock",
+   "label": "Waiting for lock",
+   "zone": "reactor",
+   "holds": "no locks",
+   "stages": [
+    "waiting-lock"
+   ]
+  },
+  {
+   "id": "in-review",
+   "label": "In review",
+   "zone": "outflow",
+   "holds": "item · waiter",
+   "stages": [
+    "in-review"
+   ]
+  },
+  {
+   "id": "awaiting-merge",
+   "label": "Awaiting merge",
+   "zone": "outflow",
+   "holds": "item · waiter",
+   "stages": [
+    "awaiting-merge"
+   ]
+  },
+  {
+   "id": "merged",
+   "label": "Merged · 7 d",
+   "zone": "done",
+   "holds": "no locks",
+   "from": "merged"
+  },
+  {
+   "id": "needs-info",
+   "label": "Needs info",
+   "zone": "aside",
+   "holds": "no locks",
+   "from": "needs_info"
+  },
+  {
+   "id": "blocked",
+   "label": "Failed",
+   "zone": "aside",
+   "holds": "no locks",
+   "from": "failed"
+  },
+  {
+   "id": "abandoned",
+   "label": "Abandoned",
+   "zone": "aside",
+   "holds": "claim only",
+   "stages": [
+    "orphan"
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "queued",
+   "to": "working",
+   "by": "start",
+   "who": "tick · operator"
+  },
+  {
+   "from": "working",
+   "to": "verifying",
+   "by": "lock",
+   "who": "run"
+  },
+  {
+   "from": "verifying",
+   "to": "working",
+   "by": "unlock",
+   "who": "run"
+  },
+  {
+   "from": "working",
+   "to": "waiting-lock",
+   "by": "finish waiting-lock",
+   "who": "run"
+  },
+  {
+   "from": "waiting-lock",
+   "to": "working",
+   "by": "start",
+   "who": "tick, once the lock is free"
+  },
+  {
+   "from": "working",
+   "to": "in-review",
+   "by": "park <pr>",
+   "who": "run"
+  },
+  {
+   "from": "in-review",
+   "to": "working",
+   "by": "start · review or failed check",
+   "who": "waiter · booking · tick"
+  },
+  {
+   "from": "in-review",
+   "to": "awaiting-merge",
+   "by": "approved",
+   "who": "reviewer"
+  },
+  {
+   "from": "awaiting-merge",
+   "to": "working",
+   "by": "start · maintainer comment or red",
+   "who": "waiter · booking · tick"
+  },
+  {
+   "from": "awaiting-merge",
+   "to": "merged",
+   "by": "merged · finish released",
+   "who": "person"
+  },
+  {
+   "from": "working",
+   "to": "needs-info",
+   "by": "finish needs-info",
+   "who": "run"
+  },
+  {
+   "from": "working",
+   "to": "blocked",
+   "by": "finish blocked",
+   "who": "run"
+  },
+  {
+   "from": "needs-info",
+   "to": "queued",
+   "by": "answered, handed off again",
+   "who": "person"
+  },
+  {
+   "from": "working",
+   "to": "abandoned",
+   "by": "sweep · run died",
+   "who": "precheck"
+  },
+  {
+   "from": "abandoned",
+   "to": "working",
+   "by": "start",
+   "who": "tick · operator"
+  }
+ ]
+}
