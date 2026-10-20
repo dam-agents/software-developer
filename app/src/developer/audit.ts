@@ -56,6 +56,19 @@ export const audit: Command = async (deps) => {
         .map((l) => `${/session=\S+/.exec(l)?.[0] ?? ""} `)
         .join("")}`,
     );
+  // How often the session that wrote a change was the one woken to answer what
+  // landed on it, and how often a fresh run had to take it over without that
+  // context. A fresh one after a parked item is a waiter lost to a restart.
+  const resumed = week.filter((l) => l.split(" ")[1] === "resumed");
+  if (resumed.length > 0) {
+    const by = (c: string) => resumed.filter((l) => new RegExp(`cause=${c}( |$)`).test(l)).length;
+    const continued = resumed.length - by("fresh");
+    o(
+      `resumes: ${continued} continued in their own session (waiter ${by("waiter")}, booked wake-up ${by("booking")}, a person ${by("operator")}), ${by("fresh")} taken over by a fresh one`,
+    );
+    if (by("fresh") > continued)
+      o(`warn runs.resumed — most resumes lost their context: ${by("fresh")} of ${resumed.length} started fresh`);
+  }
   const diag = week.filter((l) => l.includes(" diagnostic ")).length;
   if (diag === 0) o("ok   runs.diagnostic — the sandbox never read stuck");
   else o(`warn runs.diagnostic — ${diag} diagnostic run(s): the sandbox read stuck`);

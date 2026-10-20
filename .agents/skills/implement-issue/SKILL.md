@@ -113,7 +113,7 @@ misbehaves.
 git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>" [--label <label_mine>]
 gh pr edit <pr> -R <repo> --add-label <label_review>   # when set
-$RS wait <pr>...               # every pull request of the issue; then babysit, below
+$RS park <pr>...               # every pull request of the issue; then its waiter, below
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
@@ -123,12 +123,11 @@ look at first. Then `Fixes #<n>` on its own line — in another repository
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
 With `label_mine` set it carries that label from the start: without it, no
 later run finds the pull request, and `finish` refuses `pr-opened`.
-Then **babysit it in this run** until it is done: `$RS wait <pr>`, handle what
-it comes back with, push, `wait` again — [`docs/babysit.md`](../../../docs/babysit.md).
-The run ends `released` once it is approved, green and mergeable, `blocked`
-when it cannot get there, or `pr-updated` when `wait` says `babysit_max_hours`
-is up. Opening the pull request is not the end of the run — except with
-`mode: interactive`, where it is ([`docs/direct-session.md`](../../../docs/direct-session.md)).
+Then **babysit it in this session** until it is merged: park it, start
+`$RS wait --park` as a background task and end the turn; when the waiter wakes
+the session, `start` the item, handle what landed, push, park again —
+[`docs/babysit.md`](../../../docs/babysit.md). The run ends `released` once it is
+merged or closed, and `blocked` when it cannot get green.
 
 ## When it goes wrong
 

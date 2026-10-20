@@ -19,6 +19,16 @@
 //                             nothing yet (3), or the run has babysat them for
 //                             babysit_max_hours (4); a pr is #<n> in `repo`,
 //                             <owner/name>#<n> elsewhere
+//   park <pr>...              the run's part is done and a person moves next:
+//                             frees the slot and the exclusive lock, keeps the
+//                             item, so the session may end its turn
+//   wait --park               the parked item's waiter, a background task: blocks
+//                             up to ~2 hours until a pull request needs the run
+//                             (0, and the harness wakes the session), it merged
+//                             (0), or nothing came (3: start it again)
+//   booked <iso> [id]         a wake-up booked on the platform for the parked item
+//   may-stop                  whether this session may end its turn now (0), or
+//                             what is left first (1, on stderr): the Stop hook
 //   lock                      take the exclusive lock, or record waiting for it
 //   unlock                    give the exclusive lock back
 //   finish <outcome> [pr]...  the run's last act, on every way out: refused
@@ -37,14 +47,27 @@ import type { Command, Deps } from "../factory/context.ts";
 import { Exit } from "../factory/context.ts";
 import type { Conditional } from "../factory/github.ts";
 import { kv, readText, writeKv } from "../factory/kv.ts";
+import { BOOKING_GRACE_MIN, waiterAlive } from "../factory/locks.ts";
+import { ATTENDED } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
 import { persistTo } from "./backup.ts";
-import { GATE_KEYS, ITEM_KEYS, Kit, OUTCOMES, type Outcome, WRITER } from "./kit.ts";
-import { labelRef, type PrRef, type PullState, parsePrRef, recordRef, restPull, verdict } from "./pulls.ts";
+import { GATE_KEYS, ITEM_KEYS, Kit, OUTCOMES, type Outcome, PARK_FOR_SECONDS, WRITER } from "./kit.ts";
+import {
+  type Comment,
+  labelRef,
+  type PrRef,
+  type PullState,
+  parsePrRef,
+  recordRef,
+  restPull,
+  toComment,
+  verdict,
+} from "./pulls.ts";
 import { ours, reported, slackThread } from "./reports.ts";
 import { alsoDirs, prepare } from "./slots.ts";
 
-const USAGE = "usage: run-state.sh start|also|phase|wait|lock|unlock|finish|sweep|held|live|quiet|diagnosed|show";
+const USAGE =
+  "usage: run-state.sh start|also|phase|wait|park|booked|may-stop|lock|unlock|finish|sweep|held|live|quiet|diagnosed|show";
 
 class RunState {
   readonly kit: Kit;
@@ -137,8 +160,16 @@ class RunState {
       return 1;
     }
     await this.sweep(false);
+    // How this start came: the parked session itself, woken (by its waiter, a
+    // booked wake-up, or a person typing in it), or another session taking the
+    // item over. TICK.log says which, so the audit counts how often the context
+    // that wrote a change is the one that answers its review.
+    const prevSession = this.itemKey(item, "session");
+    const held = this.locks.read(`item-${item}`);
+    const parked = held?.owner.parked_at ?? "";
+    const woke = held?.owner.woke ?? "";
     if (!this.locks.take(`item-${item}`, { item })) {
-      const o = this.locks.read(`item-${item}`)?.owner;
+      const o = held?.owner;
       this.say(`item #${item} is held by session ${o?.session ?? ""}, at "${o?.phase ?? ""}" — take the next one.`);
       return 1;
     }
@@ -164,7 +195,18 @@ class RunState {
       return 1;
     }
     this.locks.update(`slot-${k}`, { item, slot: k });
-    this.locks.update(`item-${item}`, { slot: k });
+    // back from parked: the item lock is the turn's again, its waiter and booking spent
+    this.locks.update(`item-${item}`, {
+      slot: k,
+      phase: "started",
+      phase_at: this.now(),
+      parked_at: "-",
+      waiter: "-",
+      waiter_boot: "-",
+      wake_at: "-",
+      booking: "-",
+      woke: "-",
+    });
     const p = prepare({
       git: this.kit.git,
       work: this.kit.work,
@@ -185,6 +227,27 @@ class RunState {
       this.locks.drop(`slot-${k}`);
       return 1;
     }
+    const pr = this.itemKey(item, "pr");
+    const wakeAt = epoch(held?.owner.wake_at ?? "");
+    const booking = held?.owner.booking ?? "";
+    if (parked || (pr && prevSession)) {
+      const same = prevSession === this.kit.me;
+      const byBooking = wakeAt !== undefined && nowSeconds(this.deps.clock) >= wakeAt - 300;
+      const cause = same ? woke || (byBooking ? "booking" : "operator") : "fresh";
+      this.logLine(
+        "resumed",
+        this.kit.me,
+        item,
+        k,
+        pr.split(/\s+/).filter(Boolean).join(","),
+        this.now(),
+        `cause=${cause}${same ? "" : ` prev=${prevSession || "-"}`}`,
+      );
+    }
+    if (booking && woke !== "booking")
+      this.say(
+        `a wake-up is still booked for #${item} (schedule ${booking}): delete it — delete_schedule ${booking} — it is not needed now.`,
+      );
     // the babysit clock is this run's own: a run that resumes the item starts it again
     const now = this.now();
     this.writeItem(item, {
@@ -312,6 +375,14 @@ class RunState {
         }
         if (c === 1) changed = 1;
       }
+      // A person's comment is a round too: in the conversation, or on a line.
+      // A comments read that fails is skipped, the last one kept: it never
+      // makes the look unreadable, nor costs the GraphQL read.
+      for (const [name, path] of [
+        ["comments", `issues/${ref.number}/comments?per_page=100`],
+        ["inline", `pulls/${ref.number}/comments?per_page=100`],
+      ] as const)
+        if ((await cget(name, `repos/${ref.slug}/${path}`)) === 1 && changed === 0) changed = 1;
     }
     if (changed === 0 && memo.verdict) return memo.verdict;
     memo.verdict = undefined;
@@ -333,7 +404,11 @@ class RunState {
         memo.bodies.get("status"),
       );
     } else return undefined;
-    const v = verdict(pr, since, this.kit.author);
+    const comments: Comment[] = [
+      ...(Array.isArray(memo.bodies.get("comments")) ? (memo.bodies.get("comments") as unknown[]) : []),
+      ...(Array.isArray(memo.bodies.get("inline")) ? (memo.bodies.get("inline") as unknown[]) : []),
+    ].map(toComment);
+    const v = verdict(pr, since, this.kit.author, comments);
     if (!v.act && !pr.approximate) memo.verdict = v;
     return v;
   }
@@ -350,6 +425,7 @@ class RunState {
    * says done only once every one is done or merged.
    */
   async wait(args: readonly string[]): Promise<number> {
+    if (args[0] === "--park") return this.waitParked();
     if (args.length === 0) {
       this.say("usage: wait <pr>...");
       return 2;
@@ -358,6 +434,12 @@ class RunState {
     const item = this.myItem();
     if (!item) {
       this.say("this session holds no item — call start first");
+      return 1;
+    }
+    if (this.locks.mine("exclusive")) {
+      this.say(
+        "you hold the exclusive lock: unlock it first — nothing waits on a reviewer while every slot waits on you.",
+      );
       return 1;
     }
     const refs: PrRef[] = [];
@@ -411,8 +493,7 @@ class RunState {
           if (!act) act = `${prefix}${v.text}`;
         } else last = join2(last, `${prefix}${v.text}`);
       }
-      if (!act && many && doneN === refs.length)
-        act = "done — every pull request is approved, green and mergeable, or merged: release the issue";
+      if (!act && many && doneN === refs.length) act = "merged — every pull request is merged: release the issue";
       if (act) {
         this.writeItem(item, { round_at: this.now(), updated_at: this.now() });
         this.locks.stamp(`babysit ${labels.join(" ")}: ${act}`);
@@ -424,6 +505,236 @@ class RunState {
     }
     this.out(`nothing yet — ${last}. Call wait again; do not end the turn.`);
     return 3;
+  }
+
+  /**
+   * The run has done its part and a person moves next: a reviewer, or whoever
+   * merges. The item stays held — no other run takes it, and the session that
+   * wrote the change is the one woken to answer what lands on it — but the
+   * slot and the exclusive lock go back: nothing shared waits on a person.
+   * Refused, like finish, until the work is pushed and this round reported.
+   */
+  async park(args: readonly string[]): Promise<number> {
+    this.needSession();
+    const item = this.myItem();
+    if (!item) {
+      this.say("this session holds no item — call start first");
+      return 1;
+    }
+    let prs = args.join(" ") || this.itemKey(item, "pr");
+    const refs: PrRef[] = [];
+    for (const a of prs.split(/\s+/).filter(Boolean)) {
+      const r = parsePrRef(a, this.kit.slug);
+      if (!r) {
+        this.say(`'${a}' is not a pull request: #<n>, or <owner/name>#<n>`);
+        return 2;
+      }
+      refs.push(r);
+    }
+    if (refs.length === 0) {
+      this.say("park names no pull request: park <pr>... — only a pull request waits on a person");
+      return 2;
+    }
+    prs = refs.map((r) => recordRef(r, this.kit.slug)).join(" ");
+    const slot = this.mySlot();
+    const git = this.kit.git;
+    if (slot) {
+      for (const d of [join(this.kit.slots, slot), ...alsoDirs(git, this.kit.work, slot)]) {
+        const why = git.unsaved(d);
+        if (why) {
+          this.say(
+            `${relative(this.kit.work, d)} has ${why}: push it to its branch first — a parked slot is any run's.`,
+          );
+          return 1;
+        }
+      }
+    }
+    const since = this.locks.read(`item-${item}`)?.owner.since ?? "";
+    const r = await reported(this.kit, item, "pr-updated", prs, since);
+    if (r.kind === "missing") {
+      this.say(`not reported yet: ${r.why}.`);
+      this.say(
+        "Say on the pull request what this round did and what it waits for, with this run's session link; then park again.",
+      );
+      return 1;
+    }
+    // where the pull requests stand decides the state: approved, every open one, is a wait for the merge
+    let approved = true;
+    let open = 0;
+    for (const ref of refs) {
+      const view = (await this.deps.github.prView(this.kit.host, ref.slug, ref.number, "state,reviewDecision")) as
+        | { state?: string; reviewDecision?: string }
+        | undefined;
+      if (view?.state === "MERGED" || view?.state === "CLOSED") continue;
+      open++;
+      if (view?.reviewDecision !== "APPROVED") approved = false;
+    }
+    if (open === 0) {
+      this.say(
+        `${refs.map((x) => labelRef(x, this.kit.slug)).join(" ")}: merged or closed — nothing waits: release the issue and finish released.`,
+      );
+      return 1;
+    }
+    this.unlock();
+    if (slot) {
+      for (const d of [join(this.kit.slots, slot), ...alsoDirs(git, this.kit.work, slot)])
+        if (git.unsaved(d) === "") git.run(d, ["switch", "-q", "--detach"]);
+      this.locks.drop(`slot-${slot}`);
+    }
+    const now = this.now();
+    const state = approved ? "awaiting-merge" : "in-review";
+    this.locks.update(`item-${item}`, { slot: "-", parked_at: now, phase: `parked: ${state}`, phase_at: now });
+    this.writeItem(item, { state, pr: prs, session: this.kit.me, round_at: now, updated_at: now });
+    this.logLine("parked", this.kit.me, item, slot, prs.split(" ").join(","), since, `state=${state}`);
+    const labels = refs.map((x) => labelRef(x, this.kit.slug)).join(" ");
+    // a moment a person acts on: approved, it waits for whoever merges — said once
+    const chat = this.kit.cfg.get("slack_channel");
+    if (chat && state === "awaiting-merge" && this.itemKey(item, "notified") !== prs) {
+      const ts = await slackThread(this.kit, item, prs, chat);
+      const where = ts
+        ? `as a reply in thread ${ts} of slack_channel ${chat}`
+        : `to slack_channel ${chat}, and record its thread`;
+      this.say(`notify: post that ${labels} is ready to merge ${where} (docs/notify.md)`);
+      this.writeItem(item, { notified: prs });
+    }
+    this.out(`parked #${item} (${state}): the slot and the exclusive lock are free; the item stays yours.`);
+    this.out(
+      `Now start its waiter as a background task — bash "$HOME/scripts/run-state.sh" wait --park — and end the turn.`,
+    );
+    this.out(
+      `It wakes this session for a review, a comment, a red check or a conflict on ${labels}, and when it merges.`,
+    );
+    return 0;
+  }
+
+  /**
+   * The parked item's waiter: what wakes the session. Started as a harness
+   * background task, it records its pid on the item lock — the lock's holder
+   * while the turn is over — then looks at the pull requests once a minute,
+   * an unchanged one at no cost, for up to PARK_FOR_SECONDS. It exits when
+   * one needs the run, and the harness hands the session its output as a new
+   * turn; or with 3 when nothing came, and the session starts it again.
+   */
+  async waitParked(): Promise<number> {
+    this.needSession();
+    const lock = this.locks.ofKind("item-").find((h) => h.owner.session === this.kit.me && h.owner.parked_at !== "");
+    if (!lock) {
+      this.say("this session holds no parked item — park <pr> first");
+      return 1;
+    }
+    const item = lock.owner.item;
+    const refs = this.itemKey(item, "pr")
+      .split(/\s+/)
+      .filter(Boolean)
+      .flatMap((a) => parsePrRef(a, this.kit.slug) ?? []);
+    if (refs.length === 0) {
+      this.say(`#${item} is parked with no pull request on record: start it again and park <pr>`);
+      return 1;
+    }
+    const pid = this.deps.env.SD_WAITER_PID || String(process.pid);
+    if (
+      lock.owner.waiter &&
+      lock.owner.waiter !== pid &&
+      waiterAlive(lock.owner, this.locks.boot, this.locks.livePids)
+    ) {
+      this.out(`#${item} already has a waiter (pid ${lock.owner.waiter}): nothing to start. End the turn.`);
+      return 5;
+    }
+    this.locks.update(lock.name, { waiter: pid, waiter_boot: this.locks.boot });
+    const since = this.itemKey(item, "round_at") || lock.owner.parked_at;
+    const labels = refs.map((r) => labelRef(r, this.kit.slug));
+    const waitFor = Number(this.deps.env.SD_PARK_FOR || PARK_FOR_SECONDS);
+    const poll = Number(this.deps.env.SD_WAIT_POLL || 60);
+    const memos = refs.map(() => newMemo());
+    const start = nowSeconds(this.deps.clock);
+    let last = "";
+    try {
+      for (;;) {
+        // the session took its item back (a person typed in it, a booking woke it): this waiter is spent
+        const now = this.locks.read(lock.name)?.owner;
+        if (!now || now.parked_at === "" || now.waiter !== pid) {
+          this.out(`#${item} is not parked by this waiter any more: it stops. Nothing to do.`);
+          return 6;
+        }
+        let merged = 0;
+        let act = "";
+        last = "";
+        for (const [i, ref] of refs.entries()) {
+          const prefix = refs.length > 1 ? `${labels[i]}: ` : "";
+          const v = await this.look(ref, since, memos[i] ?? newMemo());
+          if (v === undefined) last = join2(last, `${prefix}GitHub unreadable`);
+          else if (v.act && v.done) merged++;
+          else if (v.act) act ||= `${prefix}${v.text}`;
+          else last = join2(last, `${prefix}${v.text}`);
+        }
+        if (!act && merged === refs.length)
+          act =
+            refs.length > 1
+              ? "merged — every pull request is merged: release the issue"
+              : "merged — the pull request is merged: release the issue";
+        if (act) {
+          this.locks.update(lock.name, { woke: "waiter", phase: `woken: ${act}`, phase_at: this.now() });
+          this.out(`#${item} needs this session — ${act}.`);
+          this.out(`bash "$HOME/scripts/run-state.sh" start ${item}, then handle it (docs/babysit.md).`);
+          return 0;
+        }
+        if (nowSeconds(this.deps.clock) - start + poll > waitFor) break;
+        await this.deps.clock.sleep(poll);
+      }
+    } finally {
+      // the waiter is gone either way: nothing may read its pid as alive after this
+      const o = this.locks.read(lock.name)?.owner;
+      if (o?.waiter === pid && o.parked_at !== "") this.locks.update(lock.name, { waiter: "-", waiter_boot: "-" });
+    }
+    this.out(
+      `nothing yet on ${labels.join(" ")} — ${last}. Start the waiter again: bash "$HOME/scripts/run-state.sh" wait --park`,
+    );
+    return 3;
+  }
+
+  /** A wake-up booked on the platform for this session's parked item: what keeps it held across a restart. */
+  booked(args: readonly string[]): number {
+    this.needSession();
+    const lock = this.locks.ofKind("item-").find((h) => h.owner.session === this.kit.me && h.owner.parked_at !== "");
+    if (!lock) {
+      this.say("this session holds no parked item — park <pr> first");
+      return 1;
+    }
+    const at = args[0] ?? "";
+    if (epoch(at) === undefined) {
+      this.say("booked <iso time> [schedule id] — when the platform wakes this session");
+      return 2;
+    }
+    this.locks.update(lock.name, { wake_at: at, booking: args[1] ?? "" });
+    this.out(`#${lock.owner.item}: held until ${at} by the booking, ${BOOKING_GRACE_MIN} minutes' grace after`);
+    return 0;
+  }
+
+  /**
+   * Whether this session may end its turn: the Stop hook's question, in one
+   * place any harness's hook can ask. It may with nothing held; in a session a
+   * person is present in; or with its item parked and something to wake it.
+   * Otherwise it says the one thing left, on stderr, and exits 1.
+   */
+  async mayStop(): Promise<number> {
+    const me = this.kit.me;
+    if (!me) return 0;
+    const mine = this.locks.all().filter((h) => h.owner.session === me);
+    if (mine.length === 0) return 0;
+    if (ATTENDED.has(await this.deps.runtime.sessionType(me))) return 0;
+    const item = mine.find((h) => h.name.startsWith("item-"));
+    const holds = mine.filter((h) => !h.name.startsWith("item-")).map((h) => h.name);
+    if (item && item.owner.parked_at !== "" && holds.length === 0) {
+      if (this.locks.parkedHolder(item.owner) !== "") return 0;
+      this.say(`#${item.owner.item} is parked, but nothing will wake this session:`);
+      this.say(
+        'start its waiter as a background task — bash "$HOME/scripts/run-state.sh" wait --park — then end the turn.',
+      );
+      return 1;
+    }
+    if (holds.includes("exclusive")) this.say("you hold the exclusive lock: unlock it, or finish.");
+    this.say(`this run still holds #${item?.owner.item ?? "?"}, last at "${item?.owner.phase ?? ""}".`);
+    return 1;
   }
 
   async lock(): Promise<number> {
@@ -498,13 +809,11 @@ class RunState {
         this.itemKey(item, "babysat_out") !== "yes" &&
         this.kit.cfg.mode() !== "interactive"
       ) {
-        this.say(`#${item} has pull request #${pr}, and a run keeps its pull request until it is done:`);
+        this.say(`#${item} has pull request #${pr}, and a run keeps its pull request until it is merged:`);
         this.say(
-          `babysit it — bash "$HOME/scripts/run-state.sh" wait ${pr} — and finish released once it is approved, green and mergeable,`,
+          `babysit it — bash "$HOME/scripts/run-state.sh" wait ${pr} — and once a person moves next, park it: run-state.sh park ${pr}.`,
         );
-        this.say(
-          "blocked when it cannot get there, or pr-updated once wait says babysit_max_hours is up (docs/babysit.md).",
-        );
+        this.say("Finish released once it is merged or closed, blocked when it cannot get green (docs/babysit.md).");
         return 1;
       }
       const r = await reported(this.kit, item, outcome, pr, since);
@@ -527,10 +836,10 @@ class RunState {
         outcome === "waiting-lock" || outcome === "needs-info" || outcome === "released" || outcome === "blocked"
           ? outcome
           : "parked";
+      // the session that last held it stays on record: the next start says whether it came back
       this.writeItem(item, {
         state,
         ...(pr ? { pr } : {}),
-        session: "-",
         babysit_since: "-",
         round_at: "-",
         babysat_out: "-",
@@ -555,9 +864,7 @@ class RunState {
       const where = ts
         ? `as a reply in thread ${ts} of slack_channel ${chat}`
         : `to slack_channel ${chat}, and record its thread`;
-      if (outcome === "released") {
-        if (pr) this.say(`notify: if #${pr} is still open, post that it is ready to merge ${where} (docs/notify.md)`);
-      } else this.say(`notify: post this ${outcome} ${where} (docs/notify.md)`);
+      if (outcome !== "released") this.say(`notify: post this ${outcome} ${where} (docs/notify.md)`);
     }
     return 0;
   }
@@ -576,6 +883,21 @@ class RunState {
       if (h.name === "exclusive") {
         mkdirSync(this.locks.dir, { recursive: true });
         appendFileSync(join(this.locks.dir, "exclusive.dirty"), "");
+      } else if (h.name.startsWith("item-") && h.owner.parked_at !== "") {
+        // a parked item whose waiter died with no booking behind it: the next tick picks it up as a run that stopped
+        if (item) {
+          this.writeItem(item, { state: "abandoned", updated_at: this.now() });
+          abandoned.push(`#${item}`);
+        }
+        this.logLine(
+          "abandoned",
+          h.owner.session,
+          item,
+          "-",
+          this.itemKey(item, "pr").split(/\s+/).filter(Boolean).join(","),
+          h.owner.parked_at,
+          `reason="parked, its waiter gone and no wake-up booked"`,
+        );
       } else if (h.name.startsWith("slot-")) {
         if (item) {
           const n = Number(this.itemKey(item, "abandoned") || 0);
@@ -705,6 +1027,12 @@ export const runState: Command = async (deps, args) => {
       return rs.phase(rest);
     case "wait":
       return rs.wait(rest);
+    case "park":
+      return rs.park(rest);
+    case "booked":
+      return rs.booked(rest);
+    case "may-stop":
+      return rs.mayStop();
     case "lock":
       return rs.lock();
     case "unlock":

@@ -24,14 +24,16 @@ from an issue:
 With `mode: interactive` nothing watches GitHub: no schedule runs, and the
 precheck wakes nothing. What changes for a run:
 
-- **The pull request is the operator's to bring back.** No later run takes it
-  over, so a run does not babysit it in the turn: open it, give the operator
-  its link, and `finish pr-opened <pr>` — `finish` does not ask for the
-  babysitting here.
-- **A review round** starts when the operator asks for one:
+- **The session carries its pull request to the merge.** Open it, give the
+  operator its link, then park it with its waiter running and a wake-up booked
+  ([babysit.md](babysit.md) → **Held, then parked**): a review, a comment — after
+  approval too — a red check or the merge wakes this same session, and so does
+  the operator typing here. No tick takes it over. `finish pr-opened <pr>`
+  instead hands it to the operator to bring back.
+- **A review round** in another session starts when the operator asks for one:
   `run-state.sh start pr<pr> <its branch>`, one round as
   [babysit.md](babysit.md) → **Each time you hold one** says, its comment with
   this run's session link, then `finish pr-updated`.
-- **Done** — approved, or merged, or the operator drops it: take the claim off
+- **Done** — merged, or the operator drops it: take the claim off
   its issue, comment the issue, `finish released`. Giving up is the same, the
   comment saying why: there is no failed label to swap in, and nobody to wake.
