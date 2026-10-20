@@ -818,6 +818,31 @@ test("a parked item with nothing left to wake it is handed on, and its next run 
     assert.match(s.read("work/TICK.log"), /resumed session=sess-b issue=7 .*cause=fresh prev=sess-a$/m);
   }));
 
+test("a parked item woken while every slot is busy stays parked, not freed", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- waiter: 99\n- waiter_boot: boot-1\n`);
+    for (const [sess, n] of [
+      ["sess-b", "8"],
+      ["sess-c", "9"],
+      ["sess-d", "10"],
+    ] as const) {
+      s.runtime.running.add(sess);
+      assert.equal((await as(s, sess, "start", n, `feat/${n}`)).rc, 0);
+    }
+    const r = await s.run(runState, ["start", "7"], { CLAUDE_CODE_SESSION_ID: "sess-a", SD_LIVE_PIDS: "99" });
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /#7 stays parked/);
+    assert.match(s.read("locks/item-7/owner"), /^- parked_at: /m, "still parked");
+    s.runtime.running.add("sess-e");
+    assert.equal((await as(s, "sess-e", "start", "7", "feat/7")).rc, 1, "no other run takes it");
+  }));
+
 test("wait refuses while the exclusive lock is held", () =>
   inSandbox(async (s) => {
     world(s);

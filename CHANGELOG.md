@@ -9,6 +9,18 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.2.1 — 2026-10-20
+
+**Fixes from the review of 6.1.0 and 6.2.0.** `start` on a parked item while
+every slot is busy now leaves it parked; before, it dropped the item lock, and
+the next run could take the item from its session. The control room's page
+build no longer expands `$'` or `$&` in an issue or pull request title, which
+could close the snapshot's `<script>` early and inject markup. Its API answers
+400 to a request target that cannot parse, instead of exiting.
+
+**Upgrade:** none. A running `bin/sd control-room` picks up the fix once
+restarted.
+
 ## 6.2.0 — 2026-10-20
 
 **The control room** ([`app/README.md`](app/README.md) → **The control room**):
