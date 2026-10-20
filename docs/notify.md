@@ -10,7 +10,7 @@ Missing, or Slack not connected to this agent: post nothing, say nothing.
 
 | Moment | Outcome | Post |
 | --- | --- | --- |
-| Pull request done: approved, green, mergeable | `finish released`, the pull request still open | ✅ `<repo>#<pr>` is ready to merge — `<title>` |
+| Pull request approved, green, mergeable | `park`, once per pull request | ✅ `<repo>#<pr>` is ready to merge — `<title>` |
 | A question for a person | `finish needs-info` | ❓ `<repo>#<n>` needs info — the question, in one line |
 | Cannot go on | `finish blocked` | 🛑 `<repo>#<n>` is blocked — what fails, in one line |
 | Weekly audit | the audit's report | the report's header and its **Action needed** lines |

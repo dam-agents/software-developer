@@ -244,20 +244,84 @@ test("repos_also: one search covers them, and a pull request there wakes its iss
     assert.match(r.out, /#4 Four/);
   }));
 
-test("an approved pull request is never work, red or reviewed again", () =>
+test("an approved pull request is babysat until merged: a red check or a maintainer's comment is work", () =>
   inSandbox(async (s) => {
+    const pr = (extra: Record<string, unknown>) => ({
+      number: 40,
+      title: "Forty",
+      url: "https://gh/pr/40",
+      reviewDecision: "APPROVED",
+      body: "Fixes #4",
+      latestReviews: [{ author: { login: "maintainer" }, state: "APPROVED", submittedAt: "2026-09-24T10:05:00Z" }],
+      statusCheckRollup: [],
+      ...extra,
+    });
+    const since = { PLATFORM_LAST_RUN_AT: "2026-09-24T10:00:00Z" };
+    gql(s, [pr({})]);
+    assert.equal((await pc(s, since)).rc, 1, "approved and quiet: it waits for a person");
+    gql(s, [pr({ statusCheckRollup: [{ name: "test", conclusion: "FAILURE", completedAt: "2026-09-24T10:06:00Z" }] })]);
+    let r = await pc(s, since);
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /#4 — PR #40 Forty — checks failed: test/);
+    const say = (login: string, association: string, body = "please rename it") => ({
+      author: { __typename: "User", login },
+      authorAssociation: association,
+      body,
+      updatedAt: "2026-09-24T10:07:00Z",
+    });
+    gql(s, [
+      pr({ comments: { nodes: [say("passer-by", "NONE"), say("dev-bot", "MEMBER", "Written by this agent — x")] } }),
+    ]);
+    assert.equal((await pc(s, since)).rc, 1, "after approval, only a maintainer's comment is a work order");
+    gql(s, [pr({ comments: { nodes: [say("alice", "MEMBER")] } })]);
+    r = await pc(s, since);
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /#4 — PR #40 Forty — commented after approval; answer every comment/);
+  }));
+
+test("a parked item is its session's: the precheck leaves it while something will wake it", () =>
+  inSandbox(async (s) => {
+    s.item("4", { state: "in-review", pr: "40", session: "sess-a" });
+    s.lock("item-4", {
+      session: "sess-a",
+      item: "4",
+      since: s.clock.ago(300),
+      parked_at: s.clock.ago(200),
+      wake_at: s.clock.ago(-60),
+    });
     gql(s, [
       {
         number: 40,
         title: "Forty",
         url: "https://gh/pr/40",
-        reviewDecision: "APPROVED",
+        reviewDecision: "CHANGES_REQUESTED",
         body: "Fixes #4",
-        latestReviews: [{ author: { login: "maintainer" }, state: "APPROVED", submittedAt: "2026-09-24T10:05:00Z" }],
-        statusCheckRollup: [{ name: "test", conclusion: "FAILURE", completedAt: "2026-09-24T10:06:00Z" }],
+        latestReviews: [{ author: { login: "guardian" }, state: "CHANGES_REQUESTED", submittedAt: s.clock.ago(1) }],
+        statusCheckRollup: [],
       },
     ]);
-    assert.equal((await pc(s, { PLATFORM_LAST_RUN_AT: "2026-09-24T10:00:00Z" })).rc, 1, "waits for a person");
+    assert.equal((await pc(s)).rc, 1, "its booked wake-up holds it");
+    s.write(
+      "locks/item-4/owner",
+      s.read("locks/item-4/owner").replace(/^- wake_at: .*$/m, `- wake_at: ${s.clock.ago(120)}`),
+    );
+    const r = await pc(s);
+    assert.equal(r.rc, 0, "waiter and booking gone: a fresh run takes the review");
+    assert.match(r.out, /stopped without finishing/);
+    assert.match(r.out, /#4 — PR #40 Forty — reviewed/);
+    assert.match(
+      s.read("work/TICK.log"),
+      /abandoned session=sess-a issue=4 .*reason="parked, its waiter gone and no wake-up booked"/,
+    );
+  }));
+
+test("merged while parked with nothing to see it: the precheck lists it to release", () =>
+  inSandbox(async (s) => {
+    s.item("4", { state: "awaiting-merge", pr: "40" });
+    gql(s, []);
+    const r = await pc(s);
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /Merged or closed while parked — release:\n- #4 — its pull request is merged or closed/);
   }));
 
 test("what waits on a person is not work", () =>

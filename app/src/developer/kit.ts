@@ -11,6 +11,9 @@ import { Locks } from "../factory/locks.ts";
 /** How long an attended session's locks wait for it before they read stale. */
 export const ATTENDED_STALE_MIN = 120;
 
+/** How long a waiter watches before it hands the turn back: under the two hours a harness background task may run. */
+export const PARK_FOR_SECONDS = 6900;
+
 export const ITEM_KEYS = [
   "item",
   "state",
@@ -23,6 +26,8 @@ export const ITEM_KEYS = [
   "babysit_since",
   "round_at",
   "babysat_out",
+  // the pull request a Slack "ready to merge" post was asked for, so it is asked once
+  "notified",
   "updated_at",
 ] as const;
 
@@ -84,6 +89,8 @@ export class Kit {
       runtime: deps.runtime,
       attendedStaleMin: ATTENDED_STALE_MIN,
       writer: WRITER,
+      // a test names the waiter pids it pretends are alive; a real run reads /proc
+      ...(env.SD_LIVE_PIDS !== undefined ? { livePids: new Set(env.SD_LIVE_PIDS.split(/\s+/).filter(Boolean)) } : {}),
     });
   }
 

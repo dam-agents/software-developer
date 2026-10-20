@@ -85,20 +85,26 @@ test("finish gives everything back and logs the run", () =>
     assert.equal(s.slot(2), "feat/7", "7 resumes its branch from the item record");
   }));
 
-test("with slack_channel set, finish says what to post, and only for a moment a person acts on", () =>
+test("with slack_channel set, park and finish say what to post, and only for a moment a person acts on", () =>
   inSandbox(async (s) => {
     world(s);
     s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
     await as(s, "sess-a", "start", "7", "feat/7");
-    let r = await as(s, "sess-a", "finish", "released", "21");
+    let r = await as(s, "sess-a", "park", "21");
     assert.doesNotMatch(r.err, /notify:/, "unset: no posts");
+    await as(s, "sess-a", "start", "7", "feat/7");
     s.config("- slack_channel: C0123ABCD");
+    s.write("work/items/7.md", s.read("work/items/7.md").replace(/^- notified: .*\n/m, ""));
+    r = await as(s, "sess-a", "park", "21");
+    assert.match(r.err, /notify: post that #21 is ready to merge to slack_channel C0123ABCD, and record its thread/);
+    await as(s, "sess-a", "start", "7", "feat/7");
+    r = await as(s, "sess-a", "park", "21");
+    assert.doesNotMatch(r.err, /notify:/, "said once for the same pull request");
     await as(s, "sess-a", "start", "7", "feat/7");
     r = await as(s, "sess-a", "finish", "released", "21");
-    assert.match(
-      r.err,
-      /notify: if #21 is still open, post that it is ready to merge to slack_channel C0123ABCD, and record its thread/,
-    );
+    assert.doesNotMatch(r.err, /notify:/, "merged: nothing left for a person to do");
     await as(s, "sess-a", "start", "7", "feat/7");
     s.github.on(ISSUE, { labels: [{ name: "agent/failed" }] });
     r = await as(s, "sess-a", "finish", "blocked");
@@ -133,7 +139,10 @@ test("a thread the item already has in Slack takes its posts, and only one the a
           body: "Ready to merge. sess-a\n<!-- slack-thread: C9999ZZZZ 1700000000.000555 -->",
         },
       ]);
-    const r = await as(s, "sess-a", "finish", "released", "21");
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
+    const r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 0, r.err);
     assert.match(r.err, /ready to merge as a reply in thread 1700000000\.000100 of slack_channel C0123ABCD/);
   }));
 
@@ -374,7 +383,7 @@ test("wait comes back with nothing yet while checks run, then with a review", ()
     assert.equal(r.rc, 3, "a review already answered is not new");
   }));
 
-test("wait says done once approved, green and mergeable, and then finish releases", () =>
+test("approved is a wait for the merge; merged is done, and then finish releases", () =>
   inSandbox(async (s) => {
     world(s);
     s.originCheckout();
@@ -382,13 +391,17 @@ test("wait says done once approved, green and mergeable, and then finish release
     await as(s, "sess-a", "start", "7", "feat/7");
     s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
     let r = await as(s, "sess-a", "wait", "21");
+    assert.equal(r.rc, 3, "approved, green and mergeable still waits for a person");
+    assert.match(r.out, /approved, green and mergeable: waiting to be merged/);
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
+    r = await as(s, "sess-a", "wait", "21");
     assert.equal(r.rc, 0);
-    assert.match(r.out, /done — approved, green and mergeable/);
+    assert.match(r.out, /merged — the pull request is merged: release the issue/);
     r = await as(s, "sess-a", "finish", "released", "21");
     assert.equal(r.rc, 0, r.err);
   }));
 
-test("a review on an approved pull request is not a round", () =>
+test("a second approval is not a round; findings after approval are", () =>
   inSandbox(async (s) => {
     world(s);
     s.originCheckout();
@@ -397,11 +410,12 @@ test("a review on an approved pull request is not a round", () =>
     const late = [{ author: { login: "guardian" }, state: "APPROVED", submittedAt: s.clock.ago(-1) }];
     s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN, late)];
     let r = await as(s, "sess-a", "wait", "21");
-    assert.equal(r.rc, 0);
-    assert.match(r.out, /done — approved, green and mergeable/);
-    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", RUNNING, late)];
+    assert.equal(r.rc, 3, "an approval on an approved pull request is nothing to do");
+    const findings = [{ author: { login: "alice" }, state: "COMMENTED", submittedAt: s.clock.ago(-2) }];
+    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN, findings)];
     r = await as(s, "sess-a", "wait", "21");
-    assert.equal(r.rc, 3, "checks still running: nothing yet");
+    assert.equal(r.rc, 0, "a review with findings after approval is a round");
+    assert.match(r.out, /reviewed by alice \(COMMENTED\)/);
   }));
 
 test("a failed check is something to do", () =>
@@ -471,7 +485,7 @@ test("GraphQL refused, wait reads REST, and an approval there is never done", ()
     await as(s, "sess-a", "start", "7", "feat/7");
     let r = await as(s, "sess-a", "wait", "21");
     assert.equal(r.rc, 3, "not done");
-    assert.match(r.out, /approved by its reviews and green; GitHub's review decision is unreadable/);
+    assert.match(r.out, /approved, green and mergeable: waiting to be merged/);
     s.github.on(/\/reviews/, [
       { user: { login: "guardian" }, state: "CHANGES_REQUESTED", submitted_at: s.clock.ago(-1) },
     ]);
@@ -616,10 +630,10 @@ test("several pull requests: Fixes on one, Part of on the others, and wait waits
     assert.equal(r.rc, 3, "one approved is not done");
     assert.match(r.out, /beta\/kits#30: checks running/);
     assert.equal(s.field("items/7.md", "pr"), "21 beta/kits#30");
-    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
     r = await as(s, "sess-a", "wait", "21", "beta/kits#30");
     assert.equal(r.rc, 0);
-    assert.match(r.out, /done — every pull request is approved/);
+    assert.match(r.out, /merged — every pull request is merged/);
     assert.equal((await as(s, "sess-a", "wait", "21", "kits#x")).rc, 2, "a malformed ref");
   }));
 
@@ -634,6 +648,211 @@ test("interactive: the operator holds the pull request, so opening it ends the r
     assert.equal(r.rc, 0, r.err);
     assert.ok(!existsSync(join(s.locks, "item-7")), "kept the item");
     assert.equal(s.field("items/7.md", "pr"), "21");
+  }));
+
+const COMMENTS21 = /^repos\/[^/]+\/[^/]+\/issues\/21\/comments/;
+
+test("park frees the slot and the exclusive lock, keeps the item, and needs the round reported", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "lock");
+    s.github.on(COMMENTS, []);
+    let r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 1, "no report yet");
+    assert.match(r.err, /not reported yet/);
+    s.github.on(COMMENTS, [{ user: { login: "dev-bot" }, body: "Round 1 pushed. sess-a" }]);
+    r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /parked #7 \(in-review\)/);
+    assert.match(r.out, /wait --park/);
+    assert.deepEqual(locks(s).sort(), ["item-7"], "the item alone stays");
+    assert.equal(s.field("items/7.md", "state"), "in-review");
+    assert.equal(s.field("items/7.md", "session"), "sess-a");
+    assert.notEqual(s.read("locks/item-7/owner").match(/^- parked_at: /m), null);
+    assert.match(s.read("work/TICK.log"), /parked session=sess-a issue=7 slot=1 pr=21 .*state=in-review/);
+    // another run cannot take it, and every slot is free for other items
+    assert.equal((await as(s, "sess-b", "start", "7", "feat/7")).rc, 1);
+    assert.equal((await as(s, "sess-b", "start", "8", "feat/8")).rc, 0);
+  }));
+
+test("park refuses unpushed work, and merged pull requests are released, not parked", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    await as(s, "sess-a", "start", "7", "feat/7");
+    writeFileSync(join(s.work, "slots", "1", "new.txt"), "x\n");
+    let r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /push it to its branch first/);
+    rmSync(join(s.work, "slots", "1", "new.txt"));
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
+    r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /merged or closed — nothing waits: release the issue/);
+    assert.equal((await as(s, "sess-a", "park")).rc, 2, "names no pull request");
+  }));
+
+test("approved, it parks awaiting the merge", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    const r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 0, r.err);
+    assert.equal(s.field("items/7.md", "state"), "awaiting-merge");
+  }));
+
+test("the waiter wakes its session for a comment after approval, and for the merge", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    const waiter = (env: Record<string, string> = {}) =>
+      s.run(runState, ["wait", "--park"], {
+        CLAUDE_CODE_SESSION_ID: "sess-a",
+        SD_PARK_FOR: "3",
+        SD_WAIT_POLL: "1",
+        SD_WAITER_PID: "777",
+        ...env,
+      });
+    let r = await waiter();
+    assert.equal(r.rc, 3, "nothing came");
+    assert.match(r.out, /Start the waiter again/);
+    assert.doesNotMatch(s.read("locks/item-7/owner"), /^- waiter: /m, "an exited waiter leaves no pid behind");
+    s.clock.advance(5);
+    s.github.on(COMMENTS21, [
+      { user: { login: "passer-by" }, author_association: "NONE", body: "+1", created_at: iso(s.clock.now()) },
+      {
+        user: { login: "alice" },
+        author_association: "MEMBER",
+        body: "Rename the flag first",
+        created_at: iso(s.clock.now()),
+      },
+    ]);
+    r = await waiter();
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /#7 needs this session — commented by alice, after approval: answer every comment/);
+    assert.match(r.out, /run-state\.sh" start 7/);
+    assert.match(s.read("locks/item-7/owner"), /^- woke: waiter$/m);
+    // the session takes it back: logged as continued, by its waiter
+    r = await as(s, "sess-a", "start", "7");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(s.read("work/TICK.log"), /resumed session=sess-a issue=7 slot=1 pr=21 .*cause=waiter$/m);
+    assert.doesNotMatch(s.read("locks/item-7/owner"), /^- (parked_at|woke|waiter):/m, "the turn holds it again");
+    // parked again, the merge wakes it
+    s.github.on(COMMENTS, [{ user: { login: "dev-bot" }, body: "Renamed. sess-a" }]);
+    await as(s, "sess-a", "park", "21");
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
+    r = await waiter();
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /merged — the pull request is merged: release the issue/);
+  }));
+
+test("a second waiter steps aside, and a waiter whose session took its item back stops", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- waiter: 555\n- waiter_boot: boot-1\n`);
+    const r = await s.run(runState, ["wait", "--park"], {
+      CLAUDE_CODE_SESSION_ID: "sess-a",
+      SD_WAITER_PID: "777",
+      SD_LIVE_PIDS: "555",
+    });
+    assert.equal(r.rc, 5);
+    assert.match(r.out, /already has a waiter \(pid 555\)/);
+    await as(s, "sess-a", "start", "7");
+    const w = await s.run(runState, ["wait", "--park"], { CLAUDE_CODE_SESSION_ID: "sess-a", SD_WAITER_PID: "777" });
+    assert.equal(w.rc, 1, "nothing parked any more");
+  }));
+
+test("a booked wake-up holds a parked item across a restart, and resumes the same session", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.runtime.running.delete("sess-a");
+    assert.equal((await as(s, "sess-a", "booked", "garbage")).rc, 2);
+    let r = await as(s, "sess-a", "booked", s.clock.ago(-120), "sched-1");
+    assert.equal(r.rc, 0, r.err);
+    await as(s, "sess-b", "sweep");
+    assert.ok(existsSync(join(s.locks, "item-7")), "the booking holds it: no waiter, the session not running");
+    s.clock.advance(121 * 60);
+    r = await as(s, "sess-a", "start", "7");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(s.read("work/TICK.log"), /resumed session=sess-a issue=7 .*cause=booking$/m);
+  }));
+
+test("a parked item with nothing left to wake it is handed on, and its next run says so", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    await as(s, "sess-a", "booked", s.clock.ago(-10));
+    s.runtime.running.delete("sess-a");
+    s.clock.advance(41 * 60);
+    await as(s, "sess-b", "sweep");
+    assert.ok(!existsSync(join(s.locks, "item-7")), "the booking is overdue past its grace, its waiter gone");
+    assert.match(s.read("work/TICK.log"), /abandoned session=sess-a issue=7 .*parked, its waiter gone/);
+    const r = await as(s, "sess-b", "start", "7");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(s.read("work/TICK.log"), /resumed session=sess-b issue=7 .*cause=fresh prev=sess-a$/m);
+  }));
+
+test("wait refuses while the exclusive lock is held", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "lock");
+    const r = await as(s, "sess-a", "wait", "21");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /you hold the exclusive lock: unlock it first/);
+  }));
+
+test("may-stop: a held run may not; at rest it may", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    assert.equal((await as(s, "sess-a", "may-stop")).rc, 0, "nothing held");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    let r = await as(s, "sess-a", "may-stop");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /this run still holds #7/);
+    await as(s, "sess-a", "park", "21");
+    r = await as(s, "sess-a", "may-stop");
+    assert.equal(r.rc, 1, "parked with nothing to wake it");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- waiter: 99\n- waiter_boot: boot-1\n`);
+    r = await s.run(runState, ["may-stop"], { CLAUDE_CODE_SESSION_ID: "sess-a", SD_LIVE_PIDS: "99" });
+    assert.equal(r.rc, 0, "its waiter runs");
+    r = await s.run(runState, ["may-stop"], {
+      CLAUDE_CODE_SESSION_ID: "sess-a",
+      SD_LIVE_PIDS: "99",
+      SD_BOOT_ID: "boot-2",
+    });
+    assert.equal(r.rc, 1, "after a restart, the same pid is not its waiter");
   }));
 
 test("unknown verbs and outcomes are usage errors", () =>

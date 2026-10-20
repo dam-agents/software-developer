@@ -13,16 +13,22 @@ apart is three kinds of lock, taken atomically in `work/locks`:
 
 | Lock | Taken by | Held for |
 | --- | --- | --- |
-| item `<n>` | `start <n>` | the run — no two runs on one issue |
-| slot `<k>` | `start <n>` | the run — one worktree, one run |
-| exclusive | `lock` | the steps on what `exclusive` names; `unlock` or `finish` gives it back |
+| item `<n>` | `start <n>` | until its pull request merges, parked between turns — no two runs on one issue |
+| slot `<k>` | `start <n>` | the turn's work — one worktree, one run; `park` or `finish` gives it back |
+| exclusive | `lock` | the steps on what `exclusive` names; `unlock`, `park` or `finish` gives it back |
 
-An item is held until its pull request is done, not until it is opened: the run
-that opens it babysits it with `run-state.sh wait <pr>`
-([babysit.md](babysit.md)), and that is why it keeps its slot meanwhile.
+An item is held until its pull request is merged, not until it is opened or
+approved: the session that opens it babysits it ([babysit.md](babysit.md)). While
+it works it holds a slot; while a person moves it is **parked** — `park` gives
+the slot and the exclusive lock back and keeps the item lock alone, so no other
+run takes it and every slot stays free for other work.
 
-**A lock never outlives the turn that took it, nor dies before it.** A holder
-is dead when the runtime says its session is not running a turn. A restart is
+**A lock never outlives its holder, nor dies before it.** A holder is the turn
+that took the lock, dead when the runtime says its session is not running a
+turn. A parked item lock's holder is what wakes its session: its waiter, a
+process on this boot, or a wake-up booked on the platform not yet past half an
+hour overdue. With neither, it is dead like any other, and the next tick takes
+the item over. A restart is
 no proof: the locks live on the home volume and survive it, and the platform
 resumes the interrupted turn, which still holds them. The direct session is the
 one exception: it ends its turns between the operator's messages and to wait
@@ -113,8 +119,9 @@ lock; then `run-state.sh lock`.
 ## Reports
 
 Nobody reads a scheduled run's turn, so every run ends with its outcome on
-GitHub, and `finish` checks that it is there before it gives the item back.
-It reads, never writes:
+GitHub, and `finish` checks that it is there before it gives the item back —
+`park` too, as for `pr-updated`, before it gives the slot back. It reads, never
+writes:
 
 - **Every outcome:** nothing unpushed in the slot.
 - **`pr-opened`:** the pull request is open, opened by `author`, says
