@@ -16,6 +16,9 @@
 !/CHANGELOG.md
 !/docs/
 !/scripts/
+!/bin/
+!/app/
+/app/node_modules/
 !/.github/
 !/.agents/
 # The platform installs its own skills beside ours in .agents/skills/: only

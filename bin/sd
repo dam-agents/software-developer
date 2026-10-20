@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# sd — this definition's app (app/README.md): every verb a run, a schedule's
+# precheck or a hook calls. Node runs the TypeScript as it is, so there is no
+# build step and nothing compiled to keep in step with the source.
+#
+# Node is looked up on PATH, then where mise keeps it: a schedule's precheck
+# runs under `bash -lc`, whose profile puts mise's tools on PATH, but a hook
+# may start with less.
+#
+# WORKAROUND (environment, not this definition): the image's mise has a shim
+# for `bash` (conda:bash) that refuses to run inside another shimmed bash —
+# "shim fallback recursion detected". So the scripts/ shims run this file with
+# the bash already running ("$BASH"), never through `env bash` again.
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+NODE="$(command -v node 2>/dev/null)" ||
+  NODE="$(mise which node 2>/dev/null)" ||
+  NODE="$(ls -d /usr/share/mise/installs/node/latest/bin/node "$HOME"/.local/share/mise/installs/node/*/bin/node 2>/dev/null | head -1)"
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  echo "sd: no node on PATH — the app needs Node 22.18 or newer (app/README.md)" >&2
+  exit 127
+fi
+exec "$NODE" --disable-warning=ExperimentalWarning "$ROOT/app/src/cli.ts" "$@"

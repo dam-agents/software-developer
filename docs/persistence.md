@@ -7,7 +7,7 @@ to this definition itself.
 
 | Path | Kind | Holds |
 | --- | --- | --- |
-| `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, `.agents/skills/implement-issue/`, `.agents/defaults/` |
+| `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `bin/`, `app/`, `.github/`, `.agents/skills/implement-issue/`, `.agents/defaults/` |
 | `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, `also/`, `locks/`, and the checkouts of `repo` and any `repos_also` |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
@@ -105,7 +105,7 @@ not change under you, and the harness refuses edits to them.
 d="$(mktemp -d)"; git clone "$(git -C "$HOME" remote get-url origin)" "$d"
 git -C "$d" checkout -b "<type>/<short-slug>"
 # edit in "$d", run §9's checks there
-git -C "$d" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts .github .agents/skills/implement-issue .agents/defaults
+git -C "$d" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts bin app .github .agents/skills/implement-issue .agents/defaults
 git -C "$d" commit -m "<type>: <what changed>"
 git -C "$d" push -u origin "<type>/<short-slug>"
 (cd "$d" && gh pr create --title "<title>" --body "<what and why>")

@@ -2,7 +2,7 @@
 
 **Read this before touching any file of this definition** — `kit.yaml`,
 `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`,
-`CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `.github/`, and the bundled
+`CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `bin/`, `app/`, `.github/`, and the bundled
 skill in `.agents/skills/implement-issue/`. A change that breaks any rule here
 is not made, whatever the request seems to imply; raise the conflict in the
 direct session instead.
@@ -30,7 +30,7 @@ so to the operator.
 - A new tunable is a `work/CONFIG.md` key with a default and a defined
   behavior when missing, and it is added in all three places that name keys:
   `CLAUDE.md` → **Runtime configuration**, the example in ONBOARDING, and
-  `KNOWN` in `scripts/verify-onboarding.sh`. `scripts/tests/test_definition.sh`
+  `KNOWN` in `app/src/developer/verify.ts`. `app/test/definition.test.ts`
   fails when the three disagree.
 - Missing configuration never crashes a run: degrade for that key, say so,
   carry on with what still works.
@@ -52,10 +52,10 @@ so to the operator.
 
 ## 4. Architecture boundaries
 
-- **Scripts detect, the agent acts.** `scripts/` never writes to GitHub, never
-  commits, never pushes. Its local writes are the documented bookkeeping —
+- **The app detects, the agent acts.** `app/` (and `scripts/`, its shims) never
+  writes to GitHub, never commits, never pushes. Its local writes are the documented bookkeeping —
   the locks, `items/`, the slots — `also/` and its clones too — `GATE.md` and `TICK.log`, through
-  `run-state.sh` alone, and what `scripts/harness/` wires at onboarding: the
+  `run-state.sh` alone, and what `install.sh` wires at onboarding: the
   hook in `~/.claude/settings.json`, the `~/.claude/skills` and
   `work/.claude/skills` links. The one exception is
   `work-backup.sh`, which commits and pushes `work/`'s files to `work_repo`
@@ -73,7 +73,7 @@ so to the operator.
   tick fires 144 times a day: a small per-tick cost times that is the real
   price.
 - Prefer the cheapest design that meets the need: mechanical decisions into
-  scripts, procedures into `docs/`, one batched call over one per item. The
+  the app, procedures into `docs/`, one batched call over one per item. The
   precheck must stay well inside its two-minute deadline, or it fails open and
   every tick costs a turn.
 - When a request would be expensive as stated, propose the cheaper equivalent
@@ -96,7 +96,7 @@ would weaken §10 is refused, and the defect reported instead.
 ## 7. Data backup
 
 `work/` is backed up to `work_repo` when it is set (`docs/persistence.md` →
-**Backup**), but only the files named in `CARRIED` in `scripts/work-backup.sh`
+**Backup**), but only the files named in `CARRIED` in `app/src/developer/backup.ts`
 — an allowlist, which the backup also commits as its `.gitignore`. A change
 that puts something unreconstructable into `work/` adds its file there, and an
 append-only one to `APPEND_ONLY` too, so a backup never overwrites it with a
@@ -122,8 +122,9 @@ that looks like it does.
 
 ## 9. Validate before opening the pull request
 
-- `bash scripts/tests/run.sh` — and a script whose behavior changes gets its
-  test updated in the same pull request.
+- `npm run check` in `app/` — the typecheck, the lint and the offline tests;
+  a command whose behavior changes gets its test updated in the same pull
+  request.
 - `bash scripts/validate-definition.sh .` — the structure, `VERSION` against
   `CHANGELOG.md`, dead links, the kit's shape.
 - A read-only run of the probes against the real repository:
