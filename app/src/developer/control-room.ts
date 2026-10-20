@@ -667,8 +667,10 @@ function send(res: ServerResponse, code: number, value: unknown): void {
 /** The HTTP API, bound to 127.0.0.1 alone: the platform carries the page's requests to it. */
 export function handler(room: ControlRoom) {
   return async (req: IncomingMessage, res: ServerResponse) => {
-    const path = new URL(req.url ?? "/", "http://x").pathname;
     try {
+      // inside the try: a target URL cannot parse (`//`, `//[`) is a 400, not a crashed server
+      const path = URL.canParse(req.url ?? "/", "http://x") ? new URL(req.url ?? "/", "http://x").pathname : "";
+      if (!path) return send(res, 400, { error: "bad request target" });
       if (req.method === "GET" && path === "/state") return send(res, 200, await room.snapshot());
       if (req.method === "GET" && path === "/health") return send(res, 200, { ok: true });
       if (req.method === "GET" && path === "/history") return send(res, 200, room.history());
@@ -718,7 +720,8 @@ export const controlRoom: Command = async (deps, args) => {
 export function buildPage(template: string, snapshot: unknown): string {
   if (template.split("__SNAPSHOT__").length !== 2) throw new Error("page.html: expected exactly one __SNAPSHOT__");
   const blob = JSON.stringify(snapshot).replaceAll("</", "<\\/").replaceAll("<!--", "\\u003c!--");
-  return template.replace("__SNAPSHOT__", blob);
+  // a function, never a string: a `$'` or `$&` in a title would expand to the page around it
+  return template.replace("__SNAPSHOT__", () => blob);
 }
 
 /** `sd control-room-page [out]`: the page with a fresh snapshot built in, for create_artifact. */

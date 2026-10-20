@@ -2,9 +2,10 @@
 // TICK.log and GitHub, read-only, and an API that changes nothing run-state owns.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer, request } from "node:http";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildPage, ControlRoom, readLog, resumeCounts, Store } from "../src/developer/control-room.ts";
+import { buildPage, ControlRoom, handler, readLog, resumeCounts, Store } from "../src/developer/control-room.ts";
 import { APP, inSandbox, type Sandbox } from "./helpers.ts";
 
 /** GitHub's answer to the control room's one query. */
@@ -193,8 +194,41 @@ test("GitHub unreadable is an alarm, never an empty picture", () =>
 
 test("the page builds with its snapshot inside, safe to inline", () => {
   const template = readFileSync(join(APP, "control-room", "page.html"), "utf8");
-  const page = buildPage(template, { note: "</script><!-- x" });
+  const page = buildPage(template, { note: "</script><!-- x", title: "Fix $' $& $` <img src=x onerror=alert(1)>" });
   assert.ok(!page.includes("__SNAPSHOT__"));
   assert.ok(!page.includes('"</script>'), "a closing tag in the data cannot end the script");
+  const blob = page.slice(
+    page.indexOf('id="snapshot">') + 'id="snapshot">'.length,
+    page.indexOf("</script>", page.indexOf('id="snapshot">')),
+  );
+  assert.equal(
+    JSON.parse(blob).title,
+    "Fix $' $& $` <img src=x onerror=alert(1)>",
+    "the snapshot round-trips, its script closed where the page closes it",
+  );
   assert.throws(() => buildPage("no placeholder", {}));
 });
+
+test("a request target that cannot parse is a 400, and the server keeps serving", () =>
+  inSandbox(async (s) => {
+    world(s);
+    const server = createServer(handler(room(s)));
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+    const port = (server.address() as { port: number }).port;
+    const get = (path: string) =>
+      new Promise<number>((resolve, reject) => {
+        const req = request({ host: "127.0.0.1", port, path, method: "GET" }, (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        });
+        req.on("error", reject);
+        req.end();
+      });
+    try {
+      assert.equal(await get("//"), 400);
+      assert.equal(await get("//["), 400);
+      assert.equal(await get("/health"), 200, "still up");
+    } finally {
+      server.close();
+    }
+  }));

@@ -190,8 +190,14 @@ class RunState {
       }
     }
     if (!k) {
-      this.locks.drop(`item-${item}`);
-      this.say(`all ${n} slots are in use — nothing can start now.`);
+      // a parked item stays parked, its waiter and booking untouched: dropping
+      // its lock here would hand it to whichever run comes next
+      if (!parked) this.locks.drop(`item-${item}`);
+      this.say(
+        parked
+          ? `all ${n} slots are in use — #${item} stays parked; start it again once a slot is free (its waiter, started again, wakes you).`
+          : `all ${n} slots are in use — nothing can start now.`,
+      );
       return 1;
     }
     this.locks.update(`slot-${k}`, { item, slot: k });
