@@ -2,7 +2,7 @@
 // request names its issue, a babysitting verdict, and the PATH workaround.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { restPull, verdict } from "../src/developer/pulls.ts";
+import { restPull, toComment, verdict } from "../src/developer/pulls.ts";
 import { Config } from "../src/factory/config.ts";
 import { shimsLast } from "../src/factory/context.ts";
 import { closesRefs, issueRefs, login, parseJsonStream } from "../src/factory/github.ts";
@@ -44,7 +44,7 @@ test("paginated answers parse as one list", () => {
   assert.equal(parseJsonStream("[1,"), undefined);
 });
 
-test("REST's reviews give an approximate decision, and an approximate approval is never done", () => {
+test("REST's reviews give an approximate decision, and only a merge is done", () => {
   const pr = restPull(
     { number: 1, state: "open", mergeable: true, head: { sha: "a" } },
     [
@@ -57,7 +57,33 @@ test("REST's reviews give an approximate decision, and an approximate approval i
   assert.equal(pr.reviewDecision, "APPROVED");
   const v = verdict(pr, "2026-01-03T00:00:00Z", "dev-bot");
   assert.equal(v.act, false);
-  assert.match(v.text, /review decision is unreadable/);
+  assert.match(v.text, /waiting to be merged/);
+  const merged = verdict({ ...pr, state: "MERGED" }, "2026-01-03T00:00:00Z", "dev-bot");
+  assert.ok(merged.act && merged.done);
+});
+
+test("a person's comment is a round; an agent's, a bot's, or a stranger's after approval is not", () => {
+  const pr = restPull(
+    { number: 1, state: "open", mergeable: true, head: { sha: "a" } },
+    [{ user: { login: "guardian" }, state: "APPROVED", submitted_at: "2026-01-02T00:00:00Z" }],
+    { check_runs: [{ id: 1, name: "t", status: "completed", conclusion: "success" }] },
+    { statuses: [] },
+  );
+  const c = (login: string, association: string, body: string, type = "User") =>
+    toComment({ user: { login, type }, author_association: association, body, created_at: "2026-01-04T00:00:00Z" });
+  const since = "2026-01-03T00:00:00Z";
+  const quiet = [
+    c("dev-bot", "MEMBER", "Round 2 pushed. Written by this agent — https://x"),
+    c("codecov", "NONE", "Coverage went up", "Bot"),
+    c("passer-by", "NONE", "+1 please merge"),
+  ];
+  assert.equal(verdict(pr, since, "dev-bot", quiet).act, false, "approved: none of these is a work order");
+  const v = verdict(pr, since, "dev-bot", [...quiet, c("alice", "MEMBER", "Please rename the flag before this lands")]);
+  assert.ok(v.act && !v.done);
+  assert.match(v.text, /commented by alice, after approval: answer every comment/);
+  const open = { ...pr, reviewDecision: "REVIEW_REQUIRED" };
+  assert.ok(verdict(open, since, "dev-bot", [c("passer-by", "NONE", "Why not a flag?")]).act, "in review: anyone's");
+  assert.equal(verdict(pr, "2026-01-05T00:00:00Z", "dev-bot", [c("alice", "MEMBER", "old")]).act, false, "answered");
 });
 
 test("mise shims go last on PATH, the rest in order", () => {

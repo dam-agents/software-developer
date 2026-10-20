@@ -47,6 +47,9 @@ test("a busy week, counted", () =>
         `${a(1500)} abandoned session=c issue=5 pr=- minutes=40 reason="sandbox idle"`,
         `${a(1000)} diagnostic busy_since=x holder=-`,
         `${a(500)} pr-updated session=d issue=3 pr=4 minutes=12`,
+        `${a(400)} resumed session=d issue=3 slot=1 pr=4 minutes=0 cause=waiter`,
+        `${a(300)} resumed session=d issue=3 slot=1 pr=4 minutes=0 cause=operator`,
+        `${a(200)} resumed session=e issue=3 slot=2 pr=4 minutes=0 cause=fresh prev=d`,
         "",
       ].join("\n"),
     );
@@ -74,10 +77,15 @@ test("a busy week, counted", () =>
     assert.match(r.out, /PASS \(live\)/, "runs the verifier first");
     assert.match(
       r.out,
-      /runs: abandoned: 1 diagnostic: 1 nothing: 1 pr-opened: 1 pr-updated: 1/,
+      /runs: abandoned: 1 diagnostic: 1 nothing: 1 pr-opened: 1 pr-updated: 1 resumed: 3/,
       "counts the week only",
     );
-    assert.match(r.out, /median 12, longest 40/);
+    assert.match(r.out, /median 1, longest 40/);
+    assert.match(
+      r.out,
+      /resumes: 2 continued in their own session \(waiter 1, booked wake-up 0, a person 1\), 1 taken over by a fresh one/,
+    );
+    assert.doesNotMatch(r.out, /warn runs\.resumed/, "most kept their context");
     assert.match(r.out, /warn runs\.abandoned — 1 run\(s\)/);
     assert.match(r.out, /session=c/);
     assert.match(r.out, /warn runs\.diagnostic — 1/);

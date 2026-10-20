@@ -31,6 +31,8 @@ export interface PullState {
   readonly headRefOid?: string;
   readonly latestReviews: readonly Review[];
   readonly statusCheckRollup: readonly Check[];
+  /** A person's comments, where the read fetched them: the precheck's list does. */
+  readonly comments?: readonly Comment[];
   /** Read off REST alone: its review decision may word a verdict, never decide that one is done. */
   readonly approximate?: boolean;
 }
@@ -120,36 +122,82 @@ export function reviewsSince(pr: PullState, since: string, author: string): Revi
   return pr.latestReviews.filter((r) => login(r.author.login) !== login(author) && r.submittedAt > since);
 }
 
+/** A conversation or inline review comment on a pull request. */
+export interface Comment {
+  readonly login: string;
+  readonly association: string;
+  readonly at: string;
+  /** Written by an agent: it carries the "Written by this agent" line every agent comment ends with. */
+  readonly agent: boolean;
+  /** Written by a bot account: CI, coverage and review bots speak through reviews and checks instead. */
+  readonly bot: boolean;
+}
+
+/** Who may give a work order on an approved pull request: its maintainers. */
+export const MAINTAINER = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+/** The line every comment of an agent of this kit carries (CLAUDE.md → Rules). */
+export const AGENT_MARK = "Written by this agent";
+
+/** An agent's comment: the mark, the status comment's marker (docs/runs.md → Reports), or a session link. */
+const AGENT_COMMENT = /Written by this agent|<!-- software-developer:status -->|\/a\/agent-[a-z0-9]+\?s=[0-9a-f-]{36}/;
+
+/**
+ * The comments a run answers: a person's, after `since` — not an agent's
+ * (whose login may be the person's own: `author` is often the operator's
+ * account), not a bot's. On an approved pull request, a maintainer's alone.
+ */
+export function commentsSince(comments: readonly Comment[], since: string, approved: boolean): Comment[] {
+  return comments.filter((c) => !c.agent && !c.bot && c.at > since && (!approved || MAINTAINER.has(c.association)));
+}
+
+/** A comment from REST's issue or review comments, or GraphQL's `{author, authorAssociation, body, updatedAt}`. */
+export function toComment(raw: unknown): Comment {
+  const o = obj(raw);
+  const user = obj(o.user ?? o.author);
+  const who = str(user.login);
+  return {
+    login: who,
+    association: str(o.author_association ?? o.authorAssociation),
+    at: str(o.updated_at ?? o.updatedAt) || str(o.created_at ?? o.createdAt),
+    agent: AGENT_COMMENT.test(str(o.body)),
+    bot: str(user.type) === "Bot" || str(user.__typename) === "Bot" || /\[bot\]$/.test(who),
+  };
+}
+
 export type Verdict =
   | { readonly act: true; readonly text: string; readonly done: boolean }
   | { readonly act: false; readonly text: string };
 
 /**
  * What a babysitting run makes of its pull request: something to do now
- * (`act`), or nothing yet. Approved ends the review: a review on an approved
- * pull request is not a round, only a failed check or a conflict is — or a
- * review the REST fallback could not weigh against the decision.
+ * (`act`), or nothing yet. It is done only once merged: approved and green is
+ * a wait for the person who merges, and what lands on it meanwhile is still a
+ * round — a failed check, a conflict, or a maintainer's review or comment.
  */
-export function verdict(pr: PullState, since: string, author: string): Verdict {
-  const fresh = reviewsSince(pr, since, author);
+export function verdict(pr: PullState, since: string, author: string, comments: readonly Comment[] = []): Verdict {
+  const approved = pr.reviewDecision === "APPROVED";
+  const fresh = reviewsSince(pr, since, author).filter((r) => !approved || r.state !== "APPROVED");
+  const talk = commentsSince(comments, since, approved);
   const failed = failedSince(pr, since, true);
   const green = pr.statusCheckRollup.every((c) => /^(SUCCESS|SKIPPED|NEUTRAL)$/.test(outcome(c)));
-  const approved = pr.reviewDecision === "APPROVED";
   const act = (text: string, done = false): Verdict => ({ act: true, text, done });
   const wait = (text: string): Verdict => ({ act: false, text });
   if (pr.state === "MERGED") return act("merged — the pull request is merged: release the issue", true);
   if (pr.state === "CLOSED") return act("closed — closed without merging: read why, release the issue");
   if (failed.length > 0) return act(`checks failed: ${failed.join(", ")}`);
-  if (fresh.length > 0 && (!approved || pr.approximate)) {
+  if (fresh.length > 0) {
     const who = [...new Set(fresh.map((r) => r.author.login))].sort().join(", ");
     const what = [...new Set(fresh.map((r) => r.state))].sort().join(", ");
     return act(`reviewed by ${who} (${what}): resolve every finding`);
   }
+  if (talk.length > 0) {
+    const who = [...new Set(talk.map((c) => c.login))].sort().join(", ");
+    return act(`commented by ${who}${approved ? ", after approval" : ""}: answer every comment`);
+  }
   if (pr.mergeable === "CONFLICTING") return act("conflicts with the base branch: rebase");
-  if (approved && green && pr.approximate)
-    return wait("approved by its reviews and green; GitHub's review decision is unreadable (GraphQL), so not yet done");
   if (approved && green && pr.mergeable === "MERGEABLE")
-    return act("done — approved, green and mergeable: release the issue", true);
+    return wait("approved, green and mergeable: waiting to be merged");
   if (approved && green) return wait("approved and green; GitHub is still computing mergeability");
   if (green) return wait("green, waiting for a review");
   return wait("checks running");
