@@ -9,6 +9,31 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.1.0 — 2026-10-20
+
+**A run carries its pull request to the merge, parked while a person moves**
+([`docs/babysit.md`](docs/babysit.md) → **Held, then parked**). Approved is no
+longer done: the item is released once its pull request is merged or closed,
+and a review, a person's comment — after approval, a maintainer's — a red
+check or a conflict is a round until then. Waiting on a person, a run parks:
+`run-state.sh park <pr>` frees its slot and the exclusive lock and keeps the
+item; `run-state.sh wait --park`, a background task, wakes the same session
+when something lands, and the Stop hook lets a parked turn end. `wait` refuses
+while the exclusive lock is held. The Stop hook asks `run-state.sh may-stop`,
+which any harness's hook can ask. `start` logs `resumed … cause=…` when it
+takes an item back, and the weekly audit counts continued against fresh. The
+"ready to merge" Slack post moves from `finish released` to `park`.
+
+**Upgrade:**
+
+1. In the direct session, while `bash "$HOME/scripts/run-state.sh" live`
+   prints `0`, update. A run in flight across the update finishes under the
+   old rules.
+2. Items released on approval before this version stay released: their pull
+   requests, still open, are not watched. To bring one back, `run-state.sh
+   start <issue>` in the direct session and park it.
+3. No key, no schedule: `babysit_max_hours` now bounds an in-turn `wait` only.
+
 ## 6.0.0 — 2026-10-20
 
 **The scripts become one app.** Everything `scripts/` did is now a TypeScript

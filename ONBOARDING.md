@@ -134,7 +134,8 @@ confirming or correcting rather than composing from nothing.
   ones wanted as `schedules`, e.g. `tick audit`, or `none`. Without the tick,
   work reaches you only when the user names an issue in a direct session.
 - **Bounds** — what is off limits, and explicitly whether you may merge. The
-  default is **no**: you stop at approved and a person merges.
+  default is **no**: a person merges, and you answer what lands on the pull
+  request until they do.
 
 ## 3. Write it down
 

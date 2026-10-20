@@ -8,8 +8,8 @@ import { enforceFinish, install, repoAllowed, sessionLink } from "../src/develop
 import { verify } from "../src/developer/verify.ts";
 import { inSandbox, type Sandbox } from "./helpers.ts";
 
-const stop = (s: Sandbox, sid: string) =>
-  s.run(enforceFinish, [], {}, JSON.stringify({ session_id: sid, stop_hook_active: false }));
+const stop = (s: Sandbox, sid: string, tasks: { command: string }[] = [], env: Record<string, string> = {}) =>
+  s.run(enforceFinish, [], env, JSON.stringify({ session_id: sid, stop_hook_active: false, background_tasks: tasks }));
 
 test("a session holding nothing stops", () =>
   inSandbox(async (s) => {
@@ -27,6 +27,7 @@ test("a session holding an item is kept going, three times", () =>
     assert.equal(r.rc, 2);
     assert.match(r.err, /Stop blocked \(1\/3\): this run still holds #7, last at "verify"/);
     assert.match(r.err, /run-state\.sh" finish/);
+    assert.match(r.err, /run-state\.sh" park <pr>/, "waiting on a person is a way out too");
     await stop(s, "sess-a");
     r = await stop(s, "sess-a");
     assert.equal(r.rc, 2, "third");
@@ -57,6 +58,33 @@ test("a runtime that does not answer holds the run as before", () =>
     s.runtime.down = true;
     s.lock("item-7", { session: "sess-a", item: "7" });
     assert.equal((await stop(s, "sess-a")).rc, 2);
+  }));
+
+test("a parked item with its waiter running stops; parked with nothing to wake it does not", () =>
+  inSandbox(async (s) => {
+    s.runtime.running.add("sess-a");
+    s.lock("item-7", { session: "sess-a", item: "7", parked_at: s.clock.ago(1), phase: "parked: in-review" });
+    let r = await stop(s, "sess-a");
+    assert.equal(r.rc, 2, "parked, but nothing will wake it");
+    assert.match(r.err, /#7 is parked, but nothing will wake this session/);
+    assert.match(r.err, /wait --park/);
+    r = await stop(s, "sess-a", [{ command: 'bash "$HOME/scripts/run-state.sh" wait --park' }]);
+    assert.equal(r.rc, 0, "the harness lists its waiter: at rest");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- waiter: 4242\n- waiter_boot: boot-1\n`);
+    assert.equal((await stop(s, "sess-a", [], { SD_LIVE_PIDS: "4242" })).rc, 0, "its waiter's pid is alive");
+    assert.equal((await stop(s, "sess-a", [], { SD_LIVE_PIDS: "" })).rc, 2, "its waiter died");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- wake_at: ${s.clock.ago(-90)}\n`);
+    assert.equal((await stop(s, "sess-a", [], { SD_LIVE_PIDS: "" })).rc, 0, "a wake-up is booked");
+  }));
+
+test("parked does not excuse a slot or the exclusive lock still held", () =>
+  inSandbox(async (s) => {
+    s.runtime.running.add("sess-a");
+    s.lock("item-7", { session: "sess-a", item: "7", parked_at: s.clock.ago(1) });
+    s.lock("exclusive", { session: "sess-a", item: "7" });
+    const r = await stop(s, "sess-a", [{ command: "run-state.sh wait --park" }]);
+    assert.equal(r.rc, 2);
+    assert.match(r.err, /you hold the exclusive lock/);
   }));
 
 test("garbage in never blocks", () =>

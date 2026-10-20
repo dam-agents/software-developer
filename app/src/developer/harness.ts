@@ -14,8 +14,8 @@ import {
 import { dirname, join } from "node:path";
 import type { Command } from "../factory/context.ts";
 import { readText } from "../factory/kv.ts";
-import { ATTENDED } from "../factory/runtime.ts";
 import { Kit } from "./kit.ts";
+import { RunState } from "./run-state.ts";
 
 /** How many times the Stop hook holds a turn before it lets the stop through. */
 export const MAX_BLOCKS = 3;
@@ -23,36 +23,55 @@ export const MAX_BLOCKS = 3;
 /** The hook's path as settings.json names it: the stable shell entry point. */
 export const hookPath = (home: string) => join(home, "scripts", "harness", "claude-code", "enforce-finish.sh");
 
+/** A waiter the harness runs as a background task, as its Stop input lists them. */
+const WAITER = /run-state(\.sh)?["']?\s+wait\s+--park/;
+
 /**
- * The Stop hook (Claude Code): refuses to end a turn while this session still
- * holds an item. Nobody watches a scheduled run, so a turn that ends mid-work
- * — a summary, a question, "I'll continue next time" — is work nobody hears
- * about until a later run finds it dead. Exit 2 keeps the turn going and
- * shows the model stderr: what it holds, and how to finish.
+ * The Stop hook (Claude Code): refuses to end a turn until the run is at
+ * rest — `run-state.sh may-stop` decides, the same question any harness's
+ * hook asks. Nobody watches a scheduled run, so a turn that ends mid-work —
+ * a summary, a question, "I'll continue next time" — is work nobody hears
+ * about until a later run finds it dead. A run whose pull request waits on a
+ * person is at rest once it is parked and something will wake it: then the
+ * turn ends, and the waiter brings it back. Exit 2 keeps the turn going and
+ * shows the model stderr: what is left, and how.
  *
- * It counts its own blocks on the item's lock. After MAX_BLOCKS it lets the
- * stop through — the harness ends a turn after eight blocks anyway — and the
- * next precheck finds the run dead and hands its item on. Anything unexpected
- * exits 0: this hook may never be what breaks a run.
- *
- * Only an unattended run is held: a session the runtime confirms as attended
- * (the direct chat, Slack) ends its turn to wait for a person or a background
- * task. Any other type, or a runtime that does not answer, is held.
+ * A waiter the harness lists as a running background task counts as one even
+ * before it has written its pid: the model may end the turn the moment it
+ * starts it. The hook counts its own blocks on the item's lock; after
+ * MAX_BLOCKS it lets the stop through — the harness ends a turn after eight
+ * blocks anyway — and the next precheck finds the run dead and hands its item
+ * on. Anything unexpected exits 0: this hook may never be what breaks a run.
  */
 export const enforceFinish: Command = async (deps) => {
   try {
     let sid = "";
+    let waiting = false;
     try {
-      const input = JSON.parse(deps.stdin()) as { session_id?: unknown };
+      const input = JSON.parse(deps.stdin()) as { session_id?: unknown; background_tasks?: unknown };
       sid = typeof input.session_id === "string" ? input.session_id : "";
+      const tasks = Array.isArray(input.background_tasks) ? input.background_tasks : [];
+      waiting = tasks.some((t) => WAITER.test(String((t as { command?: unknown })?.command ?? "")));
     } catch {
       return 0;
     }
     if (!sid) return 0;
-    const kit = new Kit({ ...deps, env: { ...deps.env, CLAUDE_CODE_SESSION_ID: sid } });
+    const sdeps = { ...deps, env: { ...deps.env, CLAUDE_CODE_SESSION_ID: sid } };
+    const kit = new Kit(sdeps);
     const lock = kit.locks.ofKind("item-").find((h) => h.owner.session === sid);
     if (!lock) return 0;
-    if (ATTENDED.has(await deps.runtime.sessionType(sid))) return 0;
+    if (
+      waiting &&
+      lock.owner.parked_at !== "" &&
+      !kit.locks.all().some((h) => h.owner.session === sid && !h.name.startsWith("item-"))
+    )
+      return 0;
+    const why: string[] = [];
+    const rc = await new RunState({
+      ...sdeps,
+      io: { out: () => {}, err: (s) => why.push(s.replace(/^run-state: /, "")) },
+    }).mayStop();
+    if (rc === 0) return 0;
     const n = kit.locks.stopBlocks(lock.name);
     if (n >= MAX_BLOCKS) return 0;
     try {
@@ -61,22 +80,20 @@ export const enforceFinish: Command = async (deps) => {
       return 0;
     }
     const e = (s = "") => deps.io.err(s);
-    e(
-      `Stop blocked (${n + 1}/${MAX_BLOCKS}): this run still holds #${lock.owner.item}, last at "${lock.owner.phase}".`,
-    );
+    e(`Stop blocked (${n + 1}/${MAX_BLOCKS}): ${why.join(" ")}`);
     e();
-    e("No one is watching this session — nothing you write here is read. The run");
-    e("ends with its outcome on GitHub, and `run-state.sh finish`, never mid-work:");
+    e("No one is watching this session — nothing you write here is read. A turn");
+    e("ends at rest, never mid-work, and only one of two ways:");
     e();
-    e("1. Commit and push everything in your slot.");
-    e("2. Report on the issue or its pull request: what you did, where it stands,");
-    e("   what happens next, with this run's session link");
-    e('   (bash "$HOME/scripts/session-link.sh"). A question for a person goes');
-    e("   there too, with the needs-info label — never into this turn.");
-    e('3. bash "$HOME/scripts/run-state.sh" finish <outcome> [pr]');
-    e();
-    e("Waiting on a review or a check of your pull request? That is not the end:");
-    e('bash "$HOME/scripts/run-state.sh" wait <pr>, and again until it is done.');
+    e("- Waiting on a person — a review, a merge? Push, comment the pull request");
+    e("  with this run's session link, then:");
+    e('    bash "$HOME/scripts/run-state.sh" park <pr>...');
+    e('    bash "$HOME/scripts/run-state.sh" wait --park     (a background task)');
+    e("  and end the turn: the waiter wakes this session when something lands.");
+    e("- Done, or cannot go on: push, report on the issue or its pull request with");
+    e('  the session link (bash "$HOME/scripts/session-link.sh"), then');
+    e('    bash "$HOME/scripts/run-state.sh" finish <outcome> [pr]');
+    e("  A question for a person goes on the issue, with the needs-info label.");
     e();
     if (n + 1 >= MAX_BLOCKS) {
       e("This is the last block. If the work cannot go on, finish `blocked`:");

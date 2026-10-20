@@ -2,20 +2,39 @@
 // the home volume, and given back by removing them. Each holds an `owner`
 // file naming its session, the boot it was taken in, and what it is doing.
 //
-// A lock never outlives the turn that took it, nor dies before it. Its holder
-// is dead only when the runtime says its session is not running a turn — a
-// restart is no proof, because the platform resumes an interrupted turn. An
-// attended session (a person is present) ends its turns between messages, so
-// its lock goes stale only `attendedStaleMin` after it was taken. A runtime
-// that does not answer frees nothing: a guess could hand a live run's slot to
-// another.
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+// A lock never outlives its holder, nor dies before it. Its holder is the turn
+// that took it, dead only when the runtime says its session is not running a
+// turn — a restart is no proof, because the platform resumes an interrupted
+// turn. An attended session (a person is present) ends its turns between
+// messages, so its lock goes stale only `attendedStaleMin` after it was taken.
+//
+// A parked lock (`parked_at`) has outlived its turn on purpose: the session
+// ended it to wait for a person, and its holder is now whatever wakes it — a
+// waiter process on this boot, or a wake-up booked on the platform. It is dead
+// once neither is left. A runtime that does not answer frees nothing: a guess
+// could hand a live run's work to another.
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { kv, parseKv, readText, writeKv } from "./kv.ts";
 import type { Liveness, Runtime } from "./runtime.ts";
 import { type Clock, epoch, iso, nowSeconds } from "./time.ts";
 
-export const OWNER_KEYS = ["session", "boot", "since", "item", "slot", "phase", "phase_at"] as const;
+export const OWNER_KEYS = [
+  "session",
+  "boot",
+  "since",
+  "item",
+  "slot",
+  "phase",
+  "phase_at",
+  // a parked item lock: when it was parked, its waiter, its booked wake-up, and what woke it last
+  "parked_at",
+  "waiter",
+  "waiter_boot",
+  "wake_at",
+  "booking",
+  "woke",
+] as const;
 
 export interface Owner {
   readonly session: string;
@@ -25,7 +44,16 @@ export interface Owner {
   readonly slot: string;
   readonly phase: string;
   readonly phase_at: string;
+  readonly parked_at: string;
+  readonly waiter: string;
+  readonly waiter_boot: string;
+  readonly wake_at: string;
+  readonly booking: string;
+  readonly woke: string;
 }
+
+/** How long past its time a booked wake-up may still come before the lock reads dead. */
+export const BOOKING_GRACE_MIN = 30;
 
 export interface Held {
   readonly name: string;
@@ -44,6 +72,8 @@ export interface LockOptions {
   readonly attendedStaleMin: number;
   /** The program named in an owner file's header. */
   readonly writer: string;
+  /** The pids that count as alive, instead of /proc: a test's. */
+  readonly livePids?: ReadonlySet<string>;
 }
 
 function owner(file: string): Owner {
@@ -57,7 +87,32 @@ function owner(file: string): Owner {
     slot: g("slot"),
     phase: g("phase"),
     phase_at: g("phase_at"),
+    parked_at: g("parked_at"),
+    waiter: g("waiter"),
+    waiter_boot: g("waiter_boot"),
+    wake_at: g("wake_at"),
+    booking: g("booking"),
+    woke: g("woke"),
   };
+}
+
+/**
+ * Whether a waiter still runs: its pid is alive on this boot and is a waiter —
+ * a run-state process. After a restart the boot differs, so a reused pid is
+ * never mistaken for it.
+ */
+export function waiterAlive(
+  o: Pick<Owner, "waiter" | "waiter_boot">,
+  boot: string,
+  livePids?: ReadonlySet<string>,
+): boolean {
+  if (!/^[0-9]+$/.test(o.waiter) || o.waiter_boot !== boot) return false;
+  if (livePids) return livePids.has(o.waiter);
+  try {
+    return readFileSync(`/proc/${o.waiter}/cmdline`, "utf8").includes("run-state");
+  } catch {
+    return false;
+  }
 }
 
 export class Locks {
@@ -146,6 +201,21 @@ export class Locks {
       if (this.me !== "" && h.owner.session === this.me) this.update(h.name, { phase, phase_at: now });
   }
 
+  get boot(): string {
+    return this.opts.boot;
+  }
+  get livePids(): ReadonlySet<string> | undefined {
+    return this.opts.livePids;
+  }
+
+  /** What keeps a parked lock alive: its waiter, or a wake-up booked and not yet overdue. "" when nothing does. */
+  parkedHolder(o: Owner): "waiter" | "booking" | "" {
+    if (waiterAlive(o, this.opts.boot, this.opts.livePids)) return "waiter";
+    const t = epoch(o.wake_at);
+    if (t !== undefined && nowSeconds(this.opts.clock) < t + BOOKING_GRACE_MIN * 60) return "booking";
+    return "";
+  }
+
   /** Whether a lock's holder is provably gone. */
   async dead(h: Held): Promise<boolean> {
     if (!h.owned) {
@@ -156,10 +226,13 @@ export class Locks {
         return false;
       }
     }
+    const parked = h.owner.parked_at !== "";
+    if (parked && this.parkedHolder(h.owner) !== "") return false;
     const l: Liveness = await this.opts.runtime.liveness(h.owner.session);
     if (l === "stopped") return true;
     if (l !== "attended") return false;
-    const t = epoch(h.owner.since);
+    // an idle chat's parked lock is stale counted from when it parked, the rest from when they were taken
+    const t = epoch(parked ? h.owner.parked_at : h.owner.since);
     if (t === undefined) return true;
     return Math.floor((nowSeconds(this.opts.clock) - t) / 60) >= this.opts.attendedStaleMin;
   }

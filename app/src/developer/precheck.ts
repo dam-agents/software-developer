@@ -25,14 +25,15 @@ import { issueRefs, login } from "../factory/github.ts";
 import { kv, parseKv, readText } from "../factory/kv.ts";
 import { epoch, nowSeconds } from "../factory/time.ts";
 import { Kit } from "./kit.ts";
-import { failedSince, type PullState, restPull, reviewsSince } from "./pulls.ts";
+import { commentsSince, failedSince, type PullState, restPull, reviewsSince, toComment } from "./pulls.ts";
 import { RunState } from "./run-state.ts";
 
 /** Everything the list needs in one GraphQL request, and only the fields read below. */
 export const QUERY = `query($q: String!, $owner: String!, $name: String!, $handoff: String!, $claimed: String!) {
   prs: search(query: $q, type: ISSUE, first: 50) { nodes { ... on PullRequest {
-    number title url body reviewDecision repository { nameWithOwner }
+    number title url body reviewDecision state mergeable repository { nameWithOwner }
     latestReviews(first: 100) { nodes { author { login } state submittedAt } }
+    comments(last: 20) { nodes { author { __typename login } authorAssociation body updatedAt } }
     commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
       ... on StatusContext { context state createdAt }
       ... on CheckRun { name status conclusion startedAt completedAt } } } } } } } } } }
@@ -113,6 +114,9 @@ export async function readGitHub(kit: Kit, authorIn: string): Promise<Snapshot> 
         url: str(o.url),
         body: str(o.body),
         reviewDecision: typeof o.reviewDecision === "string" ? o.reviewDecision : null,
+        state: str(o.state),
+        mergeable: str(o.mergeable),
+        comments: arr(obj(o.comments).nodes).map(toComment),
         repo: str(obj(o.repository).nameWithOwner) || kit.slug,
         latestReviews: arr(obj(o.latestReviews).nodes).map((r) => ({
           author: { login: str(obj(obj(r).author).login) },
@@ -176,9 +180,10 @@ async function readRest(gh: GitHub, kit: Kit, author: string, mine: string, also
     const reviews = await gh.get(kit.host, `repos/${slug}/pulls/${n}/reviews?per_page=100`);
     const checks = await gh.get(kit.host, `repos/${slug}/commits/${sha}/check-runs?per_page=100`);
     const status = await gh.get(kit.host, `repos/${slug}/commits/${sha}/status`);
+    const comments = await gh.get(kit.host, `repos/${slug}/issues/${n}/comments?per_page=100`);
     if (reviews === undefined || checks === undefined || status === undefined) return undefined;
     const p = restPull(pull, reviews, checks, status);
-    return { ...p, repo: p.repo || slug };
+    return { ...p, repo: p.repo || slug, comments: Array.isArray(comments) ? comments.map(toComment) : [] };
   };
   for (const pull of ownPulls) {
     const p = await full(kit.slug, pull);
@@ -244,31 +249,38 @@ export function worklist(
   lockFree: boolean,
 ) {
   const root = kit.slug;
-  // A pull request is babysat until it is approved (docs/babysit.md), so an
-  // approved one is never work: it waits for a person, whatever lands on it.
-  // Any other wakes a run for what happened to it since a run last started on
-  // its item: a review of any kind, or a check that failed — once, so what
-  // the agent could not fix is not reported every tick. Its item is the issue
-  // of `repo` its body names, and an item a live run holds is left out. One
+  // A pull request is babysat until it is merged (docs/babysit.md). It wakes
+  // a run for what happened to it since a run last looked: a review, a
+  // person's comment — on an approved one, a maintainer's — or a check that
+  // failed, once, so what the agent could not fix is not reported every tick.
+  // Its item is the issue of `repo` its body names, and an item held — by a
+  // live run, or parked with its session's waiter or wake-up still to come —
+  // is left out: that session answers it, with the context that wrote it. One
   // in another repository that names none is not this instance's work.
   const prWork: string[] = [];
   for (const p of snap.prs) {
     const repo = p.repo || root;
     const other = repo.toLowerCase() !== root.toLowerCase();
     const item = issueRefs(p.body, root, repo)[0] ?? (other ? undefined : `pr${String(p.number)}`);
-    if (item === undefined || held.has(item) || p.reviewDecision === "APPROVED") continue;
+    if (item === undefined || held.has(item)) continue;
     const ref = other ? `${repo}#${String(p.number)}` : `#${String(p.number)}`;
     const s = items.get(item)?.seen || since;
+    const approved = p.reviewDecision === "APPROVED";
     const latest = reviewsSince(p, "", author)
+      .filter((r) => !approved || r.state !== "APPROVED")
       .map((r) => r.submittedAt)
       .sort()
       .at(-1);
     const reviewed = (latest ?? "") > s;
+    const commented = commentsSince(p.comments ?? [], s, approved).length > 0;
     const failed = failedSince(p, s);
-    if (!reviewed && failed.length === 0) continue;
+    const conflict = p.mergeable === "CONFLICTING" && items.get(item)?.state === "awaiting-merge";
+    if (!reviewed && !commented && failed.length === 0 && !conflict) continue;
     const what = [
       ...(reviewed ? ["reviewed; resolve every finding and re-request review"] : []),
+      ...(commented ? [`commented${approved ? " after approval" : ""}; answer every comment`] : []),
       ...(failed.length > 0 ? [`checks failed: ${failed.join(", ")}`] : []),
+      ...(conflict ? ["approved, now conflicting: rebase"] : []),
     ].join("; ");
     prWork.push(
       `- ${item.startsWith("pr") ? item : `#${item}`} — PR ${ref} ${p.title ?? ""} — ${what} — docs/babysit.md\n  ${p.url ?? ""}`,
@@ -294,6 +306,19 @@ export function worklist(
   // `label_mine` set, a claim is ours only when it carries that too.
   const named = new Set(snap.prs.flatMap((p) => issueRefs(p.body, root, p.repo || root)));
   const mine = kit.labelMine;
+  // A parked item whose pull requests all merged or closed, with no session
+  // left to see it (its waiter and wake-up gone): release it, at no build cost.
+  const openNamed = new Set(
+    snap.prs.flatMap((p) =>
+      issueRefs(p.body, root, p.repo || root).concat(p.repo && p.repo !== root ? [] : [`pr${String(p.number)}`]),
+    ),
+  );
+  const releaseWork = [...items.entries()]
+    .filter(([k, v]) => (v.state === "in-review" || v.state === "awaiting-merge") && !held.has(k) && !openNamed.has(k))
+    .map(
+      ([k]) =>
+        `- ${k.startsWith("pr") ? k : `#${k}`} — its pull request is merged or closed: release the issue — docs/babysit.md`,
+    );
   const resumeWork = snap.claimed
     .filter((i) => mine === "" || i.labels.includes(mine))
     .filter((i) => !named.has(String(i.number)))
@@ -308,7 +333,7 @@ export function worklist(
       const a = items.get(String(i.number))?.abandoned ?? 0;
       return `- #${i.number} ${i.title}${a > 0 ? ` — a run died on it ${a} time(s)` : ""}\n  ${i.url}`;
     });
-  return { prWork, lockWork, issueWork, resumeWork };
+  return { prWork, lockWork, issueWork, resumeWork, releaseWork };
 }
 
 export const precheck: Command = async (deps, _args) => {
@@ -356,7 +381,8 @@ export const precheck: Command = async (deps, _args) => {
       `GitHub's GraphQL budget would not answer (${snap.restBecause.replaceAll("\n", " ").slice(0, 160)}), so this list was read over REST. Prefer \`gh api\` (REST) to \`gh pr\` / \`gh issue\` this run.`,
     );
   const w = worklist(kit, snap, readItems(kit.items), held, deps.env.PLATFORM_LAST_RUN_AT ?? "", author, lockFree);
-  if (w.prWork.length + w.lockWork.length + w.issueWork.length + w.resumeWork.length === 0) return 1;
+  if (w.prWork.length + w.lockWork.length + w.issueWork.length + w.resumeWork.length + w.releaseWork.length === 0)
+    return 1;
   const o = (s: string) => deps.io.out(s);
   o(`Repository: ${repo}`);
   o("Take the first item below that `run-state.sh start` gives you, and that one alone; another run takes the next.");
@@ -371,6 +397,7 @@ export const precheck: Command = async (deps, _args) => {
     o(lines.join("\n"));
   };
   section("Your open pull requests needing attention:", w.prWork);
+  section("Merged or closed while parked — release:", w.releaseWork);
   section("Waiting for the exclusive lock, which is free now:", w.lockWork);
   section("Claimed, with no pull request and no run on it — finish or release:", w.resumeWork);
   section(`Unclaimed issues labelled ${kit.labelHandoff}, oldest first:`, w.issueWork);
