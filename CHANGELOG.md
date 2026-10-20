@@ -9,6 +9,34 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.0.0 — 2026-10-20
+
+**The scripts become one app.** Everything `scripts/` did is now a TypeScript
+CLI, `bin/sd <command>`, in [`app/`](app/README.md), which Node runs as it is —
+no build, and nothing to install at runtime. Every script stays where it was,
+as a two-line shim onto its command, so the schedules' precheck, the Stop hook
+and every `bash "$HOME/scripts/…"` in the docs keep working unchanged. The
+state formats — the locks, `items/`, `GATE.md`, `TICK.log` — are the same, byte
+for byte. The shell libraries (`scripts/lib/`) and the shell test suite
+(`scripts/tests/`) are gone: the tests are `node:test` suites in `app/test/`,
+case for case, and CI typechecks, lints and runs them on Node 22.18 and 26.
+`app/src/factory/` holds what any kit shares, for the next kit to port onto.
+
+Major, because what runs changes under every command, and an instance needs
+Node 22.18 or newer on the path its schedules and hook run with.
+
+**Upgrade:**
+
+1. In the direct session, before the update: `node --version` prints 22.18 or
+   newer. Older or missing: operator-only — the image must carry Node; stop and
+   report it, and do not update.
+2. Update ([`docs/persistence.md`](docs/persistence.md) → **Definition version
+   & upgrade**), then run `bash "$HOME/scripts/verify-onboarding.sh" --live`:
+   it now runs through the app, and a PASS proves the precheck, GitHub and the
+   runtime work through it end to end.
+3. Nothing in `work/` changes: no key, no state format. A run in flight while
+   you update is unaffected — the locks it holds read the same.
+
 ## 5.4.1 — 2026-10-16
 
 **A Slack session counts as attended**, like the direct chat: a person is

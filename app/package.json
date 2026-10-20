@@ -1,0 +1,21 @@
+{
+  "name": "software-developer-app",
+  "private": true,
+  "description": "The software-developer kit's runtime: every verb a run, a schedule's precheck or a hook calls, as one TypeScript CLI that Node runs as is.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test --test-reporter=spec 'test/**/*.test.ts'",
+    "typecheck": "tsc -p .",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2"
+  }
+}

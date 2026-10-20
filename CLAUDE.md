@@ -34,7 +34,7 @@ name it in your turn's output so the operator sees it.
 
 Every instance value lives in `work/CONFIG.md`, written during onboarding and
 read before anything else — the only place those answers live. A key is read
-from its `- key: value` bullet, through `scripts/lib/config.sh` in every script;
+from its `- key: value` bullet, through the app's one reader (`app/src/factory/kv.ts`);
 a line in any other shape is invisible, not wrong.
 
 - `repo` — `owner/name`, checked out at `work/<name>` — missing, clone it

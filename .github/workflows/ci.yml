@@ -1,58 +1,59 @@
-# CI for the software-developer definition repo — mechanizes the pre-PR validation
-# sweep (docs/self-modification.md §9) so a definition PR cannot merge broken:
-# script syntax, the structural validator (repo shape, VERSION↔CHANGELOG
-# agreement, dead links, leftover placeholders), and the offline test suite.
+# CI for the software-developer definition — the pre-PR validation sweep
+# (docs/self-modification.md §9), mechanized, so a definition PR cannot merge
+# broken: the app's typecheck, lint and offline tests, the structural
+# validator (repo shape, VERSION↔CHANGELOG agreement, dead links, cross-file
+# section references, every shim naming a command the CLI has), and the shims
+# themselves run end to end as a schedule and a hook call them.
 name: ci
 on:
   pull_request:
   push:
     branches: [main]
+permissions:
+  contents: read
 jobs:
-  validate:
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    strategy:
+      matrix:
+        # the oldest Node that runs TypeScript as it is, and the image's
+        node: ["22.18", "26"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: typecheck
+        run: npm run typecheck
+      - name: lint
+        run: npm run lint
+      - name: offline tests
+        run: npm test
+  definition:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: bash -n all scripts
-        run: |
-          set -e
-          find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
       - name: structural validator
         run: bash scripts/validate-definition.sh .
-      # Cross-file section references ("<file>.md -> **Label**"). They are prose,
-      # not anchors, so a renamed section breaks them silently — this is the
-      # cross-reference sweep of docs/self-modification.md §9, mechanized.
-      - name: Cross-file section references resolve
+      # The shims as a schedule's precheck and the Stop hook call them, with
+      # no node_modules: the app's runtime needs nothing installed.
+      - name: shims run without dependencies
         run: |
           set -u
-          rc=0; n=0
-          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-          # every heading text and bold run-in label of a file = its anchors
-          anchors() { sed -nE 's/^#{1,6} +(.*)$/\1/p; s/^\*\*([^*]+)\*\*.*$/\1/p' "$1" | tr -s ' '; }
-          for f in CLAUDE.md AGENTS.md README.md ONBOARDING.md docs/*.md; do
-            [ -f "$f" ] || continue
-            base="$(dirname "$f")"
-            # join lines first: a reference may wrap mid-sentence
-            tr '\n' ' ' < "$f" | tr -s ' ' \
-              | grep -oE '\[?`?[A-Za-z0-9_./-]+\.md`?\)? → \*\*[^*]+\*\*' > "$tmp/refs" || true
-            while read -r ref; do
-              [ -n "$ref" ] || continue
-              t="${ref%% → *}"; t="${t#[}"; t="${t%)}"; t="${t#\`}"; t="${t%\`}"
-              label="${ref#* → \*\*}"; label="${label%\*\*}"
-              path=
-              for cand in "$base/$t" "$t" "docs/$t"; do
-                [ -f "$cand" ] && { path="$cand"; break; }
-              done
-              [ -n "$path" ] || { echo "$f: unresolvable file in '$ref'"; rc=1; continue; }
-              n=$((n + 1)); hit=
-              anchors "$path" > "$tmp/anchors"
-              # literal prefix compare — a label may hold regex metacharacters
-              while read -r a; do
-                [ "${a:0:${#label}}" = "$label" ] && { hit=1; break; }
-              done < "$tmp/anchors"
-              [ -n "$hit" ] || { echo "$f -> $path: no section '$label'"; rc=1; }
-            done < "$tmp/refs"
-          done
-          echo "checked $n cross-file section references"
-          exit $rc
-      - name: offline test suite
-        run: bash scripts/tests/run.sh
+          export HOME="$(mktemp -d)"; mkdir -p "$HOME/work"
+          printf -- '- repo: acme/widgets\n- mode: interactive\n' > "$HOME/work/CONFIG.md"
+          rc=0; bash scripts/precheck.sh || rc=$?
+          [ "$rc" = 1 ] || { echo "precheck exited $rc, wanted 1 (interactive: skip)"; exit 1; }
+          bash scripts/run-state.sh show
+          bash scripts/repo-allowed.sh acme/widgets
+          echo '{"session_id":"none"}' | bash scripts/harness/claude-code/enforce-finish.sh
+          bash scripts/verify-onboarding.sh --config | tail -1

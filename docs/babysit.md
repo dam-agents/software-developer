@@ -19,7 +19,7 @@ An item with pull requests in more than one repository waits on them all
 you, and says done only once every one is done or merged.
 
 It looks at the pull request once a minute for up to nine minutes — an
-unchanged one costs no API budget (`scripts/lib/github.sh`) — and comes
+unchanged one costs no API budget (`app/src/factory/github.ts`) — and comes
 back with what to do: a new review, a failed check, a conflict, merged or
 closed, or **done** — approved, green and mergeable. Exit `3` is nothing yet:
 call it again, never end the turn. `finish` refuses `pr-opened`, `pr-updated`

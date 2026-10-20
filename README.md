@@ -12,29 +12,29 @@ through review.
 - [`docs/`](docs/) — the procedures `CLAUDE.md` sends it to when they apply.
 - [`ONBOARDING.md`](ONBOARDING.md) — the first conversation, which asks the user
   what only they can answer.
-- [`scripts/precheck.sh`](scripts/precheck.sh) — decides whether a run is worth
-  waking the agent for, before any model is involved, and holds an occurrence
-  back while the run before it is still working.
-- [`scripts/run-state.sh`](scripts/run-state.sh) — which run works on which
-  issue, in which slot, and who holds the exclusive lock; how a dead run's slot is
-  found and freed ([`docs/runs.md`](docs/runs.md)).
-- [`scripts/session-link.sh`](scripts/session-link.sh) — the link back to the
-  run that wrote a change, which every pull request carries.
-- [`scripts/work-backup.sh`](scripts/work-backup.sh) — backs `work/` up to a
-  private repository of its own, and restores it on a fresh volume.
-- [`scripts/harness/claude-code/`](scripts/harness/claude-code/) — the `Stop`
-  hook that keeps an unattended run from ending its turn while it still holds
-  an issue (the direct session stops freely),
-  and the installer that registers it and links the skills: the bundled ones,
-  and the repository's own at `work/.claude/skills`.
-- [`scripts/verify-onboarding.sh`](scripts/verify-onboarding.sh) — checks an
-  instance has the shape onboarding promises; every failure names its fix.
-- [`scripts/audit.sh`](scripts/audit.sh) — the deterministic half of the
-  weekly audit.
-- [`scripts/tests/`](scripts/tests/) — offline tests for all of the above:
-  `bash scripts/tests/run.sh`. CI runs them, and
-  [`scripts/validate-definition.sh`](scripts/validate-definition.sh), on every
-  pull request.
+- [`app/`](app/README.md) — the code: one TypeScript CLI, `bin/sd`, that Node
+  runs as it is, with its tests. Every script in [`scripts/`](scripts/) is a
+  two-line shim onto one of its commands, so the paths a schedule, a hook and
+  these docs call never change:
+  - `precheck.sh` decides whether a run is worth waking the agent for, before
+    any model is involved;
+  - `run-state.sh` says which run works on which issue, in which slot, and who
+    holds the exclusive lock, and finds and frees a dead run's slot
+    ([`docs/runs.md`](docs/runs.md));
+  - `session-link.sh` prints the link back to the run that wrote a change,
+    which every pull request carries;
+  - `work-backup.sh` backs `work/` up to a private repository of its own, and
+    restores it on a fresh volume;
+  - `harness/claude-code/` holds the `Stop` hook that keeps an unattended run
+    from ending its turn while it still holds an issue, and the installer that
+    registers it and links the skills;
+  - `verify-onboarding.sh` checks an instance has the shape onboarding
+    promises, and every failure names its fix;
+  - `audit.sh` is the deterministic half of the weekly audit;
+  - `validate-definition.sh` checks this repository's own shape.
+
+  CI typechecks, lints and tests the app, and validates the definition, on
+  every pull request (`npm run check` in `app/`).
 
 **Nothing here names a repository.** Which one to work on, which labels mean
 what, and how to build and test it are asked during onboarding and recorded in
