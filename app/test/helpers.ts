@@ -104,7 +104,7 @@ export class FakeGitHub implements GitHub {
 
   /** Answers paths matching `re` — the latest route that matches wins. */
   on(re: RegExp | string, answer: Answer): this {
-    this.routes.unshift({ re: typeof re === "string" ? new RegExp(`^${escape(re)}`) : re, answer });
+    this.routes.unshift({ re: typeof re === "string" ? new RegExp(`^${escapeRe(re)}`) : re, answer });
     return this;
   }
 
@@ -151,7 +151,7 @@ export class FakeGitHub implements GitHub {
   }
 }
 
-const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const clone = (v: unknown): unknown => (v === undefined ? undefined : structuredClone(v));
 
 /** Issues and pull requests in `gh --json` shape, answered as the precheck's GraphQL query asks. */
