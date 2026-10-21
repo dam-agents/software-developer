@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.2.2 — 2026-10-21
+
+**A merged pull request is done, however it was merged.** A squash or rebase
+merge puts new commits on the default branch, and deleting the branch leaves
+the slot's own commits on no remote. `finish released` and `park` called them
+unpushed and refused. A slot was then stuck until someone reset it by hand,
+and `start` refused it to the next run too. Commits whose content the default
+branch already holds now count as saved: merging them into it would change
+nothing (`git merge-tree`, local, no GitHub call). `finish`, `park` and
+`start` then leave the slot on the default branch's tip, so those commits are
+not compared again later, after the default branch has moved on.
+
+**Upgrade:** none. A slot stuck this way frees itself at the next `finish` once
+the instance is updated.
+
 ## 6.2.1 — 2026-10-20
 
 **Fixes from the review of 6.1.0 and 6.2.0.** `start` on a parked item while
