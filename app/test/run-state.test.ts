@@ -172,6 +172,45 @@ test("a slot with unsaved work is never switched", () =>
     assert.equal(s.slot(1), "feat/7");
   }));
 
+test("a pull request merged by squash is saved: finish passes, and the slot leaves its commits for main", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    const slot = join(s.work, "slots/1");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    writeFileSync(join(slot, "seven"), "seven\n");
+    s.git(["add", "seven"], slot);
+    s.git(["commit", "-qm", "seven"], slot);
+    s.git(["push", "-q", "origin", "feat/7"], slot);
+    // merged by squash, its branch deleted: main has the content, no remote the commits
+    const c = join(s.home, "c");
+    s.git(["clone", "-q", join(s.home, "widgets.git"), c]);
+    s.git(["merge", "-q", "--squash", "origin/feat/7"], c);
+    s.git(["commit", "-qm", "seven (#21)"], c);
+    s.git(["push", "-q", "origin", "main", ":feat/7"], c);
+    s.git(["fetch", "-q", "--prune", "origin"], slot);
+    writeFileSync(join(slot, "eight"), "eight\n");
+    s.git(["add", "eight"], slot);
+    s.git(["commit", "-qm", "eight"], slot);
+    let r = await as(s, "sess-a", "finish", "released");
+    assert.equal(r.rc, 1, "a commit main lacks is still unpushed");
+    assert.match(r.err, /slots\/1 has commits not pushed/);
+    s.git(["reset", "-q", "--hard", "HEAD~1"], slot);
+    r = await as(s, "sess-a", "finish", "released");
+    assert.equal(r.rc, 0, r.err);
+    assert.equal(s.slot(1), "HEAD");
+    const tip = (ref: string) => s.git(["rev-parse", ref], slot).stdout.trim();
+    assert.equal(tip("HEAD"), tip("origin/main"), "the squashed commits stayed in the slot");
+    // main moves on over the same lines: a slot still on the squashed commits would conflict, and refuse
+    s.git(["pull", "-q"], c);
+    writeFileSync(join(c, "seven"), "seven, again\n");
+    s.git(["commit", "-qam", "seven again"], c);
+    s.git(["push", "-q", "origin", "main"], c);
+    r = await as(s, "sess-b", "start", "8", "feat/8");
+    assert.equal(r.rc, 0, r.err);
+    assert.equal(s.slot(1), "feat/8");
+  }));
+
 test("a branch on origin is checked out from its tip", () =>
   inSandbox(async (s) => {
     world(s);

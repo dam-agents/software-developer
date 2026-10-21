@@ -583,8 +583,7 @@ class RunState {
     }
     this.unlock();
     if (slot) {
-      for (const d of [join(this.kit.slots, slot), ...alsoDirs(git, this.kit.work, slot)])
-        if (git.unsaved(d) === "") git.run(d, ["switch", "-q", "--detach"]);
+      for (const d of [join(this.kit.slots, slot), ...alsoDirs(git, this.kit.work, slot)]) git.release(d);
       this.locks.drop(`slot-${slot}`);
     }
     const now = this.now();
@@ -854,10 +853,7 @@ class RunState {
       if (!pr) pr = this.itemKey(item, "pr");
     }
     // a saved slot lets go of its branch, so the item's next run may take any slot
-    if (slot) {
-      for (const d of [join(this.kit.slots, slot), ...alsoDirs(git, this.kit.work, slot)])
-        if (git.unsaved(d) === "") git.run(d, ["switch", "-q", "--detach"]);
-    }
+    if (slot) for (const d of [join(this.kit.slots, slot), ...alsoDirs(git, this.kit.work, slot)]) git.release(d);
     if (item) this.locks.drop(`item-${item}`);
     if (slot) this.locks.drop(`slot-${slot}`);
     this.logLine(outcome, this.kit.me, item, slot, pr.split(/\s+/).filter(Boolean).join(","), since, report);

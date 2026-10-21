@@ -123,7 +123,10 @@ GitHub, and `finish` checks that it is there before it gives the item back —
 `park` too, as for `pr-updated`, before it gives the slot back. It reads, never
 writes:
 
-- **Every outcome:** nothing unpushed in the slot.
+- **Every outcome:** nothing unpushed in the slot. Commits on no remote whose
+  content the default branch already has — a pull request merged by squash or
+  rebase, its branch deleted — are pushed; the slot is left on the default
+  branch's tip.
 - **`pr-opened`:** the pull request is open, opened by `author`, says
   `Fixes #<n>`, carries this run's session link, and `label_mine` when set.
 - **Every other outcome:** a comment by `author` on the issue or its pull

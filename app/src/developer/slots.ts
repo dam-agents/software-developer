@@ -61,7 +61,7 @@ export function prepare(a: PrepareArgs): Prepared {
       say(`branch ${b} is checked out in ${other}, which is in use or holds unsaved work.`);
       return { ok: false, code: 3 };
     }
-    git.run(other, ["switch", "-q", "--detach"]);
+    git.release(other);
   }
   if (git.hasRef(co, `refs/remotes/origin/${b}`)) {
     if (
