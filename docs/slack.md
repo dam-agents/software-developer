@@ -97,7 +97,7 @@ for the run that implements it, which takes it as data.
    adding `--remove-label` for `label_failed` and `label_needs_info` when it
    carries them — a hand-off re-opens it, as a person re-labelling would.
 3. **Comment** on #`<n>`: `Handed off from Slack by <name> on <date>.`, then
-   what the message adds, quoted.
+   what the message adds, in your own words.
 4. **Reply** in the thread: labelled.
 
 ## Filing
@@ -107,8 +107,9 @@ covers — file it in that same turn. The request is the approval: no draft
 round, unless the thread leaves unclear what the issue must say, and then one
 question and the end of the turn; the answer files it.
 
-1. **What.** The thread before the request is usually what the issue is about.
-   Read the code it touches, and search for a duplicate —
+1. **What.** The thread before the request is usually what the issue is about:
+   what it found goes in, who said what and how stays in Slack ([CLAUDE.md](../CLAUDE.md)
+   → **Rules**, public). Read the code it touches, and search for a duplicate —
    `gh issue list --repo <repo> --search "<words>" --state all`. An open one
    covers it: file nothing, link it, and treat the request as a hand-off of it
    when it asks for the work.
