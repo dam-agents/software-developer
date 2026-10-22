@@ -9,15 +9,16 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
-## 6.2.4 — 2026-10-22
+## 6.3.0 — 2026-10-22
 
 **What reaches GitHub is written as if it were public.** Issues filed from
 Slack carried what the chat held: e-mail addresses, internal hosts, one-time
 codes, connection ids, quoted messages. A new rule in `CLAUDE.md` → **Rules**
-keeps them out, in every run; a hand-off comment paraphrases the message
-instead of quoting it.
+keeps them out, in every run; `docs/slack.md` → **What leaves Slack** says
+what a Slack turn may write on GitHub; and `scripts/public-check.sh` reads a
+body for those shapes before it is posted.
 
-**Upgrade:** none.
+**Upgrade:** none — the script comes with the update.
 
 ## 6.2.2 — 2026-10-21
 

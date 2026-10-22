@@ -155,6 +155,8 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   internal host or URL other than the session link, a one-time code, a
   connection, session or user id, a log line holding one, or a quote from a
   chat; a person is named only where a line here asks for the name.
+  `scripts/public-check.sh <file>` checks a body for those shapes before it
+  is posted ([`docs/slack.md`](docs/slack.md) → **What leaves Slack**).
 - **Claim before you work**, before your first commit: the hand-off label off,
   the claimed label and `label_mine` (when set) on — the claim, dropped as one.
   Giving up, swap it for the failed label *and* comment why. Another agent's
