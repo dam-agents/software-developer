@@ -9,6 +9,16 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.2.4 — 2026-10-22
+
+**What reaches GitHub is written as if it were public.** Issues filed from
+Slack carried what the chat held: e-mail addresses, internal hosts, one-time
+codes, connection ids, quoted messages. A new rule in `CLAUDE.md` → **Rules**
+keeps them out, in every run; a hand-off comment paraphrases the message
+instead of quoting it.
+
+**Upgrade:** none.
+
 ## 6.2.2 — 2026-10-21
 
 **A merged pull request is done, however it was merged.** A squash or rebase
