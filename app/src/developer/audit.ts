@@ -58,7 +58,8 @@ export const audit: Command = async (deps) => {
     );
   // How often the session that wrote a change was the one woken to answer what
   // landed on it, and how often a fresh run had to take it over without that
-  // context. A fresh one after a parked item is a waiter lost to a restart.
+  // context. A fresh one after a parked item is a waiter lost to a restart
+  // whose session the sweep's message did not bring back.
   const resumed = week.filter((l) => l.split(" ")[1] === "resumed");
   if (resumed.length > 0) {
     const by = (c: string) => resumed.filter((l) => new RegExp(`cause=${c}( |$)`).test(l)).length;
@@ -66,6 +67,8 @@ export const audit: Command = async (deps) => {
     o(
       `resumes: ${continued} continued in their own session (waiter ${by("waiter")}, booked wake-up ${by("booking")}, a person ${by("operator")}), ${by("fresh")} taken over by a fresh one`,
     );
+    const messaged = week.filter((l) => l.split(" ")[1] === "messaged").length;
+    if (messaged > 0) o(`waiters lost to a restart: ${messaged}, each session messaged to start its own again`);
     if (by("fresh") > continued)
       o(`warn runs.resumed — most resumes lost their context: ${by("fresh")} of ${resumed.length} started fresh`);
   }

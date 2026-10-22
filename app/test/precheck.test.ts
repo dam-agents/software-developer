@@ -305,8 +305,12 @@ test("a parked item is its session's: the precheck leaves it while something wil
       "locks/item-4/owner",
       s.read("locks/item-4/owner").replace(/^- wake_at: .*$/m, `- wake_at: ${s.clock.ago(120)}`),
     );
+    assert.equal((await pc(s)).rc, 1, "waiter and booking gone: its session is messaged to come back");
+    assert.equal(s.runtime.messages[0]?.id, "sess-a");
+    assert.match(s.read("work/TICK.log"), /messaged session=sess-a issue=4 /);
+    s.clock.advance(16 * 60);
     const r = await pc(s);
-    assert.equal(r.rc, 0, "waiter and booking gone: a fresh run takes the review");
+    assert.equal(r.rc, 0, "it did not come: a fresh run takes the review");
     assert.match(r.out, /stopped without finishing/);
     assert.match(r.out, /#4 — PR #40 Forty — reviewed/);
     assert.match(

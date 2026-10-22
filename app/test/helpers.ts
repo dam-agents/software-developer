@@ -57,6 +57,9 @@ export class FakeRuntime implements Runtime {
   chats = new Set<string>();
   slack = new Set<string>();
   down = false;
+  /** The messages sent, and whether the platform queues them. */
+  readonly messages: { id: string; text: string }[] = [];
+  queues = true;
 
   private type(id: string): string {
     if (this.slack.has(id)) return "channel_slack";
@@ -79,6 +82,10 @@ export class FakeRuntime implements Runtime {
     if (this.down) return undefined;
     const ids = new Set([...this.running, ...this.chats, ...this.slack]);
     return [...ids].map((id) => ({ id, type: this.type(id), running: this.running.has(id) }));
+  }
+  async message(id: string, text: string): Promise<boolean> {
+    this.messages.push({ id, text });
+    return this.queues && !this.down;
   }
 }
 

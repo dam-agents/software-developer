@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { ATTENDED_STALE_MIN as ATTENDED_MIN } from "../src/developer/kit.ts";
 import { runState } from "../src/developer/run-state.ts";
 import { iso } from "../src/factory/time.ts";
 import { inSandbox, type Sandbox } from "./helpers.ts";
@@ -848,6 +849,7 @@ test("a parked item with nothing left to wake it is handed on, and its next run 
     await as(s, "sess-a", "park", "21");
     await as(s, "sess-a", "booked", s.clock.ago(-10));
     s.runtime.running.delete("sess-a");
+    s.runtime.queues = false; // nor will a message bring it back
     s.clock.advance(41 * 60);
     await as(s, "sess-b", "sweep");
     assert.ok(!existsSync(join(s.locks, "item-7")), "the booking is overdue past its grace, its waiter gone");
@@ -855,6 +857,80 @@ test("a parked item with nothing left to wake it is handed on, and its next run 
     const r = await as(s, "sess-b", "start", "7");
     assert.equal(r.rc, 0, r.err);
     assert.match(s.read("work/TICK.log"), /resumed session=sess-b issue=7 .*cause=fresh prev=sess-a$/m);
+  }));
+
+test("a parked item whose waiter a restart killed asks its own session to start it again, once", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.runtime.running.delete("sess-a");
+    await as(s, "sess-b", "sweep");
+    assert.ok(existsSync(join(s.locks, "item-7")), "held for its session while the message is on its way");
+    assert.equal(s.runtime.messages.length, 1);
+    assert.equal(s.runtime.messages[0]?.id, "sess-a");
+    assert.match(s.runtime.messages[0]?.text ?? "", /run-state\.sh" wait --park .* looks at #21/);
+    assert.match(s.read("work/TICK.log"), /messaged session=sess-a issue=7 slot=- pr=21 /);
+    await as(s, "sess-b", "sweep");
+    assert.equal(s.runtime.messages.length, 1, "asked once");
+    // the message starts a turn there: it may not end before its waiter runs
+    s.runtime.running.add("sess-a");
+    assert.equal((await as(s, "sess-a", "may-stop")).rc, 1);
+    const r = await s.run(runState, ["wait", "--park"], {
+      CLAUDE_CODE_SESSION_ID: "sess-a",
+      SD_PARK_FOR: "1",
+      SD_WAIT_POLL: "1",
+      SD_WAITER_PID: "777",
+    });
+    assert.equal(r.rc, 3, r.err);
+    assert.doesNotMatch(s.read("locks/item-7/owner"), /^- messaged_at:/m, "a waiter that ran clears it");
+  }));
+
+test("a session messaged that starts no waiter in time is handed on to a fresh run", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.runtime.running.delete("sess-a");
+    await as(s, "sess-b", "sweep");
+    s.clock.advance(16 * 60);
+    await as(s, "sess-b", "sweep");
+    assert.ok(!existsSync(join(s.locks, "item-7")), "its grace is over");
+    assert.match(s.read("work/TICK.log"), /abandoned session=sess-a issue=7 .*parked, its waiter gone/);
+    assert.equal((await as(s, "sess-b", "start", "7")).rc, 0);
+    assert.match(s.read("work/TICK.log"), /resumed session=sess-b issue=7 .*cause=fresh prev=sess-a$/m);
+  }));
+
+test("a message the platform does not queue, or a person's session, hands the item on at once", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.runtime.running.delete("sess-a");
+    s.runtime.queues = false;
+    await as(s, "sess-b", "sweep");
+    assert.ok(!existsSync(join(s.locks, "item-7")));
+    assert.doesNotMatch(s.read("work/TICK.log"), / messaged /);
+    s.runtime.queues = true;
+    s.runtime.chats.add("sess-c");
+    let r = await as(s, "sess-c", "start", "8", "feat/8");
+    assert.equal(r.rc, 0, r.err);
+    r = await as(s, "sess-c", "park", "21");
+    assert.equal(r.rc, 0, r.err);
+    s.runtime.running.delete("sess-c");
+    s.clock.advance(ATTENDED_MIN * 60);
+    await as(s, "sess-b", "sweep");
+    assert.equal(s.runtime.messages.length, 1, "only the refused one: a chat is never messaged");
+    assert.ok(!existsSync(join(s.locks, "item-8")));
   }));
 
 test("a parked item woken while every slot is busy stays parked, not freed", () =>

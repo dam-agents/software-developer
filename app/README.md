@@ -57,7 +57,8 @@ page shows the snapshot built into it.
   `process.env` or the system clock itself. That is what lets a test run a
   nine-minute `wait` in no time, with no network.
 - **The app detects, the agent acts.** No command writes to GitHub, commits or
-  pushes, except `work-backup`, to `work_repo` alone
+  pushes, except `work-backup`, to `work_repo` alone; the sweep's one message
+  goes to this agent's own parked session
   ([`docs/self-modification.md`](../docs/self-modification.md) §4).
 - **A failed read is not an answer.** Every GitHub and runtime read returns
   `undefined` or `unreachable` when it could not be made, and the caller says

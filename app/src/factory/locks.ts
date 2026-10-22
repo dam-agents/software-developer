@@ -10,8 +10,9 @@
 //
 // A parked lock (`parked_at`) has outlived its turn on purpose: the session
 // ended it to wait for a person, and its holder is now whatever wakes it — a
-// waiter process on this boot, or a wake-up booked on the platform. It is dead
-// once neither is left. A runtime that does not answer frees nothing: a guess
+// waiter process on this boot, or a wake-up booked on the platform. Neither
+// left, the sweep messages the session once to come back (`messaged_at`), and
+// the lock is held for that a while; it is dead once nothing is left. A runtime that does not answer frees nothing: a guess
 // could hand a live run's work to another.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -34,6 +35,7 @@ export const OWNER_KEYS = [
   "wake_at",
   "booking",
   "woke",
+  "messaged_at",
 ] as const;
 
 export interface Owner {
@@ -50,10 +52,14 @@ export interface Owner {
   readonly wake_at: string;
   readonly booking: string;
   readonly woke: string;
+  readonly messaged_at: string;
 }
 
 /** How long past its time a booked wake-up may still come before the lock reads dead. */
 export const BOOKING_GRACE_MIN = 30;
+
+/** How long a session messaged to come back to its parked item has to take it before the lock reads dead. */
+export const MESSAGE_GRACE_MIN = 15;
 
 export interface Held {
   readonly name: string;
@@ -93,6 +99,7 @@ function owner(file: string): Owner {
     wake_at: g("wake_at"),
     booking: g("booking"),
     woke: g("woke"),
+    messaged_at: g("messaged_at"),
   };
 }
 
@@ -208,11 +215,18 @@ export class Locks {
     return this.opts.livePids;
   }
 
-  /** What keeps a parked lock alive: its waiter, or a wake-up booked and not yet overdue. "" when nothing does. */
-  parkedHolder(o: Owner): "waiter" | "booking" | "" {
+  /**
+   * What keeps a parked lock alive: its waiter, a wake-up booked and not yet
+   * overdue, or a message asking its session back, sent a moment ago. "" when
+   * nothing does.
+   */
+  parkedHolder(o: Owner): "waiter" | "booking" | "message" | "" {
     if (waiterAlive(o, this.opts.boot, this.opts.livePids)) return "waiter";
+    const now = nowSeconds(this.opts.clock);
     const t = epoch(o.wake_at);
-    if (t !== undefined && nowSeconds(this.opts.clock) < t + BOOKING_GRACE_MIN * 60) return "booking";
+    if (t !== undefined && now < t + BOOKING_GRACE_MIN * 60) return "booking";
+    const m = epoch(o.messaged_at);
+    if (m !== undefined && now < m + MESSAGE_GRACE_MIN * 60) return "message";
     return "";
   }
 

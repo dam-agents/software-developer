@@ -626,7 +626,7 @@ body:not(.details) .det { display: none !important; }
         : changes ? `changes requested on ${p.map((q) => q.ref).join(" ")}: the next round answers it`
         : p.length ? `in review: ${p.map((q) => q.ref).join(" ")}` : x.stage === "orphan" ? "claimed, no pull request and no run on it" : x.stage;
       const held = x.lock && x.lock.parked_at
-        ? (x.watched === "waiter" ? " · parked, its waiter watching" : x.watched === "booking" ? ` · parked, no waiter: a wake-up at ${(x.lock.wake_at || "").slice(11, 16)} UTC` : " · parked, nothing watching: the next tick takes it over")
+        ? (x.watched === "waiter" ? " · parked, its waiter watching" : x.watched === "booking" ? ` · parked, no waiter: a wake-up at ${(x.lock.wake_at || "").slice(11, 16)} UTC` : x.watched === "message" ? " · parked, its waiter lost: its session was messaged to come back" : " · parked, nothing watching: the next tick takes it over")
         : x.lock && !x.slot ? ` · item lock held by session ${x.lock.session.slice(0, 8)}, no slot` : "";
       wait.push(row(red || changes ? "adv" : x.stage === "orphan" ? "adv" : "park", lbl(x.item), x.url, x.title || x.branch, why + held,
         p.length && (changes || red) ? askBtn("Round", `Start a review round on PR ${p[0].ref}: docs/direct-session.md → review round. Read its reviews, comments and checks first and tell me the plan before you push.`, true) : ""));
@@ -683,7 +683,7 @@ body:not(.details) .det { display: none !important; }
     const cont = (rz.waiter || 0) + (rz.booking || 0) + (rz.operator || 0);
     $("s-res").textContent = rz.total ? `${cont}/${rz.total}` : "—";
     $("s-res-sub").textContent = rz.total ? `continued · ${rz.fresh || 0} fresh` : "none this week";
-    $("s-res-sub").title = `last 7 days: ${rz.waiter || 0} woken by the waiter, ${rz.booking || 0} by a booked wake-up, ${rz.operator || 0} by a person typing in the session; ${rz.fresh || 0} taken over by a fresh session without the context`;
+    $("s-res-sub").title = `last 7 days: ${rz.waiter || 0} woken by the waiter, ${rz.booking || 0} by a booked wake-up, ${rz.operator || 0} by a person typing in the session; ${rz.messaged || 0} asked to restart a waiter a restart killed; ${rz.fresh || 0} taken over by a fresh session without the context`;
     const r = S.gh?.rate;
     if (r && r.remaining != null) {
       const lim = r.limit || 5000, pct = Math.max(0, Math.min(100, Math.round(100 * r.remaining / lim)));

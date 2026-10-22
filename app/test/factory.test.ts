@@ -1,5 +1,5 @@
 // The factory's parts on their own: the one `- key: value` parser, how a pull
-// request names its issue, a babysitting verdict, and the PATH workaround.
+// request names its issue, a babysitting verdict, the PATH workaround, and the platform's answer to a session message.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { restPull, toComment, verdict } from "../src/developer/pulls.ts";
@@ -7,6 +7,7 @@ import { Config } from "../src/factory/config.ts";
 import { shimsLast } from "../src/factory/context.ts";
 import { closesRefs, issueRefs, login, parseJsonStream } from "../src/factory/github.ts";
 import { bulletKeys, parseKv } from "../src/factory/kv.ts";
+import { queued } from "../src/factory/runtime.ts";
 
 test("a key reads from its first bullet, tolerant of case, spaces, backticks and a URL", () => {
   const m = parseKv(
@@ -89,4 +90,18 @@ test("a person's comment is a round; an agent's, a bot's, or a stranger's after 
 test("mise shims go last on PATH, the rest in order", () => {
   assert.equal(shimsLast("/a:/x/mise/shims:/b:/usr/bin:/bin"), "/a:/b:/usr/bin:/bin:/x/mise/shims");
   assert.equal(shimsLast("/a:/usr/bin:/bin"), "/a:/usr/bin:/bin");
+});
+
+test("a session message counts as sent only when the platform says it queued it", () => {
+  const answer = (text: string, isError = false) =>
+    `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text }], isError } })}\n\n`;
+  assert.ok(queued(answer(JSON.stringify({ queued: true, sessionId: "s", running: false }))));
+  assert.ok(
+    queued(JSON.stringify({ result: { content: [{ text: JSON.stringify({ queued: true }) }] } })),
+    "plain JSON",
+  );
+  assert.ok(!queued(answer("this agent has no session s; list_sessions shows the ones it has.", true)));
+  assert.ok(!queued(answer(JSON.stringify({ queued: false }))));
+  assert.ok(!queued("<html>bad gateway</html>"));
+  assert.ok(!queued(""));
 });

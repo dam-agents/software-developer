@@ -59,7 +59,9 @@ so to the operator.
   hook in `~/.claude/settings.json`, the `~/.claude/skills` and
   `work/.claude/skills` links. The one exception is
   `work-backup.sh`, which commits and pushes `work/`'s files to `work_repo`
-  and touches nothing else.
+  and touches nothing else. Its one message is to a session of this agent:
+  the sweep asks a parked item's session to start its lost waiter again
+  ([babysit.md](babysit.md) → **Held, then parked**), never a person's.
 - `CLAUDE.md` stays slim: run types, contracts, configuration, the trust
   boundary, invariants. Procedures live in `docs/`, each with its row in
   `CLAUDE.md`; a moved section leaves no stale reference behind.
