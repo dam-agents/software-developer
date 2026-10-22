@@ -83,9 +83,9 @@ export interface LockView {
   readonly silent_min: number | null;
   readonly stop_blocks: number;
   readonly holder: Holder;
-  /** A parked item lock: when, and what keeps it — its waiter, a booked wake-up, or nothing. */
+  /** A parked item lock: when, and what keeps it — its waiter, a booked wake-up, a message asking its session back, or nothing. */
   readonly parked_at: string;
-  readonly kept_by: "waiter" | "booking" | "";
+  readonly kept_by: "waiter" | "booking" | "message" | "";
   readonly wake_at: string;
 }
 
@@ -222,6 +222,8 @@ export function resumeCounts(text: string, sinceIso: string) {
     total: lines.length,
     waiter: by("waiter"),
     booking: by("booking"),
+    messaged: text.split("\n").filter((l) => l.split(" ")[1] === "messaged" && (l.split(" ")[0] ?? "") > sinceIso)
+      .length,
     operator: by("operator"),
     fresh: by("fresh"),
   };

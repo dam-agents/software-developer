@@ -27,8 +27,10 @@ run takes it and every slot stays free for other work.
 that took the lock, dead when the runtime says its session is not running a
 turn. A parked item lock's holder is what wakes its session: its waiter, a
 process on this boot, or a wake-up booked on the platform not yet past half an
-hour overdue. With neither, it is dead like any other, and the next tick takes
-the item over. A restart is
+hour overdue. With neither, the sweep messages the session once to start its
+waiter again, and holds the item fifteen minutes for it ([babysit.md](babysit.md) → **Held,
+then parked**); then it is dead like any other, and the next tick takes the
+item over. A restart is
 no proof: the locks live on the home volume and survive it, and the platform
 resumes the interrupted turn, which still holds them. The direct session is the
 one exception: it ends its turns between the operator's messages and to wait

@@ -52,10 +52,15 @@ the same session comes back: `schedule_once` with `inSession: "continue"`, a
 little over two hours ahead, then `run-state.sh booked <its time> <its id>`.
 Woken by the waiter first, delete the booking (`start` reminds you). A
 scheduled run may not change the platform's schedules (`CLAUDE.md` → **Hard
-invariants**): its waiter alone holds the item, and after a restart **a later
-run takes it over** — the precheck finds the parked item with nothing left to
-wake it, lists it like a run that stopped, and a fresh session babysits it from
-the top, from the branch and the pull request. `TICK.log` says which happened —
+invariants**): its waiter alone holds the item. After a restart, **the sweep
+asks the session to start it again**: it finds the parked item with nothing
+left to wake it, sends its session a message (`send_session_message`), and
+holds the item fifteen minutes for it. The message is a turn there: start the
+waiter again, as it says, and end the turn — it looks from your last round on,
+so what landed meanwhile wakes you at once. The message not queued, or no
+waiter in time, **a later run takes it over** — the precheck lists it like a
+run that stopped, and a fresh session babysits it from the top, from the branch
+and the pull request. `TICK.log` says which happened — `messaged`, then
 `resumed … cause=waiter|booking|operator`, or `cause=fresh prev=<session>` —
 and the weekly audit counts them.
 

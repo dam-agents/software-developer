@@ -47,7 +47,7 @@ import type { Command, Deps } from "../factory/context.ts";
 import { Exit } from "../factory/context.ts";
 import type { Conditional } from "../factory/github.ts";
 import { kv, readText, writeKv } from "../factory/kv.ts";
-import { BOOKING_GRACE_MIN, waiterAlive } from "../factory/locks.ts";
+import { BOOKING_GRACE_MIN, MESSAGE_GRACE_MIN, waiterAlive } from "../factory/locks.ts";
 import { ATTENDED } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
 import { persistTo } from "./backup.ts";
@@ -212,6 +212,7 @@ class RunState {
       wake_at: "-",
       booking: "-",
       woke: "-",
+      messaged_at: "-",
     });
     const p = prepare({
       git: this.kit.git,
@@ -645,7 +646,8 @@ class RunState {
       this.out(`#${item} already has a waiter (pid ${lock.owner.waiter}): nothing to start. End the turn.`);
       return 5;
     }
-    this.locks.update(lock.name, { waiter: pid, waiter_boot: this.locks.boot });
+    // a running waiter holds it again: a later restart may ask the session back once more
+    this.locks.update(lock.name, { waiter: pid, waiter_boot: this.locks.boot, messaged_at: "-" });
     const since = this.itemKey(item, "round_at") || lock.owner.parked_at;
     const labels = refs.map((r) => labelRef(r, this.kit.slug));
     const waitFor = Number(this.deps.env.SD_PARK_FOR || PARK_FOR_SECONDS);
@@ -730,7 +732,8 @@ class RunState {
     const item = mine.find((h) => h.name.startsWith("item-"));
     const holds = mine.filter((h) => !h.name.startsWith("item-")).map((h) => h.name);
     if (item && item.owner.parked_at !== "" && holds.length === 0) {
-      if (this.locks.parkedHolder(item.owner) !== "") return 0;
+      // a message asking for its waiter is no reason to stop: it is what woke this turn
+      if (!["", "message"].includes(this.locks.parkedHolder(item.owner))) return 0;
       this.say(`#${item.owner.item} is parked, but nothing will wake this session:`);
       this.say(
         'start its waiter as a background task — bash "$HOME/scripts/run-state.sh" wait --park — then end the turn.',
@@ -886,7 +889,11 @@ class RunState {
         mkdirSync(this.locks.dir, { recursive: true });
         appendFileSync(join(this.locks.dir, "exclusive.dirty"), "");
       } else if (h.name.startsWith("item-") && h.owner.parked_at !== "") {
-        // a parked item whose waiter died with no booking behind it: the next tick picks it up as a run that stopped
+        // a parked item whose waiter died with no booking behind it — a restart,
+        // most likely: its session is asked back once, so the context that
+        // wrote the change answers it; asked already, or not reachable, the
+        // next tick picks it up as a run that stopped
+        if (item && h.owner.messaged_at === "" && (await this.callBack(h))) continue;
         if (item) {
           this.writeItem(item, { state: "abandoned", updated_at: this.now() });
           abandoned.push(`#${item}`);
@@ -926,6 +933,39 @@ class RunState {
     }
     if (print) for (const a of abandoned) this.out(a);
     return abandoned;
+  }
+
+  /** Asks a parked item's session to take it back: true once the platform queued the message, and the lock is held for it. */
+  private async callBack(h: {
+    name: string;
+    owner: { session: string; item: string; parked_at: string };
+  }): Promise<boolean> {
+    const { session, item } = h.owner;
+    const prs = this.itemKey(item, "pr").split(/\s+/).filter(Boolean);
+    const refs = prs.length > 0 ? prs.map((p) => (p.includes("#") ? p : `#${p}`)).join(" ") : "its pull requests";
+    const text = [
+      `#${item} is parked in this session, and nothing watches it any more: its waiter is gone, the sandbox restarted most likely.`,
+      `Start its waiter again, as a background task — bash "$HOME/scripts/run-state.sh" wait --park — and end the turn. It looks at ${refs} from your last round on, so what landed meanwhile wakes you at once.`,
+      `Sent by run-state.sh sweep. No waiter within ${MESSAGE_GRACE_MIN} minutes, and a fresh run takes the item over.`,
+    ].join("\n\n");
+    // a person's session books its own wake-up (docs/babysit.md): its chat is not woken by a script
+    if (ATTENDED.has(await this.deps.runtime.sessionType(session))) return false;
+    // stamped first, so a sweep beside this one does not send it twice
+    this.locks.update(h.name, { messaged_at: this.now() });
+    if (!(await this.deps.runtime.message(session, text))) {
+      this.locks.update(h.name, { messaged_at: "-" });
+      return false;
+    }
+    this.logLine(
+      "messaged",
+      session,
+      item,
+      "-",
+      prs.join(","),
+      h.owner.parked_at,
+      `reason="parked, its waiter gone and no wake-up booked"`,
+    );
+    return true;
   }
 
   held(): number {

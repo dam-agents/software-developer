@@ -24,6 +24,8 @@ export interface Runtime {
   sessionType(sessionId: string): Promise<string>;
   /** Every session of this agent, or undefined when the runtime does not answer. */
   sessions(): Promise<SessionInfo[] | undefined>;
+  /** Sends a session of this agent a message, a new turn when it is idle: true once the platform queued it. */
+  message(sessionId: string, text: string): Promise<boolean>;
 }
 
 /** Session types a person is present in: their turns end between messages. */
@@ -35,14 +37,20 @@ export function livenessOf(s: { running?: unknown; type?: unknown } | undefined)
   return typeof s.type === "string" && ATTENDED.has(s.type) ? "attended" : "stopped";
 }
 
-/** The runtime over HTTP at $PLATFORM_RUNTIME_URL, five seconds a call. */
+/**
+ * The runtime over HTTP at $PLATFORM_RUNTIME_URL, five seconds a call; a
+ * message goes through the platform's MCP server at $PLATFORM_MCP_URL, as the
+ * `send_session_message` tool a session calls.
+ */
 export class HttpRuntime implements Runtime {
   private readonly base: string;
   private readonly timeoutMs: number;
+  private readonly mcp: string;
 
-  constructor(base: string, timeoutMs = 5000) {
+  constructor(base: string, timeoutMs = 5000, mcp = "") {
     this.base = base.replace(/\/+$/, "");
     this.timeoutMs = timeoutMs;
+    this.mcp = mcp;
   }
 
   private async list(input: Record<string, string>): Promise<unknown[] | undefined> {
@@ -89,5 +97,45 @@ export class HttpRuntime implements Runtime {
         },
       ];
     });
+  }
+
+  async message(sessionId: string, text: string): Promise<boolean> {
+    if (!this.mcp) return false;
+    try {
+      const res = await fetch(this.mcp, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "send_session_message", arguments: { sessionId, text } },
+        }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!res.ok) return false;
+      return queued(await res.text());
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** Whether a tools/call answer, plain JSON or one server-sent event, says the message was queued. */
+export function queued(body: string): boolean {
+  const json = body.includes("data:")
+    ? body
+        .split("\n")
+        .filter((l) => l.startsWith("data:"))
+        .map((l) => l.slice(5))
+        .join("")
+    : body;
+  try {
+    const r = (JSON.parse(json) as { result?: { isError?: unknown; content?: { text?: unknown }[] } }).result;
+    if (!r || r.isError === true) return false;
+    const text = r.content?.[0]?.text;
+    return typeof text === "string" && (JSON.parse(text) as { queued?: unknown }).queued === true;
+  } catch {
+    return false;
   }
 }

@@ -9,6 +9,23 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.3.0 — 2026-10-22
+
+**A restart no longer hands a parked pull request to a fresh session.** A
+restart kills every waiter, and a scheduled run may not book a wake-up, so the
+next sweep found its parked items dead and a fresh run babysat them without the
+context that wrote them. The sweep now messages the parked session first, over
+the platform's MCP server (`send_session_message`, at `$PLATFORM_MCP_URL`), and
+holds the item fifteen minutes for it. The message starts a turn there, which
+starts its waiter again; the waiter looks from the last round on, so what
+landed meanwhile wakes the session at once. `TICK.log` gains a `messaged` line,
+which the audit and the control room count. A message the platform does not
+queue, a session that starts no waiter in time, or a person's session hands
+the item on as before.
+
+**Upgrade:** none. A lock without the new `messaged_at` key reads as never
+messaged.
+
 ## 6.2.5 — 2026-10-22
 
 **The control room's inlet no longer shows a started item as queued.** A run

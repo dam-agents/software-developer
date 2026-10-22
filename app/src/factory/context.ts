@@ -47,7 +47,7 @@ export function realDeps(): Deps {
   return {
     env,
     clock: systemClock,
-    runtime: new HttpRuntime(env.PLATFORM_RUNTIME_URL ?? ""),
+    runtime: new HttpRuntime(env.PLATFORM_RUNTIME_URL ?? "", 5000, env.PLATFORM_MCP_URL ?? ""),
     github: new GhCli(env),
     io: {
       out: (s) => process.stdout.write(`${s}\n`),
