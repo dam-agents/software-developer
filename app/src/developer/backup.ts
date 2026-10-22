@@ -50,7 +50,7 @@ const LOCK_TTL_MIN = 10;
 const RETRIES = 3;
 
 /** A token, a key or a password assignment. Patterns, not proof: a match names the file, never the match. */
-const SECRET =
+export const SECRET =
   /gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|(password|passwd|secret|token)[ \t]*[:=][ \t]*[^\s<]{8,}/i;
 
 interface Backup {

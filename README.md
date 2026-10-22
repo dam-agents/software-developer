@@ -23,6 +23,8 @@ through review.
     ([`docs/runs.md`](docs/runs.md));
   - `session-link.sh` prints the link back to the run that wrote a change,
     which every pull request carries;
+  - `public-check.sh` reads a body bound for GitHub for what must stay
+    private — e-mails, codes, ids, internal hosts — before it is posted;
   - `work-backup.sh` backs `work/` up to a private repository of its own, and
     restores it on a fresh volume;
   - `harness/claude-code/` holds the `Stop` hook that keeps an unattended run
