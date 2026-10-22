@@ -9,6 +9,17 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.2.5 — 2026-10-22
+
+**The control room's inlet no longer shows a started item as queued.** A run
+holds its item lock a moment before it swaps the hand-off label for the claim.
+In that window the API listed the issue in the queue too, and the page then
+drew the queue's overflow chip for it, a `+1` with nothing behind it. The queue
+now leaves out every item a lock holds, as the precheck does, and the chip
+counts only issues past the 50 the query reads.
+
+**Upgrade:** none. A running control room picks up the fix once restarted.
+
 ## 6.2.4 — 2026-10-22
 
 **What reaches GitHub is written as if it were public.** Issues filed from

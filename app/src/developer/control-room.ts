@@ -358,9 +358,11 @@ export class ControlRoom {
     const handoff = issues("handoff");
     const claimed = issues("claimed").filter((i) => !kit.labelMine || i.labels.includes(kit.labelMine));
     const claimedNums = new Set(claimed.map((i) => String(i.number)));
-    // the queue is what the precheck would offer: not claimed by anyone, asked or failed
+    // the queue is what the precheck would offer: not claimed by anyone, asked or failed, and
+    // not held — a run that has just started holds its item before it swaps the labels
     const taken = new Set([kit.labelClaimed, kit.labelNeedsInfo, kit.labelFailed]);
-    const queue = handoff.filter((i) => !i.labels.some((l) => taken.has(l)));
+    const held = new Set(locks.filter((l) => l.kind === "item").map((l) => l.key));
+    const queue = handoff.filter((i) => !i.labels.some((l) => taken.has(l)) && !held.has(String(i.number)));
     // needs-info and failed carry no claim: ours are the issues this instance ever started
     const infoAll = issues("info");
     const failedAll = issues("failed");

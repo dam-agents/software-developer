@@ -1121,7 +1121,8 @@ body:not(.details) .det { display: none !important; }
         // the queue, oldest at the front (right), drawn right to left
         const q = [...items].sort((a, z) => String(a.at || "").localeCompare(String(z.at || "")));
         // GitHub's count of the queue can pass the 50 the query reads: those join the chip
-        const T = S.totals || {}, unread = T.handoff != null ? Math.max(0, T.handoff - (T.queue_taken || 0) - q.length) : 0;
+        // against the whole queue read, not what is drawn here: an item in a reactor is read, not unread
+        const T = S.totals || {}, unread = T.handoff != null ? Math.max(0, T.handoff - (T.queue_taken || 0) - (S.queue || []).length) : 0;
         let x = b.x + b.w - 10, row = "", shown = 0;
         for (let i = 0; i < q.length; i++) {
           const w = tokW(q[i].label), rest = q.length - i - 1 + unread;

@@ -101,19 +101,24 @@ test("the queue is what the precheck would offer; set-aside issues are ours only
     world(s, [], {
       handoff: {
         totalCount: 60,
-        nodes: [issue(1, ["agent/implement"]), issue(2, ["agent/implement", "agent/in-progress", "agent/other"])],
+        nodes: [
+          issue(1, ["agent/implement"]),
+          issue(2, ["agent/implement", "agent/in-progress", "agent/other"]),
+          issue(5, ["agent/implement"]),
+        ],
       },
       info: { totalCount: 2, nodes: [issue(3, ["agent/needs-info"]), issue(4, ["agent/needs-info"])] },
     });
     s.item("3", { state: "needs-info" });
+    s.lock("item-5", { session: "sess-a", item: "5" });
     const snap = (await room(s).snapshot(true)) as Snap;
     assert.deepEqual(
       snap.queue.map((i: Snap) => i.number),
       [1],
-      "another agent's claim is never queued for us",
+      "another agent's claim is never queued for us, nor an item a run holds before it claims",
     );
     assert.equal(snap.totals.handoff, 60, "GitHub's count, past the 50 read");
-    assert.equal(snap.totals.queue_taken, 1);
+    assert.equal(snap.totals.queue_taken, 2);
     assert.deepEqual(
       snap.needs_info.map((i: Snap) => i.number),
       [3],
