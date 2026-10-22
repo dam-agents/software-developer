@@ -7,6 +7,7 @@ import { workBackup } from "./developer/backup.ts";
 import { controlRoom, controlRoomPage } from "./developer/control-room.ts";
 import { enforceFinish, install, repoAllowed, sessionLink } from "./developer/harness.ts";
 import { precheck } from "./developer/precheck.ts";
+import { publicCheck } from "./developer/public.ts";
 import { runState } from "./developer/run-state.ts";
 import { verify } from "./developer/verify.ts";
 import type { Command } from "./factory/context.ts";
@@ -23,6 +24,7 @@ export const commands: Readonly<Record<string, Command>> = {
   "work-backup": workBackup,
   "session-link": sessionLink,
   "repo-allowed": repoAllowed,
+  "public-check": publicCheck,
   "hook-stop": enforceFinish,
   install,
   "control-room": controlRoom,

@@ -9,6 +9,17 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.4.0 — 2026-10-22
+
+**A Slack turn keeps the conversation off GitHub, and checks a body before it
+is posted.** 6.2.4 made the rule; `docs/slack.md` → **What leaves Slack** now
+says what a Slack turn may write on GitHub — the work, never the conversation —
+and `scripts/public-check.sh` reads each body for e-mails, credentials, device
+codes, Slack ids and permalinks, connection and agent ids, UUIDs, private
+addresses and the platform's own host before it is posted.
+
+**Upgrade:** none — the script comes with the update.
+
 ## 6.3.0 — 2026-10-22
 
 **A restart no longer hands a parked pull request to a fresh session.** A
