@@ -43,6 +43,7 @@ export const KNOWN = [
   "work_repo",
   "slack_channel",
   "slack_handoff",
+  "slack_automerge",
   "schedules",
   "skill_grill",
   "skill_file_issue",
@@ -134,6 +135,25 @@ function configChecks(kit: Kit, r: Report): void {
       "config.slack_handoff",
       `'${handoff}' is not anyone, people or off`,
       "write one of them, or leave it out for anyone",
+    );
+  const automerge = cfg.get("slack_automerge");
+  const ids = automerge.split(/[\s,]+/).filter(Boolean);
+  if (["", "off", "people"].includes(automerge) || ids.every((id) => /^[UW][A-Z0-9]+$/.test(id))) {
+    if (!slack) {
+      if (automerge && automerge !== "off")
+        r.warn("config.slack_automerge", "set, but slack_channel is not — nobody can ask for auto-merge");
+    } else
+      r.ok(
+        "config.slack_automerge",
+        !automerge || automerge === "off"
+          ? "off — nobody may ask for auto-merge from Slack"
+          : `${automerge === "people" ? "people" : ids.join(" ")} may ask for auto-merge from Slack (docs/slack.md → Auto-merge)`,
+      );
+  } else
+    r.fail(
+      "config.slack_automerge",
+      `'${automerge}' is not off, people or Slack user ids`,
+      "write one of them, e.g. U0123ABCD, or leave it out for off",
     );
   const app = cfg.get("app_url");
   if (app && !/^https?:\/\/\S+$/.test(app))
