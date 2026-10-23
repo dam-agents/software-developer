@@ -122,7 +122,9 @@ rights would. And it files issues there: ask it to file one, or to fix
 something no issue covers, and it files it at once — with the hand-off label
 when you asked for the work. `slack_handoff` says who may do either: `anyone`
 in the channel, bots and other agents too (the default), `people` only, or
-`off`. Asked there to change how it works, it opens a pull request on this
+`off`. Asked there to merge one of its pull requests, it turns auto-merge on
+when `slack_automerge` lets the asker (off by default), and the repository's
+required reviews and checks still decide the merge. Asked there to change how it works, it opens a pull request on this
 repository directly; a person merges it.
 
 ## What it keeps on the instance

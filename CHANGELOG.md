@@ -9,6 +9,24 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.5.0 — 2026-10-23
+
+**Slack may ask for auto-merge on a pull request of yours.** A new key,
+`slack_automerge` — `off` (missing), `people`, or Slack user ids — names who
+may. Asked by one of them, a Slack turn turns auto-merge on for that pull
+request (`docs/slack.md` → **Auto-merge**); the repository's required reviews
+and checks still decide when it merges. Never a plain merge, an approval, or a
+pull request not yours. The Hard invariant on merging names this as its one
+opening.
+
+**Upgrade:**
+
+1. Operator only: offer `slack_automerge`. On a yes, write
+   `- slack_automerge: <people or the user ids>` to `work/CONFIG.md`, and
+   reword the merge line of its `## Bounds` to match — Bounds is read too, and a
+   sentence there forbidding every merge keeps forbidding this one.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --config`.
+
 ## 6.4.0 — 2026-10-22
 
 **A Slack turn keeps the conversation off GitHub, and checks a body before it
