@@ -43,9 +43,9 @@ import { Git } from "../factory/git.ts";
 import { readText } from "../factory/kv.ts";
 import { iso, nowSeconds } from "../factory/time.ts";
 
-export const CARRIED = ["CONFIG.md", "AGENTS.md", "VERSION", "TICK.log", "AUDIT.log"] as const;
+export const CARRIED = ["CONFIG.md", "AGENTS.md", "VERSION", "TICK.log", "AUDIT.log", "BRIEF.log"] as const;
 const PROTECTED = ["CONFIG.md"];
-const APPEND_ONLY = ["TICK.log", "AUDIT.log"];
+const APPEND_ONLY = ["TICK.log", "AUDIT.log", "BRIEF.log"];
 const LOCK_TTL_MIN = 10;
 const RETRIES = 3;
 

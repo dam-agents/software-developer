@@ -51,7 +51,7 @@ a line in any other shape is invisible, not wrong.
   others. `exclusive` — what every slot shares and one uses at a time, in plain
   words; missing: nothing is. `verify_exclusive` — the check on it a pull
   request must pass; missing: none ([`docs/exclusive.md`](docs/exclusive.md)).
-- `schedules` — `tick`, `audit`, both, or `none`; missing: both — interactive, none.
+- `schedules` — `tick`, `audit`, `brief`, any of them, or `none`; missing: `tick audit` — interactive, none. `brief` is opt-in.
 - `slots` — default 3: how many runs work at once, each in its own worktree.
   `babysit_max_hours` — default 4: how long a run may `wait` in its turn. `stuck_after_min` — default 120: every slot held and a
   run silent this long lets a diagnostic run through.
@@ -75,6 +75,7 @@ a line in any other shape is invisible, not wrong.
 | **Direct session** | the operator asks for work in the chat | [`docs/direct-session.md`](docs/direct-session.md), then the tick's steps |
 | **Diagnostic** | every slot held and a run silent; the prompt opens with **DIAGNOSTIC RUN** | [`docs/diagnostic-run.md`](docs/diagnostic-run.md) |
 | **Weekly audit** | Friday 06:00 UTC, ungated | [`docs/audit.md`](docs/audit.md) |
+| **Daily brief** | weekdays 07:00 UTC, when `brief` is in `schedules` | [`docs/brief.md`](docs/brief.md) |
 | **Slack** | a message in Slack — what its **Routing** table matches, or nothing | [`docs/slack.md`](docs/slack.md) |
 
 ## The tick

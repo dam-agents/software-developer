@@ -15,7 +15,7 @@ Missing, or Slack not connected to this agent: post nothing, say nothing.
 | Cannot go on | `finish blocked` | 🛑 `<repo>#<n>` is blocked — what fails, in one line |
 | Weekly audit | the audit's report | the report's header and its **Action needed** lines |
 
-Nothing else: no claims, pushes, review rounds, `nothing` ticks or a pull
+The daily brief posts itself ([brief.md](brief.md)). Nothing else: no claims, pushes, review rounds, `nothing` ticks or a pull
 request closed without merging. Each post carries the link to the issue or pull
 request, mentions no one, and repeats nothing the link already says.
 

@@ -100,3 +100,12 @@ schedules:
     cron: "0 6 * * 5"
     sessionMode: fresh
     task: Run the weekly audit — docs/audit.md.
+
+  # Weekdays 07:00 UTC — 08:00 in Prague in winter, 09:00 in summer; a cron
+  # holds UTC only, so the operator moves it with the platform's schedule
+  # editor. Weekends are skipped, so Monday's brief covers them. Opt-in: off
+  # until `schedules` lists `brief`.
+  - name: software-developer-brief-daily
+    cron: "0 7 * * 1-5"
+    sessionMode: fresh
+    task: Post the daily brief — docs/brief.md.

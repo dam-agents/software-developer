@@ -8,7 +8,7 @@ to this definition itself.
 | Path | Kind | Holds |
 | --- | --- | --- |
 | `$HOME` | the definition, a git checkout (`origin`) | `kit.yaml`, `CLAUDE.md`, `AGENTS.md`, `ONBOARDING.md`, `README.md`, `VERSION`, `CHANGELOG.md`, `.gitignore`, `docs/`, `scripts/`, `bin/`, `app/`, `.github/`, `.agents/skills/implement-issue/`, `.agents/defaults/` |
-| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `items/`, `slots/`, `also/`, `locks/`, and the checkouts of `repo` and any `repos_also` |
+| `$HOME/work` | runtime state, a plain directory, backed up to `work_repo` | `CONFIG.md`, `AGENTS.md`, `VERSION`, `GATE.md`, `TICK.log`, `AUDIT.log`, `BRIEF.log`, `items/`, `slots/`, `also/`, `locks/`, and the checkouts of `repo` and any `repos_also` |
 
 `work/` itself is never a git repository: the home volume is virtiofs over NFS,
 and a `.git` that concurrent runs change there corrupts — `Stale file handle`,
@@ -24,7 +24,7 @@ The `.gitignore` at `$HOME` is an allowlist, so `work/` and the home's secrets
 Every fact about the work lives on GitHub — labels, branches, pull requests —
 and the tick rebuilds its own bookkeeping from nothing: a missing item file is
 an item no run has started on yet, and a lock (`work/locks`) is only ever held by a live turn. What nothing rebuilds is `CONFIG.md`, and the history in
-`TICK.log` and `AUDIT.log`. With `work_repo` set, those travel to a private
+`TICK.log`, `AUDIT.log` and `BRIEF.log`. With `work_repo` set, those travel to a private
 repository of their own through `scripts/work-backup.sh`, which pushes straight
 to its default branch — a repository of data, never of changes for review, and
 the only one a script pushes to. Its header says exactly what travels, and why

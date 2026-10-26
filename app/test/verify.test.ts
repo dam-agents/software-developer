@@ -58,7 +58,7 @@ test("--config fails what the runtime could not read", () =>
     assert.match(r.out, /is not \[host\/\]owner\/name/);
     assert.match(r.out, /app_url — 'platform\.example\.com' is not a URL/);
     assert.match(r.out, /FAIL config\.retired — retired key\(s\): cluster_install/);
-    assert.match(r.out, /FAIL config\.schedules — 'daily' is not tick, audit or none/);
+    assert.match(r.out, /FAIL config\.schedules — 'daily' is not tick, audit, brief or none/);
     assert.match(r.out, /FAIL config\.repos_also — 'gadgets' is not owner\/name or owner\/\*/);
     assert.doesNotMatch(r.out, /'acme\/\*' is not/);
     assert.doesNotMatch(r.out, /unknown key\(s\): lable_review cluster_install/, "a retired key is not also unknown");
@@ -238,7 +238,10 @@ test("interactive: only the claim is labelled, and the tick is refused", () =>
     assert.equal(r.rc, 0, r.out);
     assert.match(r.out, /ok {3}config\.mode — interactive/);
     assert.match(r.out, /ok {3}config\.schedules — unset — none/);
-    assert.match(r.out, /disabled: software-developer-tick-10m software-developer-audit-weekly/);
+    assert.match(
+      r.out,
+      /disabled: software-developer-tick-10m software-developer-audit-weekly software-developer-brief-daily/,
+    );
     assert.match(r.out, /ok {3}live\.precheck — interactive/);
     assert.doesNotMatch(r.out, /needs-info/, "no default label demanded");
     s.config("- schedules: tick");

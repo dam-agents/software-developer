@@ -49,9 +49,9 @@ watches GitHub — implementing what carries the hand-off label and babysitting
 its pull requests, unattended — or works only when you ask it in a chat, as a
 developer you pair with (`mode` in `work/CONFIG.md`,
 [`docs/direct-session.md`](docs/direct-session.md)). Interactive needs no
-schedule and only the labels of a claim. Autonomous, both schedules are still
-optional: onboarding asks whether to watch the hand-off label and whether to
-run the weekly audit.
+schedule and only the labels of a claim. Autonomous, the schedules are still
+optional: onboarding asks whether to watch the hand-off label, whether to
+run the weekly audit, and whether to post the daily brief.
 
 ## An issue's lifecycle
 
@@ -140,8 +140,9 @@ All under `work/`, none of it tracked here:
 | `GATE.md` | the precheck, via `run-state.sh` | when it last let a diagnostic run through |
 | `TICK.log` | `scripts/run-state.sh` | one line per closed run, append-only |
 | `AUDIT.log` | the weekly audit | one line per audit: ok, warn and fail counts |
+| `BRIEF.log` | the daily brief | one line per brief posted; the next one reports from it |
 
-`CONFIG.md`, `AGENTS.md`, `VERSION` and the two logs are backed up to a
+`CONFIG.md`, `AGENTS.md`, `VERSION` and the logs are backed up to a
 private repository of their own when `work_repo` names one; the rest is
 rebuilt from GitHub — [`docs/persistence.md`](docs/persistence.md). The locks
 are never backed up, and survive a restart: a resumed turn keeps them.

@@ -25,7 +25,7 @@ user can decide — never your own work:
 | `verify` | How to build, check and test — and what the slots must take turns on |
 | `access` | Confirm the connected account can push and open pull requests |
 | `platform` | The address this platform is reached at |
-| `schedules` | Autonomous: whether to watch the hand-off label, and run the weekly audit |
+| `schedules` | Whether to watch the hand-off label, run the weekly audit, post the daily brief |
 | `slack` | Whether, and to which chat, to post the moments a person acts on — and grill and hand off issues |
 | `bounds` | What you must never touch |
 
@@ -64,7 +64,7 @@ confirming or correcting rather than composing from nothing.
   user asks here, and a pull request is theirs to bring back for its review
   ([`docs/direct-session.md`](docs/direct-session.md)). Record it as `mode`.
   Interactive skips the hand-off, failed, needs-info and review labels and the
-  schedules below: both are switched off.
+  schedules below: all are switched off, the brief aside.
 - **Labels** — every mode claims the issue it works on, so two agents never
   take one: the claimed label, suggested `agent/in-progress`. Do not ask about
   `label_mine`: write `- label_mine: agent/$PLATFORM_AGENT_ID` yourself and
@@ -127,12 +127,16 @@ confirming or correcting rather than composing from nothing.
   files issues; offer them as `skill_grill` and `skill_file_issue`, or the
   definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's
   settings later.
-- **Schedules** — autonomous only; interactive, skip it. Two, both held
-  until onboarding completes. Ask whether to
-  watch the hand-off label (`tick`: every ten minutes, and how work reaches
-  you unattended) and whether to run the weekly audit (`audit`). Record the
-  ones wanted as `schedules`, e.g. `tick audit`, or `none`. Without the tick,
-  work reaches you only when the user names an issue in a direct session.
+- **Schedules** — three, held until onboarding completes. Autonomous only: ask
+  whether to watch the hand-off label (`tick`: every ten minutes, and how work
+  reaches you unattended) and whether to run the weekly audit (`audit`).
+  Either mode, when `slack_channel` is set: offer the daily brief (`brief`,
+  off unless they say yes): weekdays at 07:00 UTC, a Slack message of what the
+  merged pull requests changed for users and for developers
+  ([`docs/brief.md`](docs/brief.md)); the time is the schedule's, moved in the
+  platform. Record the ones wanted as `schedules`, e.g. `tick audit brief`, or
+  `none`. Without the tick, work reaches you only when the user names an issue
+  in a direct session.
 - **Bounds** — what is off limits, and explicitly whether you may merge. The
   default is **no**: a person merges, and you answer what lands on the pull
   request until they do.
@@ -175,7 +179,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - verify: <the repository's check-and-test command>
 - exclusive: the local cluster — anything that installs onto it or runs against it
 - verify_exclusive: <its end-to-end command, setup included>
-- schedules: tick audit
+- schedules: tick audit brief
 - slots: 3
 - babysit_max_hours: 4
 - stuck_after_min: 120
@@ -261,14 +265,14 @@ operator-only fix goes to the user. It warns that only MCP can list schedules:
 check with `list_schedules` that each one it names exists.
 
 Then switch off, with `toggle_schedule`, every schedule `schedules` does not
-list — interactive, both of them — `list_schedules` first, since it flips
+list — interactive, all of them unless `brief` — `list_schedules` first, since it flips
 whatever state it finds. Then
 call `mark_onboarding_complete` — only now, with the verification green. It
 releases the schedules. If the user left anything unanswered, leave it
 uncalled and say which step is still open.
 
 Finish with a short summary for the user: the final `work/CONFIG.md`, verbatim;
-which schedules run — the tick every ten minutes, the audit every Friday;
+which schedules run — the tick every ten minutes, the audit every Friday, the brief on weekdays;
 and how work reaches you: autonomous, by the hand-off label when the tick
 runs and pull requests by review comments; in either mode, by asking in this
 chat ([`docs/direct-session.md`](docs/direct-session.md)), which is also the

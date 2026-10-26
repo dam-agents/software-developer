@@ -166,10 +166,10 @@ function configChecks(kit: Kit, r: Report): void {
   else r.fail("config.mode", `'${m}' is not autonomous or interactive — read as interactive`, "write one of them");
   const sched = cfg.list("schedules");
   for (const w of sched)
-    if (!["tick", "audit", "none"].includes(w))
+    if (!["tick", "audit", "brief", "none"].includes(w))
       r.fail(
         "config.schedules",
-        `'${w}' is not tick, audit or none`,
+        `'${w}' is not tick, audit, brief or none`,
         "list the ones wanted, e.g. `- schedules: tick audit`",
       );
   if (mode === "interactive" && sched.includes("tick"))
@@ -377,12 +377,12 @@ function structureChecks(kit: Kit, r: Report): void {
         "remove them; the log is append-only through run-state.sh",
       );
   }
-  // `schedules` names the wanted ones by role, tick and audit; missing, both — or, interactive, none
+  // `schedules` names the wanted ones by role, tick, audit and brief; missing, tick and audit — or, interactive, none
   const on = ` ${cfg.get("schedules") || schedulesDefault(kit)} `;
   const enabled: string[] = [];
   const disabled: string[] = [];
   for (const n of kitSchedules(home)) {
-    const role = n.includes("audit") ? "audit" : "tick";
+    const role = n.includes("audit") ? "audit" : n.includes("brief") ? "brief" : "tick";
     (on.includes(` ${role} `) ? enabled : disabled).push(n);
   }
   r.warn(

@@ -9,6 +9,26 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.5.0 — 2026-10-26
+
+**A daily brief in Slack.** A new schedule, `software-developer-brief-daily`
+(weekdays 07:00 UTC), posts to `slack_channel` what the pull requests merged
+since the last brief changed: user-facing news by author, then the technical
+changes with impact and the risky ones. Weekend merges arrive on Monday.
+`docs/brief.md` is the procedure; `work/BRIEF.log` marks the window and is
+backed up.
+
+**Upgrade:**
+1. The kit is read only at create: on a deployed instance, create the schedule
+   by hand with `create_schedule` — name `software-developer-brief-daily`,
+   cron `0 7 * * 1-5` (UTC; move it for another hour), session mode `fresh`,
+   task `Post the daily brief — docs/brief.md.` — **operator only**, and
+   disable it with `toggle_schedule` unless `brief` is wanted.
+2. Offer the brief once, when `slack_channel` is set: a yes adds `brief` to
+   `schedules` in `work/CONFIG.md` (the step is the offer, never the enabling)
+   and enables the schedule.
+3. Re-run `bash "$HOME/scripts/verify-onboarding.sh" --live`.
+
 ## 6.4.0 — 2026-10-22
 
 **A Slack turn keeps the conversation off GitHub, and checks a body before it

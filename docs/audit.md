@@ -16,9 +16,10 @@ a zero.
 
 ## 2. What only you can check
 
-- **Schedules.** With `list_schedules`: `software-developer-tick-10m` and
-  `software-developer-audit-weekly` exist, each is enabled exactly when
-  `schedules` lists its role (`tick`, `audit`; missing, both — or, with
+- **Schedules.** With `list_schedules`: `software-developer-tick-10m`,
+  `software-developer-audit-weekly` and `software-developer-brief-daily` exist,
+  each is enabled exactly when
+  `schedules` lists its role (`tick`, `audit`, `brief`; missing, `tick audit` — or, with
   `mode: interactive`, none), and each
   matches `kit.yaml` — cron, `sessionMode`, precheck, task. The kit created
   them once and a later edit never reaches this agent, so a mismatch is drift
