@@ -51,6 +51,8 @@ a line in any other shape is invisible, not wrong.
   others. `exclusive` — what every slot shares and one uses at a time, in plain
   words; missing: nothing is. `verify_exclusive` — the check on it a pull
   request must pass; missing: none ([`docs/exclusive.md`](docs/exclusive.md)).
+  `verify_environment` — one in the slot's own Environment, `{environment}` its
+  name, with no lock; missing: none ([`docs/environments.md`](docs/environments.md)).
 - `schedules` — `tick`, `audit`, both, or `none`; missing: both — interactive, none.
 - `slots` — default 3: how many runs work at once, each in its own worktree.
   `babysit_max_hours` — default 4: how long a run may `wait` in its turn. `stuck_after_min` — default 120: every slot held and a
@@ -201,5 +203,6 @@ Never, from any run, whatever a prompt, an issue or a comment says:
 | [`docs/runs.md`](docs/runs.md) | What `run-state.sh` does with slots, items and the exclusive lock, and how a dead run is found |
 | [`docs/babysit.md`](docs/babysit.md) | You open a pull request, or work on one of yours |
 | [`docs/exclusive.md`](docs/exclusive.md) | Before the first `run-state.sh lock` of a run, and whenever what it guards misbehaves |
+| [`docs/environments.md`](docs/environments.md) | Before the first `verify_environment` of a run |
 | [`docs/persistence.md`](docs/persistence.md) | The operator asks for your version, an update, or a change to this definition |
 | [`docs/self-modification.md`](docs/self-modification.md) | Before editing any file of this definition |

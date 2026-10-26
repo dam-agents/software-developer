@@ -147,6 +147,14 @@ test("a worktree outside the slots fails; verify_exclusive needs exclusive", () 
     assert.match(r.out, /FAIL config\.verify_exclusive — set, but exclusive names nothing/);
   }));
 
+test("verify_environment names the slot's Environment", () =>
+  inSandbox(async (s) => {
+    s.config("- verify_environment: make e2e");
+    assert.match((await v(s, "--config")).out, /FAIL config\.verify_environment — names no \{environment\}/);
+    s.setConfig("verify_environment", "make e2e ENV={environment}");
+    assert.doesNotMatch((await v(s, "--config")).out, /config\.verify_environment/);
+  }));
+
 test("slack_channel is a chat id when set", () =>
   inSandbox(async (s) => {
     assert.match((await v(s, "--config")).out, /ok {3}config\.slack_channel — unset/);
