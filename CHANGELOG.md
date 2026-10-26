@@ -9,6 +9,20 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.4.1 — 2026-10-26
+
+**A run asks for review with the reviewer's own label, and never creates one.**
+A review bot that names its labels in its review — a full review, and a delta
+review of the new commits — is asked with those; `label_review` is the fallback
+when it names none. A run no longer creates a label to request review: a label
+the repository does not have is the wrong name, and nothing reads it.
+
+**Upgrade:** in the direct session, check that `label_review` in
+`work/CONFIG.md` is a label the review bot reads — its documented trigger, not
+a lookalike — and fix it there when it is not. Labels a run created by mistake
+are deleted by a person with triage rights, after `label_review` no longer
+names them.
+
 ## 6.4.0 — 2026-10-22
 
 **A Slack turn keeps the conversation off GitHub, and checks a body before it
