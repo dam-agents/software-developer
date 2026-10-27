@@ -9,6 +9,23 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.8.0 — 2026-10-27
+
+**An Environment belongs to the issue, not the slot, and lives until its pull
+request is done.** `verify_environment` runs in `issue-<n>`, made on the issue's
+first check and reused by a run in any slot; a freed slot leaves it running for
+the reviewer. Its pull request links it, `Environment: <address>` and
+`<!-- environment: issue-<n> -->` on lines of their own, which
+`public-check.sh` reads past; each round moves its expiry on, and it is deleted
+before `finish released`. At the agent's limit, the Environment of the oldest
+approved pull request goes first. The control room shows each slot the
+Environment of its issue, and the weekly audit names one no open pull request
+links (`environments.left`) (`docs/environments.md`).
+
+**Upgrade:** with `verify_environment` set, operator only: the old `slot-<n>`
+Environments no run uses any more — `list_environments`, then
+`delete_environment` each, in the direct session. Without it: none.
+
 ## 6.7.0 — 2026-10-27
 
 **A required check that did not pass is never silent, and holds the pull

@@ -107,7 +107,8 @@ one round, so one push answers everything:
    `COLLABORATOR` — is still a round; anyone else's is not, and the waiter
    does not wake for it. A push may dismiss the approval: then re-request it.
 3. **Conflicts.** Rebase on the default branch, run `verify` again.
-4. **Push**, comment with this run's session link, and ask for review of the
+4. **Push**, move its Environment's expiry on when it has one
+   ([environments.md](environments.md)), comment with this run's session link, and ask for review of the
    new round: re-request the reviewers who reviewed, and re-apply the
    review-request label only when nothing re-requests them otherwise. Then
    park it, above.
@@ -118,7 +119,8 @@ one round, so one push answers everything:
 re-request review if the fix was more than mechanical. You never merge.
 
 **Merged** is finished: drop the claim from its issue, comment the issue with
-the pull request link, and finish `released` (`finish released <pr>`).
+the pull request link, delete its Environment when it has one
+([environments.md](environments.md)), and finish `released` (`finish released <pr>`).
 
 **Closed without merging**, the issue still claimed: someone decided against
 it. Read why on the pull request; drop the claim, comment the issue, finish

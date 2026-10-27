@@ -51,23 +51,26 @@ test("a slot running its Environment check reads as verifying, with no exclusive
     assert.equal(snap.config.verify_environment, "make e2e ENV={environment}");
   }));
 
-test("each slot shows its own Environment when the instance verifies in them", () =>
+test("each slot shows the Environment of the issue it works on, which outlives the slot", () =>
   inSandbox(async (s) => {
     world(s);
     s.config("- verify_environment: make e2e ENV={environment}");
+    s.lock("slot-1", { session: "sess-a", item: "7", slot: "1", since: s.clock.ago(5) });
+    s.runtime.running.add("sess-a");
     s.runtime.envs = [
       {
-        name: "slot-1",
+        name: "issue-7",
         state: "running",
         expiresAt: "2026-11-02T15:35:24.761Z",
-        endpoints: [{ name: "app", url: "https://app-slot-1-abc.env.example.com" }],
+        endpoints: [{ name: "app", url: "https://app-issue-7-abc.env.example.com" }],
       },
-      { name: "other", state: "running", expiresAt: "", endpoints: [] },
+      { name: "issue-9", state: "running", expiresAt: "", endpoints: [] },
+      { name: "slot-1", state: "running", expiresAt: "", endpoints: [] },
     ];
     const snap = (await room(s).snapshot(true)) as Snap;
-    assert.equal(snap.slots[0].environment.name, "slot-1");
-    assert.equal(snap.slots[0].environment.endpoints[0].url, "https://app-slot-1-abc.env.example.com");
-    assert.equal(snap.slots[1].environment, null, "a slot whose Environment is not made yet");
+    assert.equal(snap.slots[0].environment.name, "issue-7");
+    assert.equal(snap.slots[0].environment.endpoints[0].url, "https://app-issue-7-abc.env.example.com");
+    assert.equal(snap.slots[1].environment, null, "a free slot shows none, though issue-9's still runs");
     s.runtime.down = true;
     const unread = (await room(s).snapshot(true)) as Snap;
     assert.equal(unread.slots[0].environment, undefined, "an unanswered platform is not measured, never none");
