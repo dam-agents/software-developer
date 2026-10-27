@@ -26,6 +26,7 @@ import type { Held } from "../factory/locks.ts";
 import { run } from "../factory/proc.ts";
 import type { SessionInfo } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
+import { parseChecked } from "./checks.ts";
 import { ATTENDED_STALE_MIN, Kit } from "./kit.ts";
 import { commentsSince, toComment } from "./pulls.ts";
 import { RunState, transcriptMtime } from "./run-state.ts";
@@ -163,6 +164,12 @@ async function lockView(
   };
 }
 
+/** An item's `checked` record for the room: undefined when none or unreadable. */
+function checkedView(v: string) {
+  const c = parseChecked(v);
+  return c ? { check: c.check, result: c.result, commit: c.commit, cause: c.cause } : undefined;
+}
+
 function gitSlot(kit: Kit, dir: string) {
   if (!existsSync(join(dir, ".git"))) return { exists: false };
   const g = (args: string[]) => {
@@ -293,6 +300,11 @@ export class ControlRoom {
         : (envs.find((e) => issueOf(k) !== "" && e.name === `issue-${issueOf(k)}`) ?? null);
     const locks = await Promise.all(kit.locks.all().map((h) => lockView(kit, h, sessions, now)));
     const dirty = existsSync(join(kit.locks.dir, "exclusive.dirty"));
+    // every issue's Environment, slot or not: one waits with its pull request for review
+    const issueEnvs =
+      envs === undefined
+        ? undefined
+        : envs.filter((e) => /^issue-[0-9]+$/.test(e.name)).map((e) => ({ ...e, item: e.name.slice("issue-".length) }));
     const n = kit.slotCount;
     const slots = Array.from({ length: n }, (_, i) => {
       const k = String(i + 1);
@@ -431,6 +443,8 @@ export class ControlRoom {
           prs: ps.map((p) => p.ref),
           session: lk?.session || it.get("session") || "",
           watched: lk?.parked_at ? lk.kept_by : "",
+          // the last required check run-state.sh checked recorded: its result and cause
+          checked: checkedView(it.get("checked") ?? ""),
         };
       });
 
@@ -511,6 +525,22 @@ export class ControlRoom {
           text: `slot ${s.k} is free but holds ${"dirty" in s ? s.dirty : 0} changed file(s), ${"unpushed" in s ? s.unpushed : 0} commit(s) on no remote branch`,
         });
     for (const f of flight)
+      if (f.checked && f.checked.result !== "pass")
+        alarms.push({
+          level: "alarm",
+          code: "CHECK",
+          text: `#${f.item}: ${f.checked.check} ${f.checked.result === "fail" ? "failed" : "did not run"} on ${f.checked.commit} — ${f.checked.cause}${f.state === "blocked" ? " · held back from review" : ""}`,
+          item: f.item,
+        });
+    for (const e of issueEnvs ?? [])
+      if (!flight.some((f) => f.item === e.item && f.prs.length > 0))
+        alarms.push({
+          level: "adv",
+          code: "ENV-LEFT",
+          text: `Environment ${e.name} has no open pull request left: delete it (docs/environments.md)`,
+          item: e.item,
+        });
+    for (const f of flight)
       if (f.stage === "orphan" && f.claimed)
         alarms.push({
           level: "adv",
@@ -546,6 +576,7 @@ export class ControlRoom {
         exclusive: kit.cfg.get("exclusive"),
         verify_exclusive: kit.cfg.get("verify_exclusive"),
         verify_environment: kit.cfg.get("verify_environment"),
+        verify_required_paths: kit.cfg.get("verify_required_paths"),
         schedules: kit.cfg.get("schedules"),
         slots: n,
         babysit_max_hours: kit.babysitMaxHours,
@@ -561,6 +592,7 @@ export class ControlRoom {
       locks,
       exclusive: { lock: excl, dirty, named: kit.cfg.get("exclusive") !== "" },
       slots,
+      environments: issueEnvs ?? null,
       flight,
       prs,
       merged,

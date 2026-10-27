@@ -289,7 +289,7 @@ tr:hover td { background: color-mix(in srgb, var(--panel2) 70%, transparent); }
 .pill { display: inline-block; font: 800 9px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: 3px 5px; border: 1px solid; border-radius: 2px; }
 .scroll { max-height: 360px; overflow: auto; }
 .log { font: 11px/1.5 var(--mono); max-height: 360px; overflow: auto; }
-.log div { display: grid; grid-template-columns: 124px 88px 1fr; gap: 8px; padding: 2px 10px; border-bottom: 1px solid color-mix(in srgb, var(--edge) 50%, transparent); }
+.log div { display: grid; grid-template-columns: 124px minmax(88px, max-content) 1fr; gap: 8px; padding: 2px 10px; border-bottom: 1px solid color-mix(in srgb, var(--edge) 50%, transparent); }
 .list { display: grid; }
 .list .it { display: grid; grid-template-columns: 58px 1fr auto; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--edge); align-items: baseline; }
 .list .it:last-child { border-bottom: 0; }
@@ -615,6 +615,14 @@ body:not(.details) .det { display: none !important; }
       .forEach((p) => you.push(row("ok", p.ref, p.url, `Ready to merge: ${p.title}`, `approved · ${p.checks === "passed" ? "green" : p.checks} · merges cleanly`, "")));
     prs.filter((p) => p.mergeable === "CONFLICTING")
       .forEach((p) => you.push(row("alarm", p.ref, p.url, `Conflicts with ${p.base || "its base"}: ${p.title}`, p.branch || "", askBtn("Rebase", rebasePrompt(p), true))));
+    // a required check that did not pass is a person's move, never only a line in a body
+    (S.alarms || []).filter((a) => a.code === "CHECK").forEach((a) => {
+      const x = f.find((y) => y.item === a.item);
+      you.push(row("alarm", lbl(a.item), x ? x.url : null, `🚨 ${x && x.checked ? x.checked.check : "check"} ${x && x.checked && x.checked.result === "fail" ? "failed" : "did not run"}${x && x.title ? ": " + x.title : ""}`, a.text.replace(/^#\d+: /, ""),
+        askBtn("Ask", `Control room alarm CHECK: ${a.text}. Explain what blocks the check and propose what to do; do not act yet.`)));
+    });
+    (S.alarms || []).filter((a) => a.code === "ENV-LEFT").forEach((a) => you.push(row("adv", "ENV", null, a.text, "",
+      askBtn("Delete", `Control room alarm ENV-LEFT: ${a.text}. Check that issue #${a.item} has no open pull request, then delete_environment issue-${a.item}.`, true))));
     (S.needs_info || []).forEach((i) => you.push(row("info", "#" + i.number, i.url, `Waiting for an answer: ${i.title}`, `labelled ${c.label_needs_info || "needs-info"} ${ago(i.at)}`, "")));
     (S.failed || []).forEach((i) => you.push(row("alarm", "#" + i.number, i.url, `Gave up: ${i.title}`, `labelled ${c.label_failed || "failed"} — read why on the issue`, "")));
 
@@ -630,6 +638,7 @@ body:not(.details) .det { display: none !important; }
     f.filter((x) => !working(x)).forEach((x) => {
       const p = x.prs.map(prOf).filter(Boolean);
       if (p.length && p.every((q) => q.decision === "APPROVED") || p.some((q) => q.mergeable === "CONFLICTING")) return; // in Needs you
+      if (x.checked && x.checked.result !== "pass") return; // its check did not pass: in Needs you
       const changes = p.some((q) => q.decision === "CHANGES_REQUESTED"), red = p.some((q) => q.checks === "failed");
       const why = x.stage === "waiting-lock" ? "waiting for the exclusive lock"
         : red ? `checks failed on ${p.filter((q) => q.checks === "failed").map((q) => q.ref).join(" ")}: a run fixes it`
@@ -1155,7 +1164,7 @@ body:not(.details) .det { display: none !important; }
         o += `<g transform="translate(${rcx},${rcy})" role="img" aria-label="turbine ${held ? "turning: the exclusive lock is held" : "still"}"><circle class="rotor-ring" r="13"/><g class="rotor ${held ? "spin" : ""}">` +
           [0, 120, 240].map((r) => `<path class="blade" transform="rotate(${r})" d="M0,0 C3.5,-3.5 4.5,-8.5 1.8,-11 L-1.8,-11 C-2.6,-7 -1.8,-2.6 0,0 Z"/>`).join("") + `<circle class="hub" r="2.2"/></g></g>`;
         o += plate(st, b.x + 8, b.y + 16, b.w - 16 - 34);
-        const [xc, xt] = !named ? (c.verify_environment ? ["ok", "EXCLUSIVE · PER SLOT"] : ["", "EXCLUSIVE · NONE NAMED"]) : x.dirty ? ["alarm", "EXCLUSIVE · DIRTY"] : held ? ["hot", `EXCLUSIVE · HELD ${itemRef(held.item)}`] : ["ok", "EXCLUSIVE · FREE"];
+        const [xc, xt] = !named ? (c.verify_environment ? ["ok", "EXCLUSIVE · PER ISSUE"] : ["", "EXCLUSIVE · NONE NAMED"]) : x.dirty ? ["alarm", "EXCLUSIVE · DIRTY"] : held ? ["hot", `EXCLUSIVE · HELD ${itemRef(held.item)}`] : ["ok", "EXCLUSIVE · FREE"];
         o += `<text class="excl-t ${xc}" x="${b.x + 8}" y="${b.y + 46}"><title>${esc(c.exclusive ? "exclusive: " + c.exclusive : c.verify_environment ? "no exclusive: each issue verifies in its own Environment, issue-<n>" : "CONFIG.md names no exclusive: every reactor verifies alone")}</title>${esc(F(xt, b.w - 16, "rail"))}</text>`;
         o += `<text class="pl-h" x="${b.x + 8}" y="${b.y + 59}">${esc(F(c.verify_exclusive ? "check: " + c.verify_exclusive : c.verify_environment ? "check: " + c.verify_environment : "one reactor at a time", b.w - 16, "h"))}</text>`;
         toks += rowTokens(items, { x: b.x - 4 - 140, y: b.y + 4, w: 140, h: 20 }, cls, () => where);
@@ -1163,7 +1172,7 @@ body:not(.details) .det { display: none !important; }
         const ry = 50, rx0 = hall.x + 6, rx1 = b.x - 10;
         o += `<line class="rail ${named ? "" : "none"}" x1="${rx0}" y1="${ry}" x2="${rx1}" y2="${ry}"/>`;
         G.forEach((g, i) => { if (g.cx > rx1 - 14) return; o += `<line class="dial-t" x1="${g.cx.toFixed(1)}" y1="${ry - 6}" x2="${g.cx.toFixed(1)}" y2="${ry + 6}"/><text class="rail-t" x="${g.cx.toFixed(1)}" y="${ry - 10}" text-anchor="middle">R${i + 1}</text>`; });
-        const railMsg = !named ? (c.verify_environment ? "CONTROL ROD · per slot: each reactor verifies in its own Environment" : "CONTROL ROD · none named: every reactor verifies alone") : `CONTROL ROD · ${c.exclusive}`;
+        const railMsg = !named ? (c.verify_environment ? "CONTROL ROD · per issue: each issue verifies in its own Environment" : "CONTROL ROD · none named: every reactor verifies alone") : `CONTROL ROD · ${c.exclusive}`;
         const railCap = `<text class="rail-t halo" x="${rx0}" y="${ry + 18}"><title>${esc(railMsg)}</title>${esc(F(railMsg, rx1 - rx0, "rail"))}</text>`;
         rod = railCap;
         if (named) {
@@ -1254,6 +1263,7 @@ body:not(.details) .det { display: none !important; }
     ["MULTI", "Items > slots", "adv"], ["UNSAVED", "Unsaved free slot", "alarm"], ["ORPHAN", "Claim, no run", "adv"],
     ["RED", "Checks red", "alarm"], ["CONFLICT", "Merge conflict", "adv"], ["QUEUE", "Work queued", "info"],
     ["NEEDS-INFO", "Needs info", "info"], ["FAILED", "Failed issues", "adv"], ["APPROVED", "Ready to merge", "ok"],
+    ["CHECK", "Required check not passed", "alarm"], ["ENV-LEFT", "Environment left", "adv"],
   ];
   const prByRef = (ref) => (S.prs || []).find((p) => p.ref === ref && p.mergeable === "CONFLICTING");
   function renderAnnun(alarms) {
@@ -1298,7 +1308,7 @@ body:not(.details) .det { display: none !important; }
     const x = S.exclusive || {}, c = S.config || {};
     const st = $("x-state");
     const perSlot = !x.named && !!c.verify_environment;
-    if (perSlot) { st.className = "state st-ok"; st.textContent = "PER SLOT"; }
+    if (perSlot) { st.className = "state st-ok"; st.textContent = "PER ISSUE"; }
     else if (!x.named) { st.className = "state st-off"; st.textContent = "NONE NAMED"; }
     else if (x.dirty) { st.className = "state st-alarm"; st.textContent = "DIRTY"; }
     else if (x.lock) { st.className = "state st-hot"; st.textContent = "COUPLED"; }
@@ -1307,25 +1317,31 @@ body:not(.details) .det { display: none !important; }
       const [hs, ht] = holderSt(x.lock.holder);
       const k = (S.slots || []).find((s) => s.lock && s.lock.item === x.lock.item);
       $("x-holder").innerHTML = `${k ? "R" + k.k + " · " : ""}${esc(itemRef(x.lock.item))} · ${dur(x.lock.held_min)} · <span class="pill st-${hs}">${ht}</span>`;
-    } else $("x-holder").textContent = x.named ? "— (rod withdrawn)" : perSlot ? "each reactor has a rod of its own, its Environment" : "nothing in CONFIG.md names one";
-    $("x-guards").textContent = c.exclusive
+    } else $("x-holder").textContent = x.named ? "— (rod withdrawn)" : perSlot ? "each issue has a rod of its own, its Environment issue-<n>" : "nothing in CONFIG.md names one";
+    $("x-guards").textContent = (c.exclusive
       ? `${c.exclusive}${c.verify_exclusive ? " · check: " + c.verify_exclusive : ""}${c.verify_environment ? " · in an Environment: " + c.verify_environment : ""}`
-      : c.verify_environment ? `check: ${c.verify_environment}` : "— (exclusive unset: every slot verifies alone)";
+      : c.verify_environment ? `check: ${c.verify_environment}` : "— (exclusive unset: every slot verifies alone)")
+      + (c.verify_required_paths ? ` · required before review on: ${c.verify_required_paths}` : "");
     const rods = $("x-rods");
     rods.hidden = !c.verify_environment;
     if (c.verify_environment) {
       const ENV_ST = { running: ["ok", "AWAKE"], starting: ["info", "STARTING"], hibernated: ["park", "ASLEEP"], stopped: ["park", "ASLEEP"] };
-      rods.innerHTML = (S.slots || []).map((sl) => {
-        const e = sl.environment, name = `slot-${sl.k}`;
-        const inUse = sl.lock && sl.lock.holder === "live" && sl.lock.phase === "verify_environment";
+      // every issue's Environment, kept until its pull request is done: a slot holds one only while it works
+      const envs = S.environments;
+      const list = envs === null || envs === undefined ? [{ name: "", item: "", e: undefined }] : envs.map((e) => ({ name: e.name, item: e.item, e }));
+      rods.innerHTML = (list.length ? list : [{ name: "", item: "", e: null }]).map(({ name, item, e }) => {
+        const sl = (S.slots || []).find((s) => s.lock && s.lock.item === item) || null;
+        const inUse = sl && sl.lock.holder === "live" && sl.lock.phase === "verify_environment";
         const [cls, txt] = e === undefined ? ["off", "NOT MEASURED"] : e === null ? ["off", "NOT MADE"] : inUse ? ["hot", "VERIFYING"] : ENV_ST[e.state] || ["off", esc(String(e.state || "—")).toUpperCase()];
         const left = e && e.expiresAt ? Math.floor((Date.parse(e.expiresAt) - Date.now()) / 60000) : null;
         const links = e && e.endpoints && e.endpoints.length
           ? e.endpoints.map((p) => p.url ? envLink(p.url, p.name) : `<span class="dim">${esc(p.name)} · no address</span>`).join("")
-          : e === null ? `<span class="dim">made by the slot's first verify_environment</span>`
+          : e === null ? `<span class="dim">none yet: an issue's first verify_environment makes issue-&lt;n&gt;</span>`
           : e === undefined ? `<span class="dim">the platform did not answer</span>` : "";
-        return `<div class="rod" data-slot="${esc(String(sl.k))}"><span class="rk">R${esc(String(sl.k))}</span>`
-          + `<span class="rn" title="${esc(name)}">${esc(name)}${left != null ? ` <span class="dim">· expires in ${dur(Math.max(0, left))}</span>` : ""}</span>`
+        const fl = (S.flight || []).find((f) => f.item === item);
+        const pr = fl && fl.prs.length ? fl.prs.join(" ") : "";
+        return `<div class="rod" data-slot="${esc(sl ? String(sl.k) : "")}"><span class="rk">${sl ? "R" + esc(String(sl.k)) : "—"}</span>`
+          + `<span class="rn" title="${esc(name)}">${esc(name || "Environments")}${pr ? ` <span class="dim">· ${esc(pr)}</span>` : name ? ` <span class="pill st-adv">NO PR</span>` : ""}${left != null ? ` <span class="dim">· expires in ${dur(Math.max(0, left))}</span>` : ""}</span>`
           + `<span class="pill st-${cls}">${txt}</span>`
           + (links ? `<span class="rl">${links}</span>` : "") + `</div>`;
       }).join("");
@@ -1382,7 +1398,8 @@ body:not(.details) .det { display: none !important; }
   function renderFlight() {
     const f = S.flight || [];
     $("f-tag").textContent = `${f.length} items · held ${f.filter((x) => x.lock).length}`;
-    $("flight").innerHTML = `<tr><th></th><th>Item</th><th>Title</th><th>Stage</th><th>Locks</th><th>PR</th><th>Holder</th><th></th></tr>` +
+    const chk = (c) => !c ? `<span class="dim">—</span>` : `<span class="pill st-${c.result === "pass" ? "ok" : "alarm"}" title="${esc(c.check + " on " + c.commit + (c.cause ? ": " + c.cause : ""))}">${c.result === "pass" ? "PASS" : c.result === "fail" ? "🚨 FAIL" : "🚨 SKIPPED"}</span>`;
+    $("flight").innerHTML = `<tr><th></th><th>Item</th><th>Title</th><th>Stage</th><th>Check</th><th>Locks</th><th>PR</th><th>Holder</th><th></th></tr>` +
       (f.length ? f.map((x) => {
         const s = STAGES[x.stage] || { lamp: "", txt: x.stage.toUpperCase() };
         const locks = [x.lock ? "item" : "", x.slot ? "slot " + x.slot : "", S.exclusive?.lock?.item === x.item ? "excl" : ""].filter(Boolean).join(" · ") || "—";
@@ -1392,11 +1409,12 @@ body:not(.details) .det { display: none !important; }
           <td>${link(x.url, label)}${x.abandoned ? ` <span class="pill st-adv" title="runs died on it">†${x.abandoned}</span>` : ""}</td>
           <td class="t">${esc(x.title)}</td>
           <td><span class="pill st-${s.lamp || "off"}">${esc(s.txt)}</span></td>
+          <td>${chk(x.checked)}</td>
           <td class="dim">${esc(locks)}</td>
           <td>${esc(x.prs.join(" ")) || "—"}</td>
           <td>${x.lock ? `<span class="pill st-${hs}">${ht}</span>` : "—"}</td>
           <td>${askBtn("Status", `Control room: what is the state of ${label}${x.prs.length ? " (" + x.prs.join(", ") + ")" : ""}, and what is it waiting on? Do not change anything.`)}</td></tr>`;
-      }).join("") : `<tr><td colspan="8"><div class="empty">NOTHING IN FLIGHT</div></td></tr>`);
+      }).join("") : `<tr><td colspan="9"><div class="empty">NOTHING IN FLIGHT</div></td></tr>`);
   }
 
   // A conflicting pull request is rebased in a session of its own, so this chat
@@ -1446,9 +1464,10 @@ body:not(.details) .det { display: none !important; }
   function renderLog() {
     const L = S.log || [];
     $("l-tag").textContent = `last ${L.length} · newest first`;
-    const col = (o) => ({ released: "ok", "pr-opened": "info", "pr-updated": "info", abandoned: "alarm", blocked: "alarm", "needs-info": "adv", "waiting-lock": "adv", diagnostic: "adv" }[o] || "off");
+    const col = (o, r) => o === "checked" ? (r.result === "pass" ? "ok" : "alarm") : ({ released: "ok", "pr-opened": "info", "pr-updated": "info", abandoned: "alarm", blocked: "alarm", "needs-info": "adv", "waiting-lock": "adv", diagnostic: "adv" }[o] || "off");
+    const what = (r) => r.outcome === "checked" ? `${r.result === "pass" ? "" : "🚨 "}${r.check || "check"} ${r.result || ""}` : r.outcome;
     $("log").innerHTML = L.length ? L.map((r) => `<div><span class="dimmer">${esc(String(r.at || "").replace("T", " ").replace("Z", ""))}</span>
-      <span><span class="pill st-${col(r.outcome)}">${esc(r.outcome)}</span></span>
+      <span><span class="pill st-${col(r.outcome, r)}" title="${esc(r.cause || "")}">${esc(what(r))}</span></span>
       <span class="dim">${esc([r.issue && r.issue !== "-" ? (r.issue.startsWith("pr") ? r.issue : "#" + r.issue) : "", r.pr && r.pr !== "-" ? "PR " + r.pr : "", r.slot && r.slot !== "-" ? "slot " + r.slot : "", r.minutes && r.minutes !== "-" ? r.minutes + " min" : "", r.session ? "s " + r.session.slice(0, 8) : "", r.reason || "", r.report || ""].filter(Boolean).join(" · "))}</span></div>`).join("") : `<div class="empty">NO EVENTS</div>`;
   }
 

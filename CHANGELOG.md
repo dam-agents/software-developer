@@ -9,6 +9,19 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.9.0 — 2026-10-27
+
+**The control room shows the required check and every issue's Environment.**
+A check `run-state.sh checked` recorded as failed or skipped is an alarm
+(`CHECK`, its own annunciator tile), heads **Needs you** with 🚨 and its
+cause, and has a **Check** column in **Items in flight**; the log colors
+`checked` lines by result. The control rods list every `issue-<n>`
+Environment with its pull request and expiry, slot or not, and one with no
+open pull request left is an `ENV-LEFT` alarm. The guards line names
+`verify_required_paths`, and "per slot" now reads "per issue".
+
+**Upgrade:** restart the control room — `rc-service --user control-room restart`.
+
 ## 6.8.0 — 2026-10-27
 
 **An Environment belongs to the issue, not the slot, and lives until its pull
