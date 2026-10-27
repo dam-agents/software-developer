@@ -51,6 +51,32 @@ test("a slot running its Environment check reads as verifying, with no exclusive
     assert.equal(snap.config.verify_environment, "make e2e ENV={environment}");
   }));
 
+test("each slot shows its own Environment when the instance verifies in them", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.config("- verify_environment: make e2e ENV={environment}");
+    s.runtime.envs = [
+      {
+        name: "slot-1",
+        state: "running",
+        expiresAt: "2026-11-02T15:35:24.761Z",
+        endpoints: [{ name: "app", url: "https://app-slot-1-abc.env.example.com" }],
+      },
+      { name: "other", state: "running", expiresAt: "", endpoints: [] },
+    ];
+    const snap = (await room(s).snapshot(true)) as Snap;
+    assert.equal(snap.slots[0].environment.name, "slot-1");
+    assert.equal(snap.slots[0].environment.endpoints[0].url, "https://app-slot-1-abc.env.example.com");
+    assert.equal(snap.slots[1].environment, null, "a slot whose Environment is not made yet");
+    s.runtime.down = true;
+    const unread = (await room(s).snapshot(true)) as Snap;
+    assert.equal(unread.slots[0].environment, undefined, "an unanswered platform is not measured, never none");
+    s.setConfig("verify_environment", "");
+    s.runtime.down = false;
+    const off = (await room(s).snapshot(true)) as Snap;
+    assert.ok(!("environment" in off.slots[0]), "no Environments are read when the instance does not verify in them");
+  }));
+
 test("a parked item shows as parked, its slot free, watched by its waiter", () =>
   inSandbox(async (s) => {
     world(s, [pr(21)]);

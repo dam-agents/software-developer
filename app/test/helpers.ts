@@ -9,7 +9,13 @@ import { type Command, type Deps, invoke, shimsLast } from "../src/factory/conte
 import type { Conditional, GitHub, GraphQLResult } from "../src/factory/github.ts";
 import { kv } from "../src/factory/kv.ts";
 import { run } from "../src/factory/proc.ts";
-import { type Liveness, livenessOf, type Runtime, type SessionInfo } from "../src/factory/runtime.ts";
+import {
+  type EnvironmentInfo,
+  type Liveness,
+  livenessOf,
+  type Runtime,
+  type SessionInfo,
+} from "../src/factory/runtime.ts";
 import { type Clock, iso } from "../src/factory/time.ts";
 
 export const APP = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,6 +92,11 @@ export class FakeRuntime implements Runtime {
   async message(id: string, text: string): Promise<boolean> {
     this.messages.push({ id, text });
     return this.queues && !this.down;
+  }
+  /** This agent's Environments, as list_environments answers. */
+  envs: EnvironmentInfo[] = [];
+  async environments(): Promise<EnvironmentInfo[] | undefined> {
+    return this.down ? undefined : this.envs;
   }
 }
 

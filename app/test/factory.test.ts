@@ -7,7 +7,7 @@ import { Config } from "../src/factory/config.ts";
 import { shimsLast } from "../src/factory/context.ts";
 import { closesRefs, issueRefs, login, parseJsonStream } from "../src/factory/github.ts";
 import { bulletKeys, parseKv } from "../src/factory/kv.ts";
-import { queued } from "../src/factory/runtime.ts";
+import { environmentsOf, queued } from "../src/factory/runtime.ts";
 
 test("a key reads from its first bullet, tolerant of case, spaces, backticks and a URL", () => {
   const m = parseKv(
@@ -104,4 +104,36 @@ test("a session message counts as sent only when the platform says it queued it"
   assert.ok(!queued(answer(JSON.stringify({ queued: false }))));
   assert.ok(!queued("<html>bad gateway</html>"));
   assert.ok(!queued(""));
+});
+
+test("the Environments are what list_environments answers, and a failed answer is not measured", () => {
+  const answer = (text: string, isError = false) =>
+    `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text }], isError } })}\n\n`;
+  const listed = [
+    {
+      id: "agent-x",
+      name: "slot-1",
+      state: "hibernated",
+      expiresAt: "2026-11-02T15:35:24.761Z",
+      endpoints: [
+        { name: "app", port: 4400, url: "https://app-slot-1-abc.env.example.com" },
+        { name: "db", port: 5432, url: null },
+      ],
+    },
+    { id: "agent-y" },
+  ];
+  assert.deepEqual(environmentsOf(answer(JSON.stringify(listed))), [
+    {
+      name: "slot-1",
+      state: "hibernated",
+      expiresAt: "2026-11-02T15:35:24.761Z",
+      endpoints: [
+        { name: "app", url: "https://app-slot-1-abc.env.example.com" },
+        { name: "db", url: null },
+      ],
+    },
+  ]);
+  assert.deepEqual(environmentsOf(answer("[]")), []);
+  assert.equal(environmentsOf(answer("Environments are off for this owner.", true)), undefined);
+  assert.equal(environmentsOf("<html>bad gateway</html>"), undefined);
 });

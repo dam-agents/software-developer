@@ -18,6 +18,14 @@ export interface SessionInfo {
   readonly scheduleId?: string;
 }
 
+/** One of this agent's platform Environments, as `list_environments` names it. */
+export interface EnvironmentInfo {
+  readonly name: string;
+  readonly state: string;
+  readonly expiresAt: string;
+  readonly endpoints: readonly { readonly name: string; readonly url: string | null }[];
+}
+
 export interface Runtime {
   liveness(sessionId: string): Promise<Liveness>;
   /** The session's type as the runtime names it, "" when it does not answer. */
@@ -26,6 +34,8 @@ export interface Runtime {
   sessions(): Promise<SessionInfo[] | undefined>;
   /** Sends a session of this agent a message, a new turn when it is idle: true once the platform queued it. */
   message(sessionId: string, text: string): Promise<boolean>;
+  /** This agent's Environments, or undefined when the platform does not answer. */
+  environments(): Promise<EnvironmentInfo[] | undefined>;
 }
 
 /** Session types a person is present in: their turns end between messages. */
@@ -39,8 +49,9 @@ export function livenessOf(s: { running?: unknown; type?: unknown } | undefined)
 
 /**
  * The runtime over HTTP at $PLATFORM_RUNTIME_URL, five seconds a call; a
- * message goes through the platform's MCP server at $PLATFORM_MCP_URL, as the
- * `send_session_message` tool a session calls.
+ * message and the Environments go through the platform's MCP server at
+ * $PLATFORM_MCP_URL, as the `send_session_message` and `list_environments`
+ * tools a session calls.
  */
 export class HttpRuntime implements Runtime {
   private readonly base: string;
@@ -99,30 +110,35 @@ export class HttpRuntime implements Runtime {
     });
   }
 
-  async message(sessionId: string, text: string): Promise<boolean> {
-    if (!this.mcp) return false;
+  /** One MCP tools/call: the answer's body, or undefined when it failed. */
+  private async tool(name: string, args: Record<string, unknown>): Promise<string | undefined> {
+    if (!this.mcp) return undefined;
     try {
       const res = await fetch(this.mcp, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/call",
-          params: { name: "send_session_message", arguments: { sessionId, text } },
-        }),
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
-      if (!res.ok) return false;
-      return queued(await res.text());
+      return res.ok ? await res.text() : undefined;
     } catch {
-      return false;
+      return undefined;
     }
+  }
+
+  async message(sessionId: string, text: string): Promise<boolean> {
+    const body = await this.tool("send_session_message", { sessionId, text });
+    return body !== undefined && queued(body);
+  }
+
+  async environments(): Promise<EnvironmentInfo[] | undefined> {
+    const body = await this.tool("list_environments", {});
+    return body === undefined ? undefined : environmentsOf(body);
   }
 }
 
-/** Whether a tools/call answer, plain JSON or one server-sent event, says the message was queued. */
-export function queued(body: string): boolean {
+/** A tools/call answer's first text content, plain JSON or one server-sent event; undefined for an error. */
+function toolText(body: string): string | undefined {
   const json = body.includes("data:")
     ? body
         .split("\n")
@@ -132,9 +148,50 @@ export function queued(body: string): boolean {
     : body;
   try {
     const r = (JSON.parse(json) as { result?: { isError?: unknown; content?: { text?: unknown }[] } }).result;
-    if (!r || r.isError === true) return false;
+    if (!r || r.isError === true) return undefined;
     const text = r.content?.[0]?.text;
-    return typeof text === "string" && (JSON.parse(text) as { queued?: unknown }).queued === true;
+    return typeof text === "string" ? text : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The Environments a `list_environments` answer names, or undefined when it is not one. */
+export function environmentsOf(body: string): EnvironmentInfo[] | undefined {
+  const text = toolText(body);
+  if (text === undefined) return undefined;
+  try {
+    const list = JSON.parse(text) as unknown;
+    if (!Array.isArray(list)) return undefined;
+    return list.flatMap((raw) => {
+      const o = raw as Record<string, unknown>;
+      if (typeof o.name !== "string") return [];
+      const endpoints = Array.isArray(o.endpoints)
+        ? o.endpoints.flatMap((e) => {
+            const p = e as Record<string, unknown>;
+            return typeof p.name === "string" ? [{ name: p.name, url: typeof p.url === "string" ? p.url : null }] : [];
+          })
+        : [];
+      return [
+        {
+          name: o.name,
+          state: typeof o.state === "string" ? o.state : "",
+          expiresAt: typeof o.expiresAt === "string" ? o.expiresAt : "",
+          endpoints,
+        },
+      ];
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether a tools/call answer, plain JSON or one server-sent event, says the message was queued. */
+export function queued(body: string): boolean {
+  const text = toolText(body);
+  if (text === undefined) return false;
+  try {
+    return (JSON.parse(text) as { queued?: unknown }).queued === true;
   } catch {
     return false;
   }
