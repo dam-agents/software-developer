@@ -281,11 +281,16 @@ export class ControlRoom {
     const now = nowSeconds(this.deps.clock);
     const listed = await this.deps.runtime.sessions();
     const sessions = listed && new Map(listed.map((s) => [s.id, s]));
-    // Each slot's own Environment, slot-<k>, when the instance verifies in them:
-    // null for one not made yet, undefined when the platform did not answer.
+    // The Environment of the issue a slot works on, issue-<n>, when the instance
+    // verifies in them: null for one not made yet, undefined when the platform
+    // did not answer.
     const perSlot = kit.cfg.get("verify_environment") !== "";
     const envs = perSlot ? await this.deps.runtime.environments() : [];
-    const envOf = (k: string) => (envs === undefined ? undefined : (envs.find((e) => e.name === `slot-${k}`) ?? null));
+    const issueOf = (k: string) => kit.locks.read(`slot-${k}`)?.owner.item ?? "";
+    const envOf = (k: string) =>
+      envs === undefined
+        ? undefined
+        : (envs.find((e) => issueOf(k) !== "" && e.name === `issue-${issueOf(k)}`) ?? null);
     const locks = await Promise.all(kit.locks.all().map((h) => lockView(kit, h, sessions, now)));
     const dirty = existsSync(join(kit.locks.dir, "exclusive.dirty"));
     const n = kit.slotCount;

@@ -623,7 +623,7 @@ body:not(.details) .det { display: none !important; }
     f.filter(working).forEach((x) => {
       const also = f.filter((y) => y !== x && y.lock && y.lock.session === x.lock.session && !y.slot).length;
       now.push(row(x.stage === "verifying" ? "hot" : "ok", lbl(x.item), x.url, x.title || x.branch,
-        `slot ${x.slot}${x.stage === "verifying" ? (exclItem() === x.item ? " · under the exclusive lock" : " · in its Environment, slot-" + x.slot) : ""} · ${x.lock.phase || "started"} · last sign ${dur(x.lock.silent_min)} ago${also ? ` · its session also holds ${also} more item lock(s)` : ""}`, ""));
+        `slot ${x.slot}${x.stage === "verifying" ? (exclItem() === x.item ? " · under the exclusive lock" : " · in its Environment, issue-" + x.item) : ""} · ${x.lock.phase || "started"} · last sign ${dur(x.lock.silent_min)} ago${also ? ` · its session also holds ${also} more item lock(s)` : ""}`, ""));
     });
 
     // Waiting: on a reviewer, on checks, on the lock, or in the queue
@@ -1156,7 +1156,7 @@ body:not(.details) .det { display: none !important; }
           [0, 120, 240].map((r) => `<path class="blade" transform="rotate(${r})" d="M0,0 C3.5,-3.5 4.5,-8.5 1.8,-11 L-1.8,-11 C-2.6,-7 -1.8,-2.6 0,0 Z"/>`).join("") + `<circle class="hub" r="2.2"/></g></g>`;
         o += plate(st, b.x + 8, b.y + 16, b.w - 16 - 34);
         const [xc, xt] = !named ? (c.verify_environment ? ["ok", "EXCLUSIVE · PER SLOT"] : ["", "EXCLUSIVE · NONE NAMED"]) : x.dirty ? ["alarm", "EXCLUSIVE · DIRTY"] : held ? ["hot", `EXCLUSIVE · HELD ${itemRef(held.item)}`] : ["ok", "EXCLUSIVE · FREE"];
-        o += `<text class="excl-t ${xc}" x="${b.x + 8}" y="${b.y + 46}"><title>${esc(c.exclusive ? "exclusive: " + c.exclusive : c.verify_environment ? "no exclusive: each reactor verifies in its own Environment, slot-<n>" : "CONFIG.md names no exclusive: every reactor verifies alone")}</title>${esc(F(xt, b.w - 16, "rail"))}</text>`;
+        o += `<text class="excl-t ${xc}" x="${b.x + 8}" y="${b.y + 46}"><title>${esc(c.exclusive ? "exclusive: " + c.exclusive : c.verify_environment ? "no exclusive: each issue verifies in its own Environment, issue-<n>" : "CONFIG.md names no exclusive: every reactor verifies alone")}</title>${esc(F(xt, b.w - 16, "rail"))}</text>`;
         o += `<text class="pl-h" x="${b.x + 8}" y="${b.y + 59}">${esc(F(c.verify_exclusive ? "check: " + c.verify_exclusive : c.verify_environment ? "check: " + c.verify_environment : "one reactor at a time", b.w - 16, "h"))}</text>`;
         toks += rowTokens(items, { x: b.x - 4 - 140, y: b.y + 4, w: 140, h: 20 }, cls, () => where);
         // the control rod: a rail over the reactors and one carriage, coupled to the reactor that holds the exclusive lock
@@ -1230,7 +1230,7 @@ body:not(.details) .det { display: none !important; }
       `<span><b>SCRAM n/3</b> = the Stop hook held the run's turn n of 3 times (<span class="mono">lock.stop_blocks</span>).</span>`,
       c.exclusive || !c.verify_environment
         ? `<span><b>Control rod</b> = the exclusive lock${c.exclusive ? "" : " (none named)"}: one reactor couples to it at a time.</span>`
-        : `<span><b>Control rods</b> = one per reactor, its own Environment slot-&lt;n&gt;: no reactor waits for another.</span>`,
+        : `<span><b>Control rods</b> = one per issue, its own Environment issue-&lt;n&gt;: no reactor waits for another.</span>`,
       `<span><b>Pipes</b> = the machine's edges, labelled with what moves an item along them; a pipe flows when what sits at its start can move on now. Hover a pipe or token for the full text.</span>`,
     ].join("");
   }

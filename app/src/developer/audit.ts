@@ -99,6 +99,7 @@ export const audit: Command = async (deps) => {
       );
     }
     await skippedInBodies(deps, kit, cutoff, o);
+    await leftEnvironments(deps, kit, o);
     await mainHealth(deps, kit, o);
     // Work a run left claimed with no pull request: the precheck's own resume
     // list, read without a gate and without claiming.
@@ -254,6 +255,42 @@ async function mainHealth(deps: Deps, kit: Kit, o: (s: string) => void): Promise
   if (lacking.length === 0 && off.length === 0) o("ok   main.gates — the default branch requires review and checks");
   if (lacking.length > 0) o(`warn main.gates — the default branch's rules lack ${lacking.join(", ")}`);
   if (off.length > 0) o(`warn main.gates — ruleset(s) not enforced: ${off.join(", ")}`);
+}
+
+/**
+ * The issues' Environments, issue-<n>, each kept until its pull request is done
+ * (docs/environments.md): one whose issue has no open pull request of yours
+ * left is a deletion a run missed.
+ */
+async function leftEnvironments(deps: Deps, kit: Kit, o: (s: string) => void): Promise<void> {
+  if (!kit.cfg.get("verify_environment")) return;
+  const envs = await deps.runtime.environments();
+  if (envs === undefined) {
+    o("warn environments.left — not measured: the platform did not list Environments");
+    return;
+  }
+  const mine = envs.filter((e) => /^issue-[0-9]+$/.test(e.name));
+  if (mine.length === 0) {
+    o("ok   environments.left — no issue Environment");
+    return;
+  }
+  const q = `repo:${kit.slug} is:pr is:open author:${kit.author}`;
+  const open = (await deps.github.get(kit.host, `search/issues?q=${encodeURIComponent(q)}&per_page=100`)) as
+    | { items?: { body?: string | null }[] }
+    | undefined;
+  if (open?.items === undefined) {
+    o("warn environments.left — not measured: could not list the open pull requests");
+    return;
+  }
+  const kept = new Set(
+    open.items.flatMap((p) => [...(p.body ?? "").matchAll(/<!-- environment: (issue-[0-9]+) -->/g)].map((m) => m[1])),
+  );
+  const left = mine.filter((e) => !kept.has(e.name)).map((e) => e.name);
+  o(
+    left.length === 0
+      ? `ok   environments.left — ${mine.length} Environment(s), each linked from an open pull request`
+      : `warn environments.left — no open pull request links ${left.join(" ")}: delete_environment each, once its pull request is done`,
+  );
 }
 
 function countNfs(dir: string): number {

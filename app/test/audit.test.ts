@@ -194,3 +194,23 @@ test("a week with nothing recorded is ok, and an unread week of pull requests is
     assert.match(r.out, /warn main\.scheduled — not measured/);
     assert.match(r.out, /warn main\.gates — not measured/);
   }));
+
+test("an issue's Environment no open pull request links is named, one linked is kept", () =>
+  inSandbox(async (s) => {
+    s.onboarded();
+    origin(s, s.read("VERSION").trim());
+    live(s);
+    s.config("- verify_environment: make e2e ENV={environment}");
+    s.runtime.envs = [
+      { name: "issue-3", state: "running", expiresAt: "", endpoints: [] },
+      { name: "issue-5", state: "sleeping", expiresAt: "", endpoints: [] },
+      { name: "scratch", state: "running", expiresAt: "", endpoints: [] },
+    ];
+    s.github.on(/^search\/issues/, { items: [] }).on(/^search\/issues\?q=[^&]*is%3Aopen/, {
+      items: [{ number: 4, body: "Environment: https://x\n<!-- environment: issue-3 -->\nFixes #3" }],
+    });
+    const r = await s.run(audit, []);
+    assert.match(r.out, /warn environments\.left — no open pull request links issue-5:/);
+    assert.doesNotMatch(r.out, /environments\.left — .*issue-3/);
+    assert.doesNotMatch(r.out, /scratch/, "only the issues' own");
+  }));

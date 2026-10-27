@@ -8,7 +8,8 @@
 // UUID, a private address, and any host of the platform's own domain — the
 // one `app_url` names, and its siblings. The session link and the
 // `<!-- slack-thread: … -->` marker are the two the rules ask for, and are
-// read past. Exit 1 names each hit by line, a credential never by its value;
+// read past, as is a line `Environment: <address>` with its
+// `<!-- environment: issue-<n> -->` marker (docs/environments.md). Exit 1 names each hit by line, a credential never by its value;
 // any other URL is listed as a note, for the run to judge, and leaves exit 0.
 // What a shape cannot see — a paraphrase, a name, a quote — stays judgment.
 import type { Command } from "../factory/context.ts";
@@ -37,7 +38,9 @@ const SHAPES: readonly (readonly [string, RegExp])[] = [
 const URL = /https?:\/\/([^/\s)>\]"'`]+)\S*/gi;
 const HOST = /\b[a-z0-9-]+(\.[a-z0-9-]+)+\b/gi;
 const PUBLIC_HOST = /(^|\.)(github\.com|githubusercontent\.com|slack\.com)$/i;
-const MARKER = /<!-- slack-thread: [A-Z0-9]+ [0-9]+\.[0-9]+ -->/g;
+const MARKER = /<!-- slack-thread: [A-Z0-9]+ [0-9]+\.[0-9]+ -->|<!-- environment: issue-[0-9]+ -->/g;
+/** The pull request's link to its Environment (docs/environments.md), on a line of its own. */
+const ENVIRONMENT_LINE = /^Environment: https:\/\/\S+$/;
 
 export interface Hit {
   readonly line: number;
@@ -69,6 +72,7 @@ export function scan(text: string, appUrl: string): { hits: Hit[]; notes: Hit[] 
     : undefined;
   text.split("\n").forEach((raw, i) => {
     let line = (link ? raw.replace(link, " ") : raw).replace(MARKER, " ");
+    if (ENVIRONMENT_LINE.test(line.trim())) return;
     if (SECRET.test(line)) hits.push({ line: i + 1, kind: "credential", text: "" });
     // each match is cut out as it is found: an id inside a Slack link is the link's hit alone
     for (const [kind, re] of SHAPES)

@@ -66,3 +66,11 @@ test("a hit names its file, line and match", () =>
     assert.match(r.out, /c\.md:2 internal host: dev\.apps\.cl\.acme\.example/);
     assert.match(r.err, /rewrite each with a placeholder/);
   }));
+
+test("a pull request's Environment line and its marker are read past, the same address elsewhere is not", () => {
+  const env = "https://app-issue-7-44dcc8.env-dev.apps.cl.acme.example";
+  assert.deepEqual(kinds(`Environment: ${env}`), []);
+  assert.deepEqual(kinds("<!-- environment: issue-7 -->"), []);
+  assert.deepEqual(kinds(`it fails on ${env}`), ["internal host"], "only the line of its own");
+  assert.deepEqual(kinds(`Environment: ${env} and more`), ["internal host"]);
+});

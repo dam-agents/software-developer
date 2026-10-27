@@ -51,8 +51,9 @@ a line in any other shape is invisible, not wrong.
   others. `exclusive` — what every slot shares and one uses at a time, in plain
   words; missing: nothing is. `verify_exclusive` — the check on it a pull
   request must pass; missing: none ([`docs/exclusive.md`](docs/exclusive.md)).
-  `verify_environment` — one in the slot's own Environment, `{environment}` its
-  name, with no lock; missing: none ([`docs/environments.md`](docs/environments.md)).
+  `verify_environment` — one in the issue's own Environment, `issue-<n>` its
+  `{environment}`, kept and linked from its pull request until it is merged, with
+  no lock; missing: none ([`docs/environments.md`](docs/environments.md)).
   `verify_required_paths` — paths a change on which may not go to review until
   that check passed on its head; missing: none ([`docs/babysit.md`](docs/babysit.md)
   → **The required check**).
@@ -163,7 +164,9 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   placeholders (`<host>`, `<user>`, `<code>`). Never an e-mail address, an
   internal host or URL other than the session link, a one-time code, a
   connection, session or user id, a log line holding one, or a quote from a
-  chat; a person is named only where a line here asks for the name.
+  chat; a person is named only where a line here asks for the name. The one
+  other internal URL a body carries is its Environment's
+  ([`docs/environments.md`](docs/environments.md)).
   `scripts/public-check.sh <file>` checks a body for those shapes before it
   is posted ([`docs/slack.md`](docs/slack.md) → **What leaves Slack**).
 - **Claim before you work**, before your first commit: the hand-off label off,
