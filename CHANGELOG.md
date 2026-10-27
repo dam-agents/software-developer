@@ -20,7 +20,19 @@ Environment with its pull request and expiry, slot or not, and one with no
 open pull request left is an `ENV-LEFT` alarm. The guards line names
 `verify_required_paths`, and "per slot" now reads "per issue".
 
+**A slot can be closed.** `slots_closed` names slots that finish what they hold
+and take no new item: `start` passes them by, and the precheck counts only the
+open ones. Raise `slots` with the new ones closed and open them one by one. In
+the plant each reactor has its own control rod, in when closed, out when open; a
+click asks the agent to open or close it. The plant also draws the gate as a
+**Held back** station, each token's check result (a green tick, or a blinking red
+ring), its issue's Environment as a small vessel, and a **Spent fuel** pool for
+Environments left behind; the Verifying pipe flows without the lock when
+`verify_environment` is set.
+
 **Upgrade:** restart the control room — `rc-service --user control-room restart`.
+Optional, operator only: to add slots slowly, raise `slots` and name the new
+ones in `slots_closed` in `work/CONFIG.md`.
 
 ## 6.8.0 — 2026-10-27
 
