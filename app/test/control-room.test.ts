@@ -281,3 +281,78 @@ test("a request target that cannot parse is a 400, and the server keeps serving"
       server.close();
     }
   }));
+
+test("a required check that did not pass is an alarm with its cause, and a pass is none", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.config("- verify_required_paths: ui/");
+    s.item("7", {
+      state: "blocked",
+      session: "sess-a",
+      branch: "feat/7",
+      checked: "verify_exclusive skipped abc123def456 no /dev/kvm",
+    });
+    s.item("8", {
+      state: "parked",
+      session: "sess-b",
+      branch: "feat/8",
+      checked: "verify_exclusive pass fed654cba321",
+    });
+    s.lock("item-7", { session: "sess-a", item: "7", since: s.clock.ago(5) });
+    s.lock("item-8", { session: "sess-b", item: "8", since: s.clock.ago(5) });
+    s.runtime.running.add("sess-a");
+    s.runtime.running.add("sess-b");
+    const snap = (await room(s).snapshot(true)) as Snap;
+    const f7 = snap.flight.find((x: Snap) => x.item === "7");
+    assert.deepEqual(f7.checked, {
+      check: "verify_exclusive",
+      result: "skipped",
+      commit: "abc123def456",
+      cause: "no /dev/kvm",
+    });
+    const check = snap.alarms.filter((a: Snap) => a.code === "CHECK");
+    assert.equal(check.length, 1, "the pass raises none");
+    assert.equal(check[0].level, "alarm");
+    assert.match(
+      check[0].text,
+      /#7: verify_exclusive did not run on abc123def456 — no \/dev\/kvm · held back from review/,
+    );
+    assert.equal(snap.config.verify_required_paths, "ui/");
+  }));
+
+test("every issue's Environment is listed, slot or not, and one with no open pull request is named", () =>
+  inSandbox(async (s) => {
+    world(s, [
+      {
+        number: 21,
+        title: "x",
+        url: "u",
+        headRefName: "feat/7",
+        baseRefName: "main",
+        body: "Fixes #7",
+        author: { login: "dev-bot" },
+        labels: { nodes: [] },
+        reviewDecision: "REVIEW_REQUIRED",
+        latestReviews: { nodes: [] },
+        mergeable: "MERGEABLE",
+        commits: { nodes: [] },
+      },
+    ]);
+    s.config("- verify_environment: make e2e ENV={environment}");
+    s.runtime.envs = [
+      { name: "issue-7", state: "hibernated", expiresAt: "", endpoints: [] },
+      { name: "issue-9", state: "running", expiresAt: "", endpoints: [] },
+      { name: "scratch", state: "running", expiresAt: "", endpoints: [] },
+    ];
+    const snap = (await room(s).snapshot(true)) as Snap;
+    assert.deepEqual(
+      snap.environments.map((e: Snap) => e.name),
+      ["issue-7", "issue-9"],
+      "the issues' own, with no slot held",
+    );
+    const left = snap.alarms.filter((a: Snap) => a.code === "ENV-LEFT");
+    assert.equal(left.length, 1);
+    assert.match(left[0].text, /issue-9 has no open pull request left/);
+    s.runtime.down = true;
+    assert.equal(((await room(s).snapshot(true)) as Snap).environments, null, "not measured, never none");
+  }));

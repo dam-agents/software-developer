@@ -59,6 +59,8 @@ a line in any other shape is invisible, not wrong.
   → **The required check**).
 - `schedules` — `tick`, `audit`, both, or `none`; missing: both — interactive, none.
 - `slots` — default 3: how many runs work at once, each in its own worktree.
+  `slots_closed` — slot numbers, by spaces, that finish what they hold and
+  take no new item; missing: none ([`docs/runs.md`](docs/runs.md) → **Slots**).
   `babysit_max_hours` — default 4: how long a run may `wait` in its turn. `stuck_after_min` — default 120: every slot held and a
   run silent this long lets a diagnostic run through.
 - `work_repo` — `owner/name`, private, holding the backup of `work/`

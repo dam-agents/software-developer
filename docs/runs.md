@@ -50,6 +50,14 @@ removes untracked files there, never ignored ones. It prefers the slot the item
 last used. `finish` detaches a saved slot, so the branch is free for any slot
 next time.
 
+**A closed slot**, one `slots_closed` names, finishes what it holds and takes
+no new item: `start` passes it by, and the precheck counts only the open ones
+as free. It keeps its worktree and its build output, so opening it again is
+one key away. Raise `slots` with the new ones closed, then open them one by one
+as the sandbox shows it can carry them. The control room draws a closed
+slot's control rod in, and a click on a rod asks the agent to open or close it
+— a change to `work/CONFIG.md`, so the direct session's.
+
 ## Other repositories
 
 The work always comes from an issue of `repo`, but may need changes in the

@@ -61,7 +61,7 @@ test("every slot in use refuses, and keeps nothing", () =>
     await as(s, "sess-a", "start", "7", "feat/7");
     const r = await as(s, "sess-b", "start", "8", "feat/8");
     assert.equal(r.rc, 1);
-    assert.match(r.err, /all 1 slots are in use/);
+    assert.match(r.err, /all 1 open slots of 1 are in use/);
     assert.ok(!existsSync(join(s.locks, "item-8")), "kept the item it could not work on");
   }));
 
@@ -1073,4 +1073,22 @@ test("a change off verify_required_paths parks without the check, and a cause se
     assert.match(r.err, /before this week: link the issue that tracks it, post nothing new/);
     r = await as(s, "sess-a", "park", "21");
     assert.equal(r.rc, 0, r.err);
+  }));
+
+test("start passes a closed slot by, and a closed slot's own run keeps it", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config("- slots: 3\n- slots_closed: 1 3");
+    let r = await as(s, "sess-a", "start", "7", "feat/7");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /slot 2: /, "the one open slot");
+    r = await as(s, "sess-b", "start", "8", "feat/8");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /all 1 open slots of 3 are in use/);
+    // closing the slot a run holds lets it finish there
+    s.setConfig("slots_closed", "1 2 3");
+    r = await as(s, "sess-a", "start", "7", "feat/7");
+    assert.equal(r.rc, 0, "a second start reuses its own slot");
+    assert.match(r.out, /slot 2: /);
   }));

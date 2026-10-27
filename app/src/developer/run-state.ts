@@ -179,15 +179,16 @@ class RunState {
       return 1;
     }
     // a run holds one slot: one already ours (a second start) is reused; else
-    // the item's last slot, whose build output is its own, then any free one
+    // the item's last slot, whose build output is its own, then any free one —
+    // an open one: a closed slot (slots_closed) finishes what it holds and takes nothing new
     const n = this.kit.slotCount;
+    const open = this.kit.openSlots;
     let k = this.mySlot();
     if (!k) {
       const last = this.itemKey(item, "slot");
-      const order = [last, ...Array.from({ length: n }, (_, i) => String(i + 1))];
+      const order = [last, ...open];
       for (const c of order) {
-        const num = Number(c);
-        if (!/^[0-9]+$/.test(c) || num < 1 || num > n) continue;
+        if (!open.includes(c)) continue;
         if (this.locks.take(`slot-${c}`, { item, slot: c })) {
           k = c;
           break;
@@ -200,8 +201,8 @@ class RunState {
       if (!parked) this.locks.drop(`item-${item}`);
       this.say(
         parked
-          ? `all ${n} slots are in use — #${item} stays parked; start it again once a slot is free (its waiter, started again, wakes you).`
-          : `all ${n} slots are in use — nothing can start now.`,
+          ? `all ${open.length} open slots of ${n} are in use — #${item} stays parked; start it again once a slot is free (its waiter, started again, wakes you).`
+          : `all ${open.length} open slots of ${n} are in use — nothing can start now.`,
       );
       return 1;
     }
@@ -1140,7 +1141,10 @@ class RunState {
   }
 
   show(): number {
-    this.out(`slots: ${this.locks.ofKind("slot-").length} of ${this.kit.slotCount} in use`);
+    const closed = [...this.kit.closedSlots];
+    this.out(
+      `slots: ${this.locks.ofKind("slot-").length} of ${this.kit.slotCount} in use${closed.length ? ` · closed: ${closed.join(" ")}` : ""}`,
+    );
     for (const h of this.locks.all()) this.out(`${h.name}: ${bullets(join(h.dir, "owner"))}`);
     if (existsSync(join(this.locks.dir, "exclusive.dirty")))
       this.out("exclusive: dirty — its last holder died mid-use");
