@@ -105,7 +105,13 @@ $RS unlock
 ```
 
 [`docs/exclusive.md`](../../../docs/exclusive.md) for what to do when it
-misbehaves.
+misbehaves. When `verify_environment` is set, run it too, in the slot's own
+Environment and with no lock ([`docs/environments.md`](../../../docs/environments.md)):
+
+```sh
+$RS phase "verify_environment"
+<verify_environment, {environment} as slot-<n>>
+```
 
 ## 6. The pull request
 
@@ -117,7 +123,7 @@ $RS park <pr>...               # every pull request of the issue; then its waite
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
-`verify_exclusive` covered or why it did not run), anything a reviewer should
+`verify_exclusive` or `verify_environment` covered or why it did not run), anything a reviewer should
 look at first. Then `Fixes #<n>` on its own line — in another repository
 `Fixes <repo>#<n>` or `Part of <repo>#<n>`, one of them closing it — and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.

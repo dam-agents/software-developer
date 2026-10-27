@@ -281,12 +281,22 @@ export class ControlRoom {
     const now = nowSeconds(this.deps.clock);
     const listed = await this.deps.runtime.sessions();
     const sessions = listed && new Map(listed.map((s) => [s.id, s]));
+    // Each slot's own Environment, slot-<k>, when the instance verifies in them:
+    // null for one not made yet, undefined when the platform did not answer.
+    const perSlot = kit.cfg.get("verify_environment") !== "";
+    const envs = perSlot ? await this.deps.runtime.environments() : [];
+    const envOf = (k: string) => (envs === undefined ? undefined : (envs.find((e) => e.name === `slot-${k}`) ?? null));
     const locks = await Promise.all(kit.locks.all().map((h) => lockView(kit, h, sessions, now)));
     const dirty = existsSync(join(kit.locks.dir, "exclusive.dirty"));
     const n = kit.slotCount;
     const slots = Array.from({ length: n }, (_, i) => {
       const k = String(i + 1);
-      return { k: i + 1, ...gitSlot(kit, join(kit.slots, k)), lock: locks.find((l) => l.name === `slot-${k}`) ?? null };
+      return {
+        k: i + 1,
+        ...gitSlot(kit, join(kit.slots, k)),
+        lock: locks.find((l) => l.name === `slot-${k}`) ?? null,
+        ...(perSlot ? { environment: envOf(k) } : {}),
+      };
     });
     const items = new Map<string, Map<string, string>>();
     try {
@@ -392,7 +402,7 @@ export class ControlRoom {
         const slot = lk ? slotLocks.find((s) => s.session === lk.session && s.item === k) : undefined;
         const state = it.get("state") ?? "";
         let stage: string;
-        if (lk && slot) stage = excl?.item === k ? "verifying" : "working";
+        if (lk && slot) stage = excl?.item === k || slot.phase === "verify_environment" ? "verifying" : "working";
         else if (lk?.parked_at)
           stage = ps.length > 0 && ps.every((p) => p.decision === "APPROVED") ? "awaiting-merge" : "in-review";
         else if (lk) stage = "item-lock";
@@ -530,6 +540,7 @@ export class ControlRoom {
         verify: kit.cfg.get("verify"),
         exclusive: kit.cfg.get("exclusive"),
         verify_exclusive: kit.cfg.get("verify_exclusive"),
+        verify_environment: kit.cfg.get("verify_environment"),
         schedules: kit.cfg.get("schedules"),
         slots: n,
         babysit_max_hours: kit.babysitMaxHours,

@@ -37,6 +37,7 @@ export const KNOWN = [
   "verify",
   "exclusive",
   "verify_exclusive",
+  "verify_environment",
   "slots",
   "babysit_max_hours",
   "stuck_after_min",
@@ -154,6 +155,13 @@ function configChecks(kit: Kit, r: Report): void {
       "config.verify_exclusive",
       "set, but exclusive names nothing — no lock would guard it",
       "add `- exclusive: <what is shared>`, or drop verify_exclusive",
+    );
+  const inEnvironment = cfg.get("verify_environment");
+  if (inEnvironment && !inEnvironment.includes("{environment}"))
+    r.fail(
+      "config.verify_environment",
+      "names no {environment} — every slot's check would run against the same place",
+      "write `{environment}` where the command takes the Environment's name (docs/environments.md)",
     );
   const m = cfg.get("mode");
   if (["autonomous", "interactive"].includes(m.toLowerCase())) r.ok("config.mode", m);

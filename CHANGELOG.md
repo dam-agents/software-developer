@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.6.0 — 2026-10-26
+
+**A check that needs its own cluster runs in an Environment of the slot's own,
+with no lock.** `verify_environment` names a check a pull request must pass,
+with `{environment}` for the Environment's name; each slot makes `slot-<n>` on
+first use and reuses it, so every slot runs its check at once instead of taking
+turns under the exclusive lock (`docs/environments.md`). It needs a vm agent
+with the platform's Environments on, and the repository's instructions for how
+a check runs in one.
+
+**Upgrade:** none. Optional, operator only: where `verify_exclusive` checks
+something every slot installs in one place, such as a local cluster, and the
+repository can run that check in an Environment, replace `exclusive` and
+`verify_exclusive` in `work/CONFIG.md` with `- verify_environment: <command>`.
+
 ## 6.4.0 — 2026-10-22
 
 **A Slack turn keeps the conversation off GitHub, and checks a body before it

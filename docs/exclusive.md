@@ -2,7 +2,10 @@
 
 Only when `exclusive` in `work/CONFIG.md` names something: what every slot
 shares and only one may use at a time — a cluster, a database, a device, a
-port. The definition knows nothing more about it than that.
+port. The definition knows nothing more about it than that. What is shared
+only because every slot installs it in one place can instead live in an
+Environment of each slot's own, with no lock
+([environments.md](environments.md)).
 
 **Everything that touches it runs under `run-state.sh lock`**, which one item
 holds at a time ([runs.md](runs.md) → **The exclusive lock**): trying a change

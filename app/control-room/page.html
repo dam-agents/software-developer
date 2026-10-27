@@ -254,6 +254,12 @@ details.machine .note { padding: 0 10px 8px; font: 11px/1.4 var(--sans); color: 
 .row .k { font: 800 9px/1.2 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink3); }
 .row .v { font: 11.5px/1.35 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .v.wr { white-space: normal; }
+.rods { display: grid; gap: 6px; }
+.rod { display: grid; grid-template-columns: 34px 1fr auto; gap: 4px 8px; align-items: center; padding: 7px 8px; border: 1px solid var(--edge); border-radius: var(--r); }
+.rod .rk { font: 800 12px/1 var(--mono); }
+.rod .rn { font: 11.5px/1.3 var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rod .rl { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 4px 10px; font: 11px/1.3 var(--mono); }
+.rod .rl a { text-decoration: underline; }
 .seg { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 3px; }
 .seg i { height: 16px; background: var(--off); border-radius: 1px; border: 1px solid var(--edge); }
 .seg i.on { background: var(--ok); border-color: var(--ok); box-shadow: var(--glow) color-mix(in srgb, var(--ok) 50%, transparent); }
@@ -376,6 +382,7 @@ body:not(.details) .det { display: none !important; }
       <div class="state st-off" id="x-state">—</div>
       <div class="row"><span class="k">Coupled to</span><span class="v" id="x-holder">—</span></div>
       <div class="row"><span class="k">Guards</span><span class="v wr" id="x-guards">—</span></div>
+      <div class="rods" id="x-rods" hidden></div>
       <div class="row"><span class="k">Reactors</span><span class="v"><span class="big-n" id="g-slots">–</span> <span class="dim" id="g-slots-of"></span></span></div>
       <div class="seg" id="g-seg"></div>
       <div class="row"><span class="k">Items held</span><span class="v"><span class="big-n" id="g-items">–</span> <span class="dim">item locks</span></span></div>
@@ -422,6 +429,7 @@ body:not(.details) .det { display: none !important; }
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const safeUrl = (u) => /^https:\/\/github\.com\//.test(u || "") ? u : null;
   const link = (u, t) => safeUrl(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t);
+  const envLink = (u, t) => /^https:\/\/[^\s"<>]+$/.test(u || "") ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t);
   const mins = (iso) => { if (!iso) return null; const t = Date.parse(iso); return isNaN(t) ? null : Math.max(0, Math.floor((Date.now() - t) / 60000)); };
   const dur = (m) => m == null ? "—" : m < 60 ? `${m}m` : m < 1440 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}` : `${Math.floor(m / 1440)}d${Math.floor((m % 1440) / 60)}h`;
   const ago = (iso) => { const m = mins(iso); return m == null ? "—" : dur(m) + " ago"; };
@@ -532,7 +540,8 @@ body:not(.details) .det { display: none !important; }
     const l = s.lock;
     if (!s.exists) return ["off", "NOT BUILT"];
     if (!l) return s.dirty || s.unpushed ? ["alarm", "UNSAVED"] : ["off", "COLD"];
-    if (l.holder === "live") return exclItem() === l.item ? ["hot", "VERIFYING"] : ["ok", "RUNNING"];
+    if (l.holder === "live")
+      return exclItem() === l.item || l.phase === "verify_environment" ? ["hot", "VERIFYING"] : ["ok", "RUNNING"];
     return holderSt(l.holder);
   };
 
@@ -580,6 +589,7 @@ body:not(.details) .det { display: none !important; }
     $("foot").innerHTML = [
       `generated ${esc(S.generated_at)}`, `runtime ${S.runtime_ok ? "answering" : "NOT answering"}`,
       `verify: ${esc(c.verify || "—")}`, c.exclusive ? `exclusive: ${esc(c.exclusive)}` : "exclusive: none named",
+      ...(c.verify_environment ? [`verify_environment: ${esc(c.verify_environment)}`] : []),
       `babysit_max_hours ${esc(c.babysit_max_hours)}`, `stuck_after_min ${esc(c.stuck_after_min)}`,
     ].map((s) => `<span>${s}</span>`).join("");
   }
@@ -613,7 +623,7 @@ body:not(.details) .det { display: none !important; }
     f.filter(working).forEach((x) => {
       const also = f.filter((y) => y !== x && y.lock && y.lock.session === x.lock.session && !y.slot).length;
       now.push(row(x.stage === "verifying" ? "hot" : "ok", lbl(x.item), x.url, x.title || x.branch,
-        `slot ${x.slot}${x.stage === "verifying" ? " · under the exclusive lock" : ""} · ${x.lock.phase || "started"} · last sign ${dur(x.lock.silent_min)} ago${also ? ` · its session also holds ${also} more item lock(s)` : ""}`, ""));
+        `slot ${x.slot}${x.stage === "verifying" ? (exclItem() === x.item ? " · under the exclusive lock" : " · in its Environment, slot-" + x.slot) : ""} · ${x.lock.phase || "started"} · last sign ${dur(x.lock.silent_min)} ago${also ? ` · its session also holds ${also} more item lock(s)` : ""}`, ""));
     });
 
     // Waiting: on a reviewer, on checks, on the lock, or in the queue
@@ -1145,15 +1155,15 @@ body:not(.details) .det { display: none !important; }
         o += `<g transform="translate(${rcx},${rcy})" role="img" aria-label="turbine ${held ? "turning: the exclusive lock is held" : "still"}"><circle class="rotor-ring" r="13"/><g class="rotor ${held ? "spin" : ""}">` +
           [0, 120, 240].map((r) => `<path class="blade" transform="rotate(${r})" d="M0,0 C3.5,-3.5 4.5,-8.5 1.8,-11 L-1.8,-11 C-2.6,-7 -1.8,-2.6 0,0 Z"/>`).join("") + `<circle class="hub" r="2.2"/></g></g>`;
         o += plate(st, b.x + 8, b.y + 16, b.w - 16 - 34);
-        const [xc, xt] = !named ? ["", "EXCLUSIVE · NONE NAMED"] : x.dirty ? ["alarm", "EXCLUSIVE · DIRTY"] : held ? ["hot", `EXCLUSIVE · HELD ${itemRef(held.item)}`] : ["ok", "EXCLUSIVE · FREE"];
-        o += `<text class="excl-t ${xc}" x="${b.x + 8}" y="${b.y + 46}"><title>${esc(c.exclusive ? "exclusive: " + c.exclusive : "CONFIG.md names no exclusive: every reactor verifies alone")}</title>${esc(F(xt, b.w - 16, "rail"))}</text>`;
-        o += `<text class="pl-h" x="${b.x + 8}" y="${b.y + 59}">${esc(F(c.verify_exclusive ? "check: " + c.verify_exclusive : "one reactor at a time", b.w - 16, "h"))}</text>`;
+        const [xc, xt] = !named ? (c.verify_environment ? ["ok", "EXCLUSIVE · PER SLOT"] : ["", "EXCLUSIVE · NONE NAMED"]) : x.dirty ? ["alarm", "EXCLUSIVE · DIRTY"] : held ? ["hot", `EXCLUSIVE · HELD ${itemRef(held.item)}`] : ["ok", "EXCLUSIVE · FREE"];
+        o += `<text class="excl-t ${xc}" x="${b.x + 8}" y="${b.y + 46}"><title>${esc(c.exclusive ? "exclusive: " + c.exclusive : c.verify_environment ? "no exclusive: each reactor verifies in its own Environment, slot-<n>" : "CONFIG.md names no exclusive: every reactor verifies alone")}</title>${esc(F(xt, b.w - 16, "rail"))}</text>`;
+        o += `<text class="pl-h" x="${b.x + 8}" y="${b.y + 59}">${esc(F(c.verify_exclusive ? "check: " + c.verify_exclusive : c.verify_environment ? "check: " + c.verify_environment : "one reactor at a time", b.w - 16, "h"))}</text>`;
         toks += rowTokens(items, { x: b.x - 4 - 140, y: b.y + 4, w: 140, h: 20 }, cls, () => where);
         // the control rod: a rail over the reactors and one carriage, coupled to the reactor that holds the exclusive lock
         const ry = 50, rx0 = hall.x + 6, rx1 = b.x - 10;
         o += `<line class="rail ${named ? "" : "none"}" x1="${rx0}" y1="${ry}" x2="${rx1}" y2="${ry}"/>`;
         G.forEach((g, i) => { if (g.cx > rx1 - 14) return; o += `<line class="dial-t" x1="${g.cx.toFixed(1)}" y1="${ry - 6}" x2="${g.cx.toFixed(1)}" y2="${ry + 6}"/><text class="rail-t" x="${g.cx.toFixed(1)}" y="${ry - 10}" text-anchor="middle">R${i + 1}</text>`; });
-        const railMsg = !named ? "CONTROL ROD · none named: every reactor verifies alone" : `CONTROL ROD · ${c.exclusive}`;
+        const railMsg = !named ? (c.verify_environment ? "CONTROL ROD · per slot: each reactor verifies in its own Environment" : "CONTROL ROD · none named: every reactor verifies alone") : `CONTROL ROD · ${c.exclusive}`;
         const railCap = `<text class="rail-t halo" x="${rx0}" y="${ry + 18}"><title>${esc(railMsg)}</title>${esc(F(railMsg, rx1 - rx0, "rail"))}</text>`;
         rod = railCap;
         if (named) {
@@ -1218,7 +1228,9 @@ body:not(.details) .det { display: none !important; }
       `<span><b>Power output</b> = activity: 100 % at the holder's last sign of life (<span class="mono">lock.silent_min</span> 0), falling linearly to 0 % at <span class="mono">stuck_after_min</span> (${esc(dur(stuckMin()))}); 0 % with no holder or a holder that is not live. Glow and bubbles follow it.</span>`,
       `<span><b>Core temp</b> = time held: <span class="mono">lock.held_min</span> against <span class="mono">babysit_max_hours</span> (${esc(babysitMin() / 60)} h); OVER past it.</span>`,
       `<span><b>SCRAM n/3</b> = the Stop hook held the run's turn n of 3 times (<span class="mono">lock.stop_blocks</span>).</span>`,
-      `<span><b>Control rod</b> = the exclusive lock${c.exclusive ? "" : " (none named)"}: one reactor couples to it at a time.</span>`,
+      c.exclusive || !c.verify_environment
+        ? `<span><b>Control rod</b> = the exclusive lock${c.exclusive ? "" : " (none named)"}: one reactor couples to it at a time.</span>`
+        : `<span><b>Control rods</b> = one per reactor, its own Environment slot-&lt;n&gt;: no reactor waits for another.</span>`,
       `<span><b>Pipes</b> = the machine's edges, labelled with what moves an item along them; a pipe flows when what sits at its start can move on now. Hover a pipe or token for the full text.</span>`,
     ].join("");
   }
@@ -1285,7 +1297,9 @@ body:not(.details) .det { display: none !important; }
   function renderExcl() {
     const x = S.exclusive || {}, c = S.config || {};
     const st = $("x-state");
-    if (!x.named) { st.className = "state st-off"; st.textContent = "NONE NAMED"; }
+    const perSlot = !x.named && !!c.verify_environment;
+    if (perSlot) { st.className = "state st-ok"; st.textContent = "PER SLOT"; }
+    else if (!x.named) { st.className = "state st-off"; st.textContent = "NONE NAMED"; }
     else if (x.dirty) { st.className = "state st-alarm"; st.textContent = "DIRTY"; }
     else if (x.lock) { st.className = "state st-hot"; st.textContent = "COUPLED"; }
     else { st.className = "state st-ok"; st.textContent = "FREE"; }
@@ -1293,8 +1307,29 @@ body:not(.details) .det { display: none !important; }
       const [hs, ht] = holderSt(x.lock.holder);
       const k = (S.slots || []).find((s) => s.lock && s.lock.item === x.lock.item);
       $("x-holder").innerHTML = `${k ? "R" + k.k + " · " : ""}${esc(itemRef(x.lock.item))} · ${dur(x.lock.held_min)} · <span class="pill st-${hs}">${ht}</span>`;
-    } else $("x-holder").textContent = x.named ? "— (rod withdrawn)" : "nothing in CONFIG.md names one";
-    $("x-guards").textContent = c.exclusive ? `${c.exclusive}${c.verify_exclusive ? " · check: " + c.verify_exclusive : ""}` : "— (exclusive unset: every slot verifies alone)";
+    } else $("x-holder").textContent = x.named ? "— (rod withdrawn)" : perSlot ? "each reactor has a rod of its own, its Environment" : "nothing in CONFIG.md names one";
+    $("x-guards").textContent = c.exclusive
+      ? `${c.exclusive}${c.verify_exclusive ? " · check: " + c.verify_exclusive : ""}${c.verify_environment ? " · in an Environment: " + c.verify_environment : ""}`
+      : c.verify_environment ? `check: ${c.verify_environment}` : "— (exclusive unset: every slot verifies alone)";
+    const rods = $("x-rods");
+    rods.hidden = !c.verify_environment;
+    if (c.verify_environment) {
+      const ENV_ST = { running: ["ok", "AWAKE"], starting: ["info", "STARTING"], hibernated: ["park", "ASLEEP"], stopped: ["park", "ASLEEP"] };
+      rods.innerHTML = (S.slots || []).map((sl) => {
+        const e = sl.environment, name = `slot-${sl.k}`;
+        const inUse = sl.lock && sl.lock.holder === "live" && sl.lock.phase === "verify_environment";
+        const [cls, txt] = e === undefined ? ["off", "NOT MEASURED"] : e === null ? ["off", "NOT MADE"] : inUse ? ["hot", "VERIFYING"] : ENV_ST[e.state] || ["off", esc(String(e.state || "—")).toUpperCase()];
+        const left = e && e.expiresAt ? Math.floor((Date.parse(e.expiresAt) - Date.now()) / 60000) : null;
+        const links = e && e.endpoints && e.endpoints.length
+          ? e.endpoints.map((p) => p.url ? envLink(p.url, p.name) : `<span class="dim">${esc(p.name)} · no address</span>`).join("")
+          : e === null ? `<span class="dim">made by the slot's first verify_environment</span>`
+          : e === undefined ? `<span class="dim">the platform did not answer</span>` : "";
+        return `<div class="rod" data-slot="${esc(String(sl.k))}"><span class="rk">R${esc(String(sl.k))}</span>`
+          + `<span class="rn" title="${esc(name)}">${esc(name)}${left != null ? ` <span class="dim">· expires in ${dur(Math.max(0, left))}</span>` : ""}</span>`
+          + `<span class="pill st-${cls}">${txt}</span>`
+          + (links ? `<span class="rl">${links}</span>` : "") + `</div>`;
+      }).join("");
+    }
     $("x-tag").textContent = x.lock ? `since ${x.lock.since}` : "";
     const n = c.slots || 3, held = (S.locks || []).filter((l) => l.kind === "slot");
     $("g-slots").textContent = held.length; $("g-slots-of").textContent = `of ${n} held`;
@@ -1336,6 +1371,7 @@ body:not(.details) .det { display: none !important; }
           ` : `<div class="empty">${s.exists ? "COLD · NO HOLDER" : "NOT BUILT · WORKTREE NOT CREATED YET"}</div>`}
           ${s.exists ? `
           <div class="row"><span class="k">Branch</span><span class="v">${esc(s.branch || "(detached)")}</span></div>
+          ${"environment" in s ? `<div class="row"><span class="k">Environment</span><span class="v">${s.environment ? `slot-${esc(String(s.k))} <span class="dim">${esc(s.environment.state || "")}</span> ${s.environment.endpoints.map((p) => p.url ? envLink(p.url, p.name) : "").join(" ")}` : s.environment === null ? `<span class="dim">slot-${esc(String(s.k))} · not made yet</span>` : `<span class="dim">not measured</span>`}</span></div>` : ""}
           <div class="row"><span class="k">Head</span><span class="v" title="${esc(s.subject)}">${esc(s.head)} <span class="dim">${esc(s.subject)}</span></span></div>
           <div class="row"><span class="k">Tree</span><span class="v">${s.dirty ? `<span class="pill st-adv">${s.dirty} changed</span>` : `<span class="pill st-ok">clean</span>`}
             ${s.unpushed ? `<span class="pill st-${l ? "info" : "alarm"}" title="commits on no remote branch, as of this worktree's last fetch">${s.unpushed} ahead of last fetch</span>` : ""}</span></div>` : ""}

@@ -93,7 +93,12 @@ confirming or correcting rather than composing from nothing.
   a check on it, that command as `verify_exclusive`, setup for the branch
   included. How to set it up, try a change out on it and recover it is the
   repository's to document, not this file's: if it does not, say so, and
-  suggest the user adds it there.
+  suggest the user adds it there. On a vm agent with Environments, a check
+  that is shared only because every slot installs it in one place, such as a
+  local cluster, can instead run in an Environment of each slot's own: record
+  it as `verify_environment`, with `{environment}` for the Environment's name,
+  and leave `exclusive` and `verify_exclusive` out
+  ([`docs/environments.md`](docs/environments.md)).
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here. Also record
@@ -175,6 +180,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - verify: <the repository's check-and-test command>
 - exclusive: the local cluster — anything that installs onto it or runs against it
 - verify_exclusive: <its end-to-end command, setup included>
+- verify_environment: <its end-to-end command against {environment}, setup included>
 - schedules: tick audit
 - slots: 3
 - babysit_max_hours: 4
@@ -194,7 +200,7 @@ merge (by default you may not).
 
 Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `label_review` and `schedules`. With nothing shared, leave `exclusive` and
-`verify_exclusive` out; with no
+`verify_exclusive` out; with no check in an Environment, `verify_environment`; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel` and `slack_handoff`;
 for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
