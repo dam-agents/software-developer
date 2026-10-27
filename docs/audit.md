@@ -14,6 +14,17 @@ first, then the week in numbers from `work/TICK.log`, then the checks against
 GitHub. Take its lines as they are: a `not measured` stays not measured, never
 a zero.
 
+Its `checks.*` and `main.*` lines are the ones this audit exists for: a
+required check that did not run, the same cause in several runs, and a
+default branch every slot inherits broken.
+
+- **The required check on the default branch.** With `verify_environment` or
+  `verify_exclusive` set: `run-state.sh lock --main` — refused, the line is
+  `not measured` — then the repository's setup and the check on a fresh
+  checkout of the default branch, in the background, then `run-state.sh
+  checked <check> <result> [cause]` and `unlock`. Not passing is red: what is
+  broken there, every pull request inherits.
+
 ## 2. What only you can check
 
 - **Schedules.** With `list_schedules`: `software-developer-tick-10m` and
@@ -57,7 +68,9 @@ Action needed: one line per thing a person must do, or "none"
 ```
 
 With `slack_channel` set, post the header and the **Action needed** lines there
-too ([notify.md](notify.md)).
+too ([notify.md](notify.md)). **With any 🔴**, the post opens with 🚨 and the
+red lines themselves, one each, before the header: a red check is never only a
+count.
 
 Then its line in `work/AUDIT.log`:
 

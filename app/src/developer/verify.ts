@@ -38,6 +38,7 @@ export const KNOWN = [
   "exclusive",
   "verify_exclusive",
   "verify_environment",
+  "verify_exclusive_paths",
   "slots",
   "babysit_max_hours",
   "stuck_after_min",
@@ -155,6 +156,12 @@ function configChecks(kit: Kit, r: Report): void {
       "config.verify_exclusive",
       "set, but exclusive names nothing — no lock would guard it",
       "add `- exclusive: <what is shared>`, or drop verify_exclusive",
+    );
+  if (cfg.get("verify_exclusive_paths") && !cfg.get("verify_exclusive") && !cfg.get("verify_environment"))
+    r.fail(
+      "config.verify_exclusive_paths",
+      "set, but neither verify_exclusive nor verify_environment names the check it requires",
+      "add the check, or drop verify_exclusive_paths",
     );
   const inEnvironment = cfg.get("verify_environment");
   if (inEnvironment && !inEnvironment.includes("{environment}"))

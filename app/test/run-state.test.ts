@@ -1000,3 +1000,77 @@ test("unknown verbs and outcomes are usage errors", () =>
     assert.equal((await s.run(runState, ["bogus"])).rc, 2);
     assert.equal((await as(s, "sess-a", "finish", "maybe")).rc, 2);
   }));
+
+test("a change on verify_exclusive_paths parks only once its check passed on its head, and a skip says what to post", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config(
+      "- exclusive: the local cluster\n- verify_exclusive: make e2e\n- verify_exclusive_paths: ui/\n- slack_channel: C0123ABCD",
+    );
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    const slot = join(s.work, "slots", "1");
+    mkdirSync(join(slot, "ui"));
+    writeFileSync(join(slot, "ui", "page.tsx"), "x\n");
+    s.git(["add", "-A"], slot);
+    s.git(["commit", "-qm", "ui"], slot);
+    s.git(["push", "-q", "origin", "feat/7"], slot);
+    let r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 1, "no result recorded");
+    assert.match(r.err, /not ready for review: the branch changes ui\/page\.tsx.*no verify_exclusive result/);
+    assert.match(r.err, /gh pr ready <pr> --undo/);
+    r = await as(s, "sess-a", "checked", "verify_exclusive", "skipped");
+    assert.equal(r.rc, 2, "a skip needs its cause");
+    r = await as(s, "sess-a", "checked", "verify_exclusive", "skipped", "no", "/dev/kvm");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(
+      r.err,
+      /notify: post 🚨 that verify_exclusive did not run on #7 — no \/dev\/kvm — to slack_channel C0123ABCD/,
+    );
+    assert.match(
+      s.read("work/TICK.log"),
+      /checked session=sess-a issue=7 .*check=verify_exclusive result=skipped commit=\S+ cause="no \/dev\/kvm"/,
+    );
+    r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /verify_exclusive did not run on \S+: no \/dev\/kvm/);
+    r = await as(s, "sess-a", "finish", "pr-updated", "21");
+    assert.equal(r.rc, 1, "finish holds it back too");
+    r = await as(s, "sess-a", "checked", "verify_exclusive", "pass");
+    assert.doesNotMatch(r.err, /notify:/, "a pass posts nothing");
+    r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 0, r.err);
+    // a new commit needs the check again
+    await as(s, "sess-a", "start", "7", "feat/7");
+    writeFileSync(join(slot, "ui", "page.tsx"), "y\n");
+    s.git(["commit", "-qam", "again"], slot);
+    s.git(["push", "-q", "origin", "feat/7"], slot);
+    r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /no verify_exclusive result is recorded on/);
+  }));
+
+test("a change off verify_exclusive_paths parks without the check, and a cause seen this week is not posted again", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config(
+      "- exclusive: the local cluster\n- verify_exclusive: make e2e\n- verify_exclusive_paths: ui/ deploy/**/*.yaml",
+    );
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    const slot = join(s.work, "slots", "1");
+    writeFileSync(join(slot, "lib.ts"), "x\n");
+    s.git(["add", "-A"], slot);
+    s.git(["commit", "-qm", "lib"], slot);
+    s.git(["push", "-q", "origin", "feat/7"], slot);
+    let r = await as(s, "sess-a", "checked", "verify_exclusive", "fail", "image build: UnknownIssuer");
+    assert.match(r.err, /notify: post 🚨/);
+    r = await as(s, "sess-a", "checked", "verify_exclusive", "fail", "image build: UnknownIssuer");
+    assert.match(r.err, /before this week: link the issue that tracks it, post nothing new/);
+    r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 0, r.err);
+  }));

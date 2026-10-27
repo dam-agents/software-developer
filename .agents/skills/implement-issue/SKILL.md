@@ -101,8 +101,16 @@ is set — or you want to try the change out on it, at any step:
 $RS lock                       # refused: push, finish waiting-lock
 $RS phase "verify_exclusive"
 <set it up for your branch, as the repository says>; <verify_exclusive>
+$RS checked verify_exclusive pass|fail|skipped [cause]
 $RS unlock
 ```
+
+**The change touches `verify_exclusive_paths`:** the check is not optional, and
+"small", "covered by unit tests" or "CI runs it" is not a reason to skip it.
+Whatever it records, a `checked` that did not pass prints a `notify:` line:
+post it at once ([`docs/notify.md`](../../../docs/notify.md)); `park` and
+`finish` then hold the pull request back from review
+([`docs/babysit.md`](../../../docs/babysit.md) → **The required check**).
 
 [`docs/exclusive.md`](../../../docs/exclusive.md) for what to do when it
 misbehaves. When `verify_environment` is set, run it too, in the slot's own
@@ -111,6 +119,7 @@ Environment and with no lock ([`docs/environments.md`](../../../docs/environment
 ```sh
 $RS phase "verify_environment"
 <verify_environment, {environment} as slot-<n>>
+$RS checked verify_environment pass|fail|skipped [cause]
 ```
 
 ## 6. The pull request

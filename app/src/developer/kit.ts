@@ -28,6 +28,8 @@ export const ITEM_KEYS = [
   "babysat_out",
   // the pull request a Slack "ready to merge" post was asked for, so it is asked once
   "notified",
+  // the last required check recorded for the item: "<check> <pass|fail|skipped> <commit>"
+  "checked",
   "updated_at",
 ] as const;
 
@@ -120,6 +122,21 @@ export class Kit {
   }
   get author(): string {
     return this.cfg.get("author");
+  }
+  /** The check a change on `verify_exclusive_paths` must pass: in the slot's Environment when set, else on what `exclusive` names. */
+  get requiredCheck(): string {
+    return this.cfg.get("verify_environment")
+      ? "verify_environment"
+      : this.cfg.get("verify_exclusive")
+        ? "verify_exclusive"
+        : "";
+  }
+  /** The default branch of `repo`, from its checkout: main when that cannot say. */
+  get defaultBranch(): string {
+    return this.git.defaultBranch(this.checkout);
+  }
+  get requiredPaths(): string[] {
+    return this.cfg.list("verify_exclusive_paths");
   }
 
   /** work/<name>: the checkout of `repo`. */
