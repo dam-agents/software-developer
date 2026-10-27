@@ -392,7 +392,7 @@ export class ControlRoom {
         const slot = lk ? slotLocks.find((s) => s.session === lk.session && s.item === k) : undefined;
         const state = it.get("state") ?? "";
         let stage: string;
-        if (lk && slot) stage = excl?.item === k ? "verifying" : "working";
+        if (lk && slot) stage = excl?.item === k || slot.phase === "verify_environment" ? "verifying" : "working";
         else if (lk?.parked_at)
           stage = ps.length > 0 && ps.every((p) => p.decision === "APPROVED") ? "awaiting-merge" : "in-review";
         else if (lk) stage = "item-lock";
@@ -530,6 +530,7 @@ export class ControlRoom {
         verify: kit.cfg.get("verify"),
         exclusive: kit.cfg.get("exclusive"),
         verify_exclusive: kit.cfg.get("verify_exclusive"),
+        verify_environment: kit.cfg.get("verify_environment"),
         schedules: kit.cfg.get("schedules"),
         slots: n,
         babysit_max_hours: kit.babysitMaxHours,

@@ -532,7 +532,8 @@ body:not(.details) .det { display: none !important; }
     const l = s.lock;
     if (!s.exists) return ["off", "NOT BUILT"];
     if (!l) return s.dirty || s.unpushed ? ["alarm", "UNSAVED"] : ["off", "COLD"];
-    if (l.holder === "live") return exclItem() === l.item ? ["hot", "VERIFYING"] : ["ok", "RUNNING"];
+    if (l.holder === "live")
+      return exclItem() === l.item || l.phase === "verify_environment" ? ["hot", "VERIFYING"] : ["ok", "RUNNING"];
     return holderSt(l.holder);
   };
 
@@ -580,6 +581,7 @@ body:not(.details) .det { display: none !important; }
     $("foot").innerHTML = [
       `generated ${esc(S.generated_at)}`, `runtime ${S.runtime_ok ? "answering" : "NOT answering"}`,
       `verify: ${esc(c.verify || "—")}`, c.exclusive ? `exclusive: ${esc(c.exclusive)}` : "exclusive: none named",
+      ...(c.verify_environment ? [`verify_environment: ${esc(c.verify_environment)}`] : []),
       `babysit_max_hours ${esc(c.babysit_max_hours)}`, `stuck_after_min ${esc(c.stuck_after_min)}`,
     ].map((s) => `<span>${s}</span>`).join("");
   }
@@ -613,7 +615,7 @@ body:not(.details) .det { display: none !important; }
     f.filter(working).forEach((x) => {
       const also = f.filter((y) => y !== x && y.lock && y.lock.session === x.lock.session && !y.slot).length;
       now.push(row(x.stage === "verifying" ? "hot" : "ok", lbl(x.item), x.url, x.title || x.branch,
-        `slot ${x.slot}${x.stage === "verifying" ? " · under the exclusive lock" : ""} · ${x.lock.phase || "started"} · last sign ${dur(x.lock.silent_min)} ago${also ? ` · its session also holds ${also} more item lock(s)` : ""}`, ""));
+        `slot ${x.slot}${x.stage === "verifying" ? (exclItem() === x.item ? " · under the exclusive lock" : " · in its Environment, slot-" + x.slot) : ""} · ${x.lock.phase || "started"} · last sign ${dur(x.lock.silent_min)} ago${also ? ` · its session also holds ${also} more item lock(s)` : ""}`, ""));
     });
 
     // Waiting: on a reviewer, on checks, on the lock, or in the queue
@@ -1285,7 +1287,8 @@ body:not(.details) .det { display: none !important; }
   function renderExcl() {
     const x = S.exclusive || {}, c = S.config || {};
     const st = $("x-state");
-    if (!x.named) { st.className = "state st-off"; st.textContent = "NONE NAMED"; }
+    if (!x.named && c.verify_environment) { st.className = "state st-ok"; st.textContent = "PER SLOT"; }
+    else if (!x.named) { st.className = "state st-off"; st.textContent = "NONE NAMED"; }
     else if (x.dirty) { st.className = "state st-alarm"; st.textContent = "DIRTY"; }
     else if (x.lock) { st.className = "state st-hot"; st.textContent = "COUPLED"; }
     else { st.className = "state st-ok"; st.textContent = "FREE"; }
@@ -1293,8 +1296,10 @@ body:not(.details) .det { display: none !important; }
       const [hs, ht] = holderSt(x.lock.holder);
       const k = (S.slots || []).find((s) => s.lock && s.lock.item === x.lock.item);
       $("x-holder").innerHTML = `${k ? "R" + k.k + " · " : ""}${esc(itemRef(x.lock.item))} · ${dur(x.lock.held_min)} · <span class="pill st-${hs}">${ht}</span>`;
-    } else $("x-holder").textContent = x.named ? "— (rod withdrawn)" : "nothing in CONFIG.md names one";
-    $("x-guards").textContent = c.exclusive ? `${c.exclusive}${c.verify_exclusive ? " · check: " + c.verify_exclusive : ""}` : "— (exclusive unset: every slot verifies alone)";
+    } else $("x-holder").textContent = x.named ? "— (rod withdrawn)" : c.verify_environment ? "— (no rod: each slot has its own Environment)" : "nothing in CONFIG.md names one";
+    $("x-guards").textContent = c.exclusive
+      ? `${c.exclusive}${c.verify_exclusive ? " · check: " + c.verify_exclusive : ""}${c.verify_environment ? " · in an Environment: " + c.verify_environment : ""}`
+      : c.verify_environment ? `each slot's Environment, slot-<n> · check: ${c.verify_environment}` : "— (exclusive unset: every slot verifies alone)";
     $("x-tag").textContent = x.lock ? `since ${x.lock.since}` : "";
     const n = c.slots || 3, held = (S.locks || []).filter((l) => l.kind === "slot");
     $("g-slots").textContent = held.length; $("g-slots-of").textContent = `of ${n} held`;
