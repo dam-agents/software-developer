@@ -66,7 +66,7 @@ and the weekly audit counts them.
 
 ## The required check
 
-A change on `verify_exclusive_paths` goes to review only once
+A change on `verify_required_paths` goes to review only once
 `verify_environment` — else `verify_exclusive` — passed on its head. After every
 run of it, `run-state.sh checked <check> pass|fail|skipped [cause]` records the
 result on the item and in `TICK.log`; `park` and `finish pr-opened|pr-updated`

@@ -880,7 +880,7 @@ class RunState {
 
   /**
    * Whether the slot's branch, as pushed, may go to review: a change on
-   * `verify_exclusive_paths` needs the required check passed on HEAD.
+   * `verify_required_paths` needs the required check passed on HEAD.
    * "" when it may; else what is missing.
    */
   requiredMissing(item: string, slot: string): string {
@@ -894,7 +894,7 @@ class RunState {
     if (hit.length === 0) return "";
     const head = this.kit.git.line(dir, ["rev-parse", "--short=12", "HEAD"]);
     const rec = parseChecked(this.itemKey(item, "checked"));
-    const on = `the branch changes ${hit.slice(0, 3).join(", ")}${hit.length > 3 ? ` and ${hit.length - 3} more` : ""}, under verify_exclusive_paths`;
+    const on = `the branch changes ${hit.slice(0, 3).join(", ")}${hit.length > 3 ? ` and ${hit.length - 3} more` : ""}, under verify_required_paths`;
     if (
       !rec ||
       rec.check !== check ||

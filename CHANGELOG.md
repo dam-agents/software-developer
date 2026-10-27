@@ -15,7 +15,7 @@ direct session.
 request back.** `run-state.sh checked <check> pass|fail|skipped [cause]`
 records each `verify_exclusive` or `verify_environment` result on the item and
 in `TICK.log`, and says to post 🚨 to `slack_channel` when it did not pass —
-once a week per cause. With `verify_exclusive_paths` set, `park` and `finish
+once a week per cause. With `verify_required_paths` set, `park` and `finish
 pr-opened|pr-updated` refuse a change on those paths until the check passed on
 its head: the pull request goes back to draft and the run finishes `blocked`
 (`docs/babysit.md` → **The required check**). The weekly audit reads it all:
@@ -28,7 +28,7 @@ opens its Slack post with 🚨.
 
 **Upgrade:** operator only, in the direct session: where some changes must
 pass `verify_exclusive` or `verify_environment` before review, add
-`- verify_exclusive_paths: <paths>` to `work/CONFIG.md` (`dir/`, `*`, `**`),
+`- verify_required_paths: <paths>` to `work/CONFIG.md` (`dir/`, `*`, `**`),
 then `bash scripts/verify-onboarding.sh`. Without it nothing is held back, but
 every check that did not pass is still recorded, posted and audited.
 

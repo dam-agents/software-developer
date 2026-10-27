@@ -1001,12 +1001,12 @@ test("unknown verbs and outcomes are usage errors", () =>
     assert.equal((await as(s, "sess-a", "finish", "maybe")).rc, 2);
   }));
 
-test("a change on verify_exclusive_paths parks only once its check passed on its head, and a skip says what to post", () =>
+test("a change on verify_required_paths parks only once its check passed on its head, and a skip says what to post", () =>
   inSandbox(async (s) => {
     world(s);
     s.originCheckout();
     s.config(
-      "- exclusive: the local cluster\n- verify_exclusive: make e2e\n- verify_exclusive_paths: ui/\n- slack_channel: C0123ABCD",
+      "- exclusive: the local cluster\n- verify_exclusive: make e2e\n- verify_required_paths: ui/\n- slack_channel: C0123ABCD",
     );
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -1052,12 +1052,12 @@ test("a change on verify_exclusive_paths parks only once its check passed on its
     assert.match(r.err, /no verify_exclusive result is recorded on/);
   }));
 
-test("a change off verify_exclusive_paths parks without the check, and a cause seen this week is not posted again", () =>
+test("a change off verify_required_paths parks without the check, and a cause seen this week is not posted again", () =>
   inSandbox(async (s) => {
     world(s);
     s.originCheckout();
     s.config(
-      "- exclusive: the local cluster\n- verify_exclusive: make e2e\n- verify_exclusive_paths: ui/ deploy/**/*.yaml",
+      "- exclusive: the local cluster\n- verify_exclusive: make e2e\n- verify_required_paths: ui/ deploy/**/*.yaml",
     );
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];

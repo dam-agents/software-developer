@@ -1,4 +1,4 @@
-// The required check: a change on `verify_exclusive_paths` passes
+// The required check: a change on `verify_required_paths` passes
 // `verify_environment`, else `verify_exclusive`, on the commit it ships, before
 // a pull request goes to review. `run-state.sh checked` records each result on
 // the item and in TICK.log; park and finish read the record, and the weekly
@@ -21,7 +21,7 @@ export function parseChecked(v: string): Checked | undefined {
   return { check, result: result as Checked["result"], commit, cause: rest.join(" ") };
 }
 
-/** A `verify_exclusive_paths` entry as a test of a path: `dir/` a prefix, `*` within a segment, `**` across them, else the path or a directory of it. */
+/** A `verify_required_paths` entry as a test of a path: `dir/` a prefix, `*` within a segment, `**` across them, else the path or a directory of it. */
 export function pathMatcher(entries: readonly string[]): (path: string) => boolean {
   const res = entries.map((e) => {
     if (e.includes("*")) {

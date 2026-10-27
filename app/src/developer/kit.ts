@@ -123,7 +123,7 @@ export class Kit {
   get author(): string {
     return this.cfg.get("author");
   }
-  /** The check a change on `verify_exclusive_paths` must pass: in the slot's Environment when set, else on what `exclusive` names. */
+  /** The check a change on `verify_required_paths` must pass: in the slot's Environment when set, else on what `exclusive` names. */
   get requiredCheck(): string {
     return this.cfg.get("verify_environment")
       ? "verify_environment"
@@ -136,7 +136,7 @@ export class Kit {
     return this.git.defaultBranch(this.checkout);
   }
   get requiredPaths(): string[] {
-    return this.cfg.list("verify_exclusive_paths");
+    return this.cfg.list("verify_required_paths");
   }
 
   /** work/<name>: the checkout of `repo`. */

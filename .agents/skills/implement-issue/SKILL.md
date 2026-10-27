@@ -105,7 +105,7 @@ $RS checked verify_exclusive pass|fail|skipped [cause]
 $RS unlock
 ```
 
-**The change touches `verify_exclusive_paths`:** the check is not optional, and
+**The change touches `verify_required_paths`:** the check is not optional, and
 "small", "covered by unit tests" or "CI runs it" is not a reason to skip it.
 Whatever it records, a `checked` that did not pass prints a `notify:` line:
 post it at once ([`docs/notify.md`](../../../docs/notify.md)); `park` and

@@ -101,7 +101,7 @@ confirming or correcting rather than composing from nothing.
   ([`docs/environments.md`](docs/environments.md)). Then ask which changes
   must pass that check before review, whatever else covers them — the web UI,
   the install, the end-to-end suite — and record those paths as
-  `verify_exclusive_paths`: `dir/` for a tree, `*` and `**` for patterns.
+  `verify_required_paths`: `dir/` for a tree, `*` and `**` for patterns.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here. Also record
@@ -184,7 +184,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - exclusive: the local cluster — anything that installs onto it or runs against it
 - verify_exclusive: <its end-to-end command, setup included>
 - verify_environment: <its end-to-end command against {environment}, setup included>
-- verify_exclusive_paths: <paths a change on which needs that check, e.g. ui/ deploy/**>
+- verify_required_paths: <paths a change on which needs that check, e.g. ui/ deploy/**>
 - schedules: tick audit
 - slots: 3
 - babysit_max_hours: 4
@@ -205,7 +205,7 @@ merge (by default you may not).
 Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `label_review` and `schedules`. With nothing shared, leave `exclusive` and
 `verify_exclusive` out; with no check in an Environment, `verify_environment`; with
-neither, or no path that needs one, `verify_exclusive_paths`; with no
+neither, or no path that needs one, `verify_required_paths`; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel` and `slack_handoff`;
 for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
