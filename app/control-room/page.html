@@ -820,6 +820,18 @@ body:not(.details) .det { display: none !important; }
     aside:   { x: 12,  y: 642, label: "SET ASIDE · SIDE LOOPS" },
   };
   const ZORD = { feed: 0, reactor: 1, outflow: 2, done: 3 };
+  // the plant below the hall's top, moved down by dy: every station but the feed, the turbine and the outflow tanks
+  const ABOVE = new Set(["queued", "verifying", "in-review", "awaiting-merge"]);
+  const shiftLayout = (dy) => Object.fromEntries(Object.entries(LAYOUT).map(([k, b]) =>
+    [k, k === "working" ? { ...b, h: b.h + dy } : ABOVE.has(k) ? b : { ...b, y: b.y + dy }]));
+  // a route's points below y 200 move with what they join; the hall's own top edge stays
+  const shiftRoutes = (dy) => Object.fromEntries(Object.entries(ROUTES).map(([k, r]) => {
+    const [from, to] = k.split(">"), fixed = ABOVE.has(from) && ABOVE.has(to);
+    const pts = fixed ? r.pts : r.pts.map(([x, y]) => [x, y > 200 && !(k === "queued>working") ? y + dy : y]);
+    return [k, { ...r, pts }];
+  }));
+  const shiftZones = (dy) => Object.fromEntries(Object.entries(ZONES).map(([k, z]) => [k, k === "aside" || k === "done" ? { ...z, y: z.y + dy } : z]));
+
   const TOKCLS = { queued: "q", working: "w", verifying: "v", "waiting-lock": "i", "held-back": "x", "in-review": "r", "awaiting-merge": "a", merged: "m", "needs-info": "i", blocked: "x", abandoned: "o" };
   const ZONECLS = { feed: "q", reactor: "w", outflow: "r", done: "m", aside: "o" };
   const LAMPCLS = { q: "info", w: "adv", v: "hot", i: "info", r: "park", a: "ok", m: "ok", x: "alarm", o: "adv", u: "info" };
@@ -904,11 +916,16 @@ body:not(.details) .det { display: none !important; }
   }
 
   // reactor cells: 170 wide at scale 1, 180 with the gap
+  // reactors in rows of up to three, so each keeps its size: a fourth slot starts a second row.
+  // Each row has its own feed header under it (fy) and returns to the outflow header at y 108.
+  const PER_ROW = 3, ROW_H = 246;
   function reactorGeom(hall, n) {
-    const pad = 8, cw = (hall.w - 2 * pad) / Math.max(1, n), s = Math.min(1, cw / 180), T = hall.y + 18;
+    const pad = 8, rows = Math.max(1, Math.ceil(n / PER_ROW)), per = Math.min(n, PER_ROW) || 1;
+    const cw = (hall.w - 2 * pad) / per, s = Math.min(1, cw / 180);
     return Array.from({ length: n }, (_, i) => {
-      const x0 = hall.x + pad + i * cw + (cw - 170 * s) / 2;
-      return { x0, s, T, cx: x0 + 51 * s, rx: x0 + 78 * s, gx: (lx) => x0 + lx * s, gy: (ly) => T + ly * s };
+      const row = Math.floor(i / PER_ROW), col = i % PER_ROW, T = hall.y + 18 + row * ROW_H;
+      const x0 = hall.x + pad + col * cw + (cw - 170 * s) / 2;
+      return { x0, s, T, row, cx: x0 + 51 * s, rx: x0 + 78 * s, gx: (lx) => x0 + lx * s, gy: (ly) => T + ly * s };
     });
   }
 
@@ -1055,15 +1072,18 @@ body:not(.details) .det { display: none !important; }
     // stations: their layout, or a fallback place so nothing disappears
     let fb = 0;
     const box = {};
+    // a second row of reactors makes the hall taller: what stands below its top moves down by as much
+    const extra = (Math.ceil(n / PER_ROW) - 1) * ROW_H;
+    const lay = extra ? shiftLayout(extra) : LAYOUT, routes = extra ? shiftRoutes(extra) : ROUTES, zones = extra ? shiftZones(extra) : ZONES;
     M.states.forEach((st) => {
-      if (LAYOUT[st.id]) box[st.id] = LAYOUT[st.id];
-      else { box[st.id] = { kind: "box", x: 24 + (fb % 7) * 164, y: 672 + Math.floor(fb / 7) * 84, w: 150, h: 72, fallback: true }; fb++; }
+      if (lay[st.id]) box[st.id] = lay[st.id];
+      else { box[st.id] = { kind: "box", x: 24 + (fb % 7) * 164, y: 672 + extra + Math.floor(fb / 7) * 84, w: 150, h: 72, fallback: true }; fb++; }
     });
-    const unY = 672 + Math.ceil(fb / 7) * 84;
+    const unY = 672 + extra + Math.ceil(fb / 7) * 84;
     const H = Math.max(650, ...Object.values(box).map((b) => b.y + b.h + 12), M.unmapped.length ? unY + 70 : 0);
     svg.setAttribute("viewBox", `0 0 ${VBW} ${H}`);
     const hallSt = M.states.find((s) => box[s.id].kind === "hall");
-    const hall = hallSt ? box[hallSt.id] : LAYOUT.working;
+    const hall = hallSt ? box[hallSt.id] : lay.working;
     const G = reactorGeom(hall, n);
     const inReactor = new Map();
     slots.forEach((s) => { if (s.lock) inReactor.set(String(s.lock.item), s.k); });
@@ -1093,13 +1113,13 @@ body:not(.details) .det { display: none !important; }
     let o = `<defs><radialGradient id="cher" cx="50%" cy="55%" r="55%"><stop offset="0" class="cher0"/><stop offset="1" class="cher1"/></radialGradient></defs>`;
     // zone captions
     [...new Set(M.states.map((s) => s.zone))].forEach((z) => {
-      const Z = ZONES[z]; if (!Z) return;
+      const Z = zones[z]; if (!Z) return;
       const lbl = z === "reactor" ? `${Z.label} · ${slotsN()} SLOT${slotsN() === 1 ? "" : "S"}` : Z.label;
       o += `<text class="z-cap" x="${Z.x}" y="${Z.y}">${esc(lbl)}</text>`;
     });
-    if (ZONES.outflow && M.states.some((s) => s.zone === "outflow")) {
+    if (zones.outflow && M.states.some((s) => s.zone === "outflow")) {
       const P = S.prs || [];
-      o += `<text class="pl-h" x="${ZONES.outflow.x}" y="${ZONES.outflow.y + 15}">${esc(F(`${P.length} open PRs · ${P.filter((p) => p.decision === "APPROVED").length} approved · ${P.filter((p) => p.checks === "failed").length} red · ${P.filter((p) => p.decision === "CHANGES_REQUESTED").length} changes asked`, 320, "h"))}</text>`;
+      o += `<text class="pl-h" x="${zones.outflow.x}" y="${zones.outflow.y + 15}">${esc(F(`${P.length} open PRs · ${P.filter((p) => p.decision === "APPROVED").length} approved · ${P.filter((p) => p.checks === "failed").length} red · ${P.filter((p) => p.decision === "CHANGES_REQUESTED").length} changes asked`, 320, "h"))}</text>`;
     }
 
     // the key: what the token colours mean
@@ -1117,14 +1137,27 @@ body:not(.details) .det { display: none !important; }
     o += `<rect class="hall" x="${hall.x}" y="${hall.y}" width="${hall.w}" height="${hall.h}" rx="8"/>`;
     const anyPower = slots.some((s) => power(s.lock) > 0);
     if (G.length) {
-      const hy = G[0].gy(198), last = G[G.length - 1];
-      const inD = `M${hall.x},316 L${hall.x + 6},316 L${hall.x + 6},${hy.toFixed(1)} L${last.cx.toFixed(1)},${hy.toFixed(1)}`;
-      o += `<path class="pipe-wall" d="${inD}"/><path class="pipe-core" d="${inD}"/>${anyPower ? `<path class="pipe-flow slow" d="${inD}"/>` : ""}`;
+      // a feed header under each row, fed from the inlet at y 316 by a riser along the hall's left wall
+      const rows = [...new Set(G.map((g) => g.row))];
+      const hyOf = (r) => G.find((g) => g.row === r).gy(198);
+      const lastOf = (r) => G.filter((g) => g.row === r).at(-1);
+      const top = Math.min(316, ...rows.map(hyOf)), bot = Math.max(316, ...rows.map(hyOf));
+      const riser = `M${hall.x},316 L${hall.x + 6},316 M${hall.x + 6},${top.toFixed(1)} L${hall.x + 6},${bot.toFixed(1)}`;
+      o += `<path class="pipe-wall" d="${riser}"/><path class="pipe-core" d="${riser}"/>${anyPower ? `<path class="pipe-flow slow" d="${riser}"/>` : ""}`;
+      rows.forEach((r) => {
+        const inD = `M${hall.x + 6},${hyOf(r).toFixed(1)} L${lastOf(r).cx.toFixed(1)},${hyOf(r).toFixed(1)}`;
+        o += `<path class="pipe-wall" d="${inD}"/><path class="pipe-core" d="${inD}"/>${anyPower ? `<path class="pipe-flow slow" d="${inD}"/>` : ""}`;
+      });
       const outD = `M${G[0].rx.toFixed(1)},108 L${hall.x + hall.w},108`;
       o += `<path class="pipe-wall" d="${outD}"/><path class="pipe-core" d="${outD}"/>${anyPower ? `<path class="pipe-flow slow" d="${outD}"/>` : ""}`;
       G.forEach((g, i) => {
         const s = slots[i] || { k: i + 1, exists: false }, live = power(s.lock) > 0, dash = s.exists ? "" : ' stroke-dasharray="4 3"';
-        const dn = `M${g.cx.toFixed(1)},${hy.toFixed(1)} L${g.cx.toFixed(1)},${g.gy(180).toFixed(1)}`, up = `M${g.rx.toFixed(1)},${g.gy(32).toFixed(1)} L${g.rx.toFixed(1)},108`;
+        const hy = hyOf(g.row);
+        // a second row's outflow climbs past the row above, beside its reactors
+        const ux = g.row === 0 ? g.rx : g.x0 + 168 * g.s;
+        const dn = `M${g.cx.toFixed(1)},${hy.toFixed(1)} L${g.cx.toFixed(1)},${g.gy(180).toFixed(1)}`,
+          up = g.row === 0 ? `M${g.rx.toFixed(1)},${g.gy(32).toFixed(1)} L${g.rx.toFixed(1)},108`
+            : `M${g.rx.toFixed(1)},${g.gy(32).toFixed(1)} L${g.rx.toFixed(1)},${g.gy(20).toFixed(1)} L${ux.toFixed(1)},${g.gy(20).toFixed(1)} L${ux.toFixed(1)},108`;
         o += `<path class="pipe-wall" d="${dn}"${dash}/><path class="pipe-core" d="${dn}"/><path class="pipe-wall" d="${up}"${dash}/><path class="pipe-core" d="${up}"/>`;
         if (live) o += `<path class="pipe-flow" d="${dn}"/><path class="pipe-flow" d="${up}"/>`;
       });
@@ -1132,7 +1165,7 @@ body:not(.details) .det { display: none !important; }
 
     // pipes: one per edge of the machine
     const center = (b) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
-    const BUS = 656;
+    const BUS = 656 + extra;
     const autoRoute = (a, b) => {
       const ca = center(a), cb = center(b);
       if (a.fallback || b.fallback) {
@@ -1154,8 +1187,8 @@ body:not(.details) .det { display: none !important; }
     M.edges.forEach((e) => {
       const key = `${e.from}>${e.to}`;
       used[key] = (used[key] || 0) + 1;
-      const placed = box[e.from] === LAYOUT[e.from] && box[e.to] === LAYOUT[e.to];
-      const hint = used[key] === 1 && placed ? ROUTES[key] || null : null;
+      const placed = box[e.from] === lay[e.from] && box[e.to] === lay[e.to];
+      const hint = used[key] === 1 && placed ? routes[key] || null : null;
       let pts = hint ? hint.pts : autoRoute(box[e.from], box[e.to]);
       if (!hint && used[key] > 1) pts = pts.map(([x, y]) => [x + 12 * (used[key] - 1), y + 12 * (used[key] - 1)]);
       pts = pts.filter((p, i) => i === 0 || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]);
@@ -1212,7 +1245,8 @@ body:not(.details) .det { display: none !important; }
         if (!q.length) row = `<text class="pl-h" x="${b.x + b.w / 2}" y="${py + 3}" text-anchor="middle">empty</text>`;
         toks += active(st) ? `<g class="drift">${row}</g>` : row;
       } else if (b.kind === "hall") {
-        const px = b.x + 10, py = b.y + b.h - 52, inR = cnt - items.length;
+        const rowsN = Math.ceil(slotsN() / PER_ROW);
+        const px = b.x + 10, py = rowsN > 1 ? b.y + b.h - 16 : b.y + b.h - 52, inR = cnt - items.length;
         o += plate(st, px, py, 150);
         o += `<text class="pl-h" x="${px}" y="${py + 26}">${esc(F(`${inR} in a reactor${items.length ? ` · ${items.length} without a slot →` : ""}`, 180, "h"))}</text>`;
         toks += rowTokens(items, { x: px + 190, y: py - 13, w: b.x + b.w - 10 - (px + 190), h: 46 }, cls,
@@ -1231,7 +1265,12 @@ body:not(.details) .det { display: none !important; }
         // the control rod: a rail over the reactors and one carriage, coupled to the reactor that holds the exclusive lock
         const ry = 50, rx0 = hall.x + 6, rx1 = b.x - 10;
         o += `<line class="rail ${named ? "" : "none"}" x1="${rx0}" y1="${ry}" x2="${rx1}" y2="${ry}"/>`;
-        G.forEach((g, i) => { if (g.cx > rx1 - 14) return; o += `<line class="dial-t" x1="${g.cx.toFixed(1)}" y1="${ry - 6}" x2="${g.cx.toFixed(1)}" y2="${ry + 6}"/><text class="rail-t" x="${g.cx.toFixed(1)}" y="${ry - 10}" text-anchor="middle">R${i + 1}</text>`; });
+        // one tick per column of reactors, named for every reactor in it (R1·R4 with a second row)
+        G.forEach((g, i) => {
+          if (g.row !== 0 || g.cx > rx1 - 14) return;
+          const col = G.map((h, j) => (h.cx === g.cx ? `R${j + 1}` : "")).filter(Boolean).join("·");
+          o += `<line class="dial-t" x1="${g.cx.toFixed(1)}" y1="${ry - 6}" x2="${g.cx.toFixed(1)}" y2="${ry + 6}"/><text class="rail-t" x="${g.cx.toFixed(1)}" y="${ry - 10}" text-anchor="middle">${col}</text>`;
+        });
         const shut = (c.slots_closed || []).length;
         const railMsg = `CONTROL RODS · ${slotsN() - shut} open · ${shut} closed${named ? " · EXCLUSIVE: " + c.exclusive : c.verify_environment ? " · each issue verifies in its own Environment" : ""}`;
         const railCap = `<text class="rail-t halo" x="${rx0}" y="${ry + 18}"><title>${esc(railMsg)}</title>${esc(F(railMsg, rx1 - rx0, "rail"))}</text>`;
@@ -1287,7 +1326,7 @@ body:not(.details) .det { display: none !important; }
       const it = st ? st.items.find((x) => x.key === String(s.lock.item)) : null;
       o += reactorSVG(s, g, it, st);
     });
-    o += rod + generatorSVG(slots, 820, 474, 368, 160);
+    o += rod + generatorSVG(slots, 820, 474 + extra, 368, 160);
     // flight items whose stage no state lists: shown, never dropped
     if (M.unmapped.length) {
       o += `<rect class="st-box ghost" x="24" y="${unY}" width="560" height="60" rx="5"/><text class="pl-l" x="32" y="${unY + 15}">STAGE NOT IN THE MACHINE · ${M.unmapped.length}</text>` +

@@ -28,7 +28,7 @@ click asks the agent to open or close it. The plant also draws the gate as a
 **Held back** station, each token's check result (a green tick, or a blinking red
 ring), its issue's Environment as a small vessel, and a **Spent fuel** pool for
 Environments left behind; the Verifying pipe flows without the lock when
-`verify_environment` is set.
+`verify_environment` is set. Reactors stand in rows of three, so a fourth slot starts a second row at full size and the plant grows to fit.
 
 **Upgrade:** restart the control room — `rc-service --user control-room restart`.
 Optional, operator only: to add slots slowly, raise `slots` and name the new
