@@ -306,10 +306,13 @@ export class ControlRoom {
         ? undefined
         : envs.filter((e) => /^issue-[0-9]+$/.test(e.name)).map((e) => ({ ...e, item: e.name.slice("issue-".length) }));
     const n = kit.slotCount;
+    const closed = kit.closedSlots;
     const slots = Array.from({ length: n }, (_, i) => {
       const k = String(i + 1);
       return {
         k: i + 1,
+        // a closed slot (slots_closed) finishes what it holds and takes no new item: its control rod is in
+        closed: closed.has(k),
         ...gitSlot(kit, join(kit.slots, k)),
         lock: locks.find((l) => l.name === `slot-${k}`) ?? null,
         ...(perSlot ? { environment: envOf(k) } : {}),
@@ -423,6 +426,10 @@ export class ControlRoom {
         else if (lk?.parked_at)
           stage = ps.length > 0 && ps.every((p) => p.decision === "APPROVED") ? "awaiting-merge" : "in-review";
         else if (lk) stage = "item-lock";
+        // the required check's gate held it back (run-state.sh checked, then finish blocked): its own
+        // station, though its pull request is open — a draft waiting for the check, not for review
+        else if (state === "blocked" && (parseChecked(it.get("checked") ?? "")?.result ?? "pass") !== "pass")
+          stage = "held-back";
         else if (ps.length > 0) stage = ps.every((p) => p.decision === "APPROVED") ? "awaiting-merge" : "in-review";
         else if (["waiting-lock", "needs-info", "blocked"].includes(state)) stage = state;
         else stage = "orphan";
@@ -579,6 +586,7 @@ export class ControlRoom {
         verify_required_paths: kit.cfg.get("verify_required_paths"),
         schedules: kit.cfg.get("schedules"),
         slots: n,
+        slots_closed: [...closed].map(Number),
         babysit_max_hours: kit.babysitMaxHours,
         stuck_after_min: kit.stuckMin,
         version: readText(join(kit.home, "VERSION")).trim(),

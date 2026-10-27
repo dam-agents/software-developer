@@ -99,6 +99,16 @@ export class Kit {
   get slotCount(): number {
     return this.cfg.int("slots", 3, 1);
   }
+  /** The slots `slots_closed` names, within 1..slots: each finishes what it holds and takes no new item. */
+  get closedSlots(): Set<string> {
+    const n = this.slotCount;
+    return new Set(this.cfg.list("slots_closed").filter((k) => /^[0-9]+$/.test(k) && Number(k) >= 1 && Number(k) <= n));
+  }
+  /** The open slots, 1..slots less the closed ones, as numbers in order. */
+  get openSlots(): string[] {
+    const closed = this.closedSlots;
+    return Array.from({ length: this.slotCount }, (_, i) => String(i + 1)).filter((k) => !closed.has(k));
+  }
   get stuckMin(): number {
     return this.cfg.int("stuck_after_min", 120);
   }

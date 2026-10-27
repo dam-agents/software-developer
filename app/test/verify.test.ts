@@ -264,3 +264,15 @@ test("a bad flag is a usage error", () =>
     assert.equal((await v(s, "--bogus")).rc, 2);
     writeFileSync(join(s.work, "x"), "");
   }));
+
+test("slots_closed names slots that exist, and leaves one open", () =>
+  inSandbox(async (s) => {
+    s.config("- slots: 5\n- slots_closed: 4 5");
+    assert.equal((await v(s, "--config")).rc, 0, "two of five closed");
+    s.setConfig("slots_closed", "6");
+    let r = await v(s, "--config");
+    assert.match(r.out, /FAIL config\.slots_closed — 6: no such slot of 5/);
+    s.setConfig("slots_closed", "1 2 3 4 5");
+    r = await v(s, "--config");
+    assert.match(r.out, /FAIL config\.slots_closed — every slot is closed/);
+  }));

@@ -187,6 +187,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - verify_required_paths: <paths a change on which needs that check, e.g. ui/ deploy/**>
 - schedules: tick audit
 - slots: 3
+- slots_closed: <slot numbers that take no new work yet, e.g. 4 5>
 - babysit_max_hours: 4
 - stuck_after_min: 120
 - work_repo: owner/name-work
@@ -207,7 +208,7 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `verify_exclusive` out; with no check in an Environment, `verify_environment`; with
 neither, or no path that needs one, `verify_required_paths`; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel` and `slack_handoff`;
-for the default grill skills, `skill_grill` and `skill_file_issue`; leave
+with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
 
 `slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the

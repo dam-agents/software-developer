@@ -36,6 +36,15 @@
    ]
   },
   {
+   "id": "held-back",
+   "label": "Held back",
+   "zone": "outflow",
+   "holds": "no locks",
+   "stages": [
+    "held-back"
+   ]
+  },
+  {
    "id": "in-review",
    "label": "In review",
    "zone": "outflow",
@@ -85,6 +94,18 @@
   }
  ],
  "edges": [
+  {
+   "from": "working",
+   "to": "held-back",
+   "by": "gate",
+   "who": "run-state.sh checked fail|skipped on verify_required_paths, then finish blocked"
+  },
+  {
+   "from": "held-back",
+   "to": "working",
+   "by": "start",
+   "who": "the check can run again"
+  },
   {
    "from": "queued",
    "to": "working",

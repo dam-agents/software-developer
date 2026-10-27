@@ -351,7 +351,9 @@ export const precheck: Command = async (deps, _args) => {
       notes.push(
         `A run working on ${abandoned.join(" ")} stopped without finishing (its session is not running any more); its branch and slot hold what it got to.`,
       );
-    if (kit.locks.ofKind("slot-").length >= kit.slotCount) return diagnostic(deps, kit);
+    // a free open slot, or no run starts: a closed one finishes what it holds and takes nothing new
+    const taken = new Set(kit.locks.ofKind("slot-").map((h) => h.name.slice("slot-".length)));
+    if (kit.openSlots.every((k) => taken.has(k))) return diagnostic(deps, kit);
     lockFree = kit.locks.read("exclusive") === undefined;
   }
   const held = new Set(kit.locks.ofKind("item-").map((h) => h.name.slice("item-".length)));
@@ -420,7 +422,7 @@ function diagnostic(deps: Deps, kit: Kit): number {
   o("DIAGNOSTIC RUN — do not build, do not start an item, do not take new work.");
   o("");
   o(
-    `Every one of the ${kit.slotCount} slots is held, and these runs have shown no sign of life for ${kit.cfg.get("stuck_after_min") || "120"} minutes or more:`,
+    `Every open slot (${kit.openSlots.length} of ${kit.slotCount}) is held, and these runs have shown no sign of life for ${kit.cfg.get("stuck_after_min") || "120"} minutes or more:`,
   );
   for (const q of quiet) o(`- ${q}`);
   o("");

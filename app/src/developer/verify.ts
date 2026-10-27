@@ -40,6 +40,7 @@ export const KNOWN = [
   "verify_environment",
   "verify_required_paths",
   "slots",
+  "slots_closed",
   "babysit_max_hours",
   "stuck_after_min",
   "work_repo",
@@ -151,6 +152,17 @@ function configChecks(kit: Kit, r: Report): void {
   whole("stuck_after_min", true, "a whole number of minutes", "write 120, or more");
   whole("babysit_max_hours", false, "a whole number of hours", "write 4, or leave it out");
   whole("slots", false, "a whole number of slots", "write 3, or leave it out");
+  const closed = cfg.list("slots_closed");
+  const most = cfg.int("slots", 3, 1);
+  const outside = closed.filter((k) => !/^[0-9]+$/.test(k) || Number(k) < 1 || Number(k) > most);
+  if (outside.length > 0)
+    r.fail(
+      "config.slots_closed",
+      `${outside.join(" ")}: no such slot of ${most} — read as open`,
+      `name slots 1 to ${most}, by spaces, or raise slots`,
+    );
+  else if (closed.length > 0 && new Set(closed).size >= most)
+    r.fail("config.slots_closed", "every slot is closed — no new work starts", "open one, or leave the key out");
   if (cfg.get("verify_exclusive") && !cfg.get("exclusive"))
     r.fail(
       "config.verify_exclusive",

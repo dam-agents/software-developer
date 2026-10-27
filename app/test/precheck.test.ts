@@ -511,3 +511,13 @@ test("no mode reads as interactive: nothing is watched", () =>
     assert.equal((await pc(s)).rc, 1);
     assert.deepEqual(s.github.calls, []);
   }));
+
+test("closed slots count as taken: every open one held declines, a free open one lets a run through", () =>
+  inSandbox(async (s) => {
+    s.config("- slots: 5\n- slots_closed: 4 5");
+    full(s);
+    gql(s, [], ISSUE7);
+    assert.equal((await pc(s)).rc, 1, "slots 4 and 5 are free but closed");
+    s.setConfig("slots_closed", "5");
+    assert.equal((await pc(s)).rc, 0, "slot 4 opened");
+  }));
