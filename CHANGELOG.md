@@ -9,6 +9,29 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.7.0 — 2026-10-27
+
+**A required check that did not pass is never silent, and holds the pull
+request back.** `run-state.sh checked <check> pass|fail|skipped [cause]`
+records each `verify_exclusive` or `verify_environment` result on the item and
+in `TICK.log`, and says to post 🚨 to `slack_channel` when it did not pass —
+once a week per cause. With `verify_required_paths` set, `park` and `finish
+pr-opened|pr-updated` refuse a change on those paths until the check passed on
+its head: the pull request goes back to draft and the run finishes `blocked`
+(`docs/babysit.md` → **The required check**). The weekly audit reads it all:
+`checks.required` red for every check that did not pass, `checks.repeated` for
+a cause in two or more runs, `checks.skipped` for every pull request of the
+week whose body says a check did not run, `main.scheduled` and `main.gates`
+for a default branch every slot inherits broken, and the audit runs the
+check on the default branch itself (`run-state.sh lock --main`). A red line
+opens its Slack post with 🚨.
+
+**Upgrade:** operator only, in the direct session: where some changes must
+pass `verify_exclusive` or `verify_environment` before review, add
+`- verify_required_paths: <paths>` to `work/CONFIG.md` (`dir/`, `*`, `**`),
+then `bash scripts/verify-onboarding.sh`. Without it nothing is held back, but
+every check that did not pass is still recorded, posted and audited.
+
 ## 6.6.0 — 2026-10-26
 
 **A check that needs its own cluster runs in an Environment of the slot's own,

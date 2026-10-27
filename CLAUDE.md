@@ -53,6 +53,9 @@ a line in any other shape is invisible, not wrong.
   request must pass; missing: none ([`docs/exclusive.md`](docs/exclusive.md)).
   `verify_environment` — one in the slot's own Environment, `{environment}` its
   name, with no lock; missing: none ([`docs/environments.md`](docs/environments.md)).
+  `verify_required_paths` — paths a change on which may not go to review until
+  that check passed on its head; missing: none ([`docs/babysit.md`](docs/babysit.md)
+  → **The required check**).
 - `schedules` — `tick`, `audit`, both, or `none`; missing: both — interactive, none.
 - `slots` — default 3: how many runs work at once, each in its own worktree.
   `babysit_max_hours` — default 4: how long a run may `wait` in its turn. `stuck_after_min` — default 120: every slot held and a
@@ -102,6 +105,10 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
 - **Before each long step:** `run-state.sh phase "<what>"`.
 - **What `exclusive` names** is one, shared by every slot: touch it only
   under `run-state.sh lock` ([`docs/exclusive.md`](docs/exclusive.md)).
+- **After each `verify_exclusive` or `verify_environment`:** `run-state.sh checked
+  <check> pass|fail|skipped [cause]`. A check that did not pass is never only a
+  line in a pull request body: `checked` says what to post, and park and finish
+  hold a change on `verify_required_paths` back from review until it passes.
 - **Waiting on a person** — a review, a merge: `park` it, with its waiter
   running ([`docs/babysit.md`](docs/babysit.md) → **Held, then parked**).
 - **Last, on every way out:** push everything, report on GitHub, then

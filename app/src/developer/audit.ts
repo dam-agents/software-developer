@@ -8,7 +8,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { splitRepo } from "../factory/config.ts";
-import type { Command } from "../factory/context.ts";
+import type { Command, Deps } from "../factory/context.ts";
 import { readText } from "../factory/kv.ts";
 import { iso, nowSeconds } from "../factory/time.ts";
 import { Kit } from "./kit.ts";
@@ -72,6 +72,7 @@ export const audit: Command = async (deps) => {
     if (by("fresh") > continued)
       o(`warn runs.resumed — most resumes lost their context: ${by("fresh")} of ${resumed.length} started fresh`);
   }
+  checkedLines(week, o);
   const diag = week.filter((l) => l.includes(" diagnostic ")).length;
   if (diag === 0) o("ok   runs.diagnostic — the sandbox never read stuck");
   else o(`warn runs.diagnostic — ${diag} diagnostic run(s): the sandbox read stuck`);
@@ -97,6 +98,8 @@ export const audit: Command = async (deps) => {
           : `warn prs.waiting — older than a week, not approved: ${stale.join(" ")}`,
       );
     }
+    await skippedInBodies(deps, kit, cutoff, o);
+    await mainHealth(deps, kit, o);
     // Work a run left claimed with no pull request: the precheck's own resume
     // list, read without a gate and without claiming.
     const lines: string[] = [];
@@ -156,6 +159,102 @@ export const audit: Command = async (deps) => {
   } else o("warn definition.version — not measured: could not fetch the definition");
   return 0;
 };
+
+/**
+ * The required checks the week recorded (run-state.sh checked): every one that
+ * did not pass is red, and a cause seen in two or more runs is red again, as
+ * one problem — the connection no single run can make.
+ */
+export function checkedLines(week: readonly string[], o: (s: string) => void): void {
+  const recs = week
+    .filter((l) => l.split(" ")[1] === "checked")
+    .map((l) => ({
+      check: /check=(\S+)/.exec(l)?.[1] ?? "",
+      result: /result=(\S+)/.exec(l)?.[1] ?? "",
+      issue: /issue=(\S+)/.exec(l)?.[1] ?? "-",
+      session: /session=(\S+)/.exec(l)?.[1] ?? "-",
+      cause: /cause="([^"]*)"/.exec(l)?.[1] ?? "",
+    }));
+  const bad = recs.filter((r) => r.result !== "pass");
+  if (recs.length === 0) o("ok   checks.required — no required check recorded this week");
+  else if (bad.length === 0) o(`ok   checks.required — ${recs.length} recorded, every one passed`);
+  for (const r of bad)
+    o(
+      `FAIL checks.required — ${r.check} ${r.result === "fail" ? "failed" : "did not run"} on ${r.issue === "main" ? "the default branch" : `#${r.issue}`}: ${r.cause || "no cause given"}`,
+    );
+  const byCause = new Map<string, Set<string>>();
+  for (const r of bad) {
+    const k = `${r.check}: ${r.cause}`;
+    byCause.set(k, (byCause.get(k) ?? new Set()).add(r.session));
+  }
+  for (const [k, sessions] of byCause)
+    if (sessions.size >= 2)
+      o(`FAIL checks.repeated — ${k} — in ${sessions.size} runs this week: one problem, not ${sessions.size}`);
+}
+
+/** What a pull request body says about a required check that did not run, in the words agents write it. */
+export const SKIPPED =
+  /\b(verify|verify_exclusive|verify_environment)\b[^.\n]{0,80}\b(did not run|not run|could not run|cannot run|skipped|failed)\b|\b(did not run|could not run|cannot run|skipped)\b[^.\n]{0,40}\b(verify|verify_exclusive|verify_environment)\b/i;
+
+/** The week's pull requests of yours whose body says a required check did not run: each is red, with the sentence that says so. */
+async function skippedInBodies(deps: Deps, kit: Kit, cutoff: string, o: (s: string) => void): Promise<void> {
+  const q = `repo:${kit.slug} is:pr author:${kit.author} created:>=${cutoff.slice(0, 10)}${kit.labelMine ? ` label:"${kit.labelMine}"` : ""}`;
+  const found = (await deps.github.get(kit.host, `search/issues?q=${encodeURIComponent(q)}&per_page=100`)) as
+    | { items?: { number: number; body?: string | null }[] }
+    | undefined;
+  if (found?.items === undefined) {
+    o("warn checks.skipped — not measured: could not list the week's pull requests");
+    return;
+  }
+  const hits = found.items.flatMap((it) => {
+    const line = (it.body ?? "").split("\n").find((l) => SKIPPED.test(l));
+    return line ? [{ n: it.number, line: line.replace(/^[-*\s]+/, "").slice(0, 160) }] : [];
+  });
+  if (hits.length === 0) o("ok   checks.skipped — no pull request of the week says a required check did not run");
+  for (const h of hits) o(`FAIL checks.skipped — #${h.n}: ${h.line}`);
+}
+
+/**
+ * Whether the default branch is healthy, which every slot inherits: a
+ * scheduled workflow red three runs running, or the rules that apply to it
+ * lacking review and required checks, or a ruleset that is not enforced.
+ */
+async function mainHealth(deps: Deps, kit: Kit, o: (s: string) => void): Promise<void> {
+  const gh = deps.github;
+  const runs = (await gh.get(kit.host, `repos/${kit.slug}/actions/runs?event=schedule&per_page=50`)) as
+    | { workflow_runs?: { name?: string; conclusion?: string | null }[] }
+    | undefined;
+  if (runs?.workflow_runs === undefined) o("warn main.scheduled — not measured: could not list scheduled runs");
+  else {
+    // newest first: the streak is how many runs came before the last success
+    const byName = new Map<string, string[]>();
+    for (const r of runs.workflow_runs)
+      if (r.name && r.conclusion) byName.set(r.name, [...(byName.get(r.name) ?? []), r.conclusion]);
+    const red = [...byName.entries()].flatMap(([name, cs]) => {
+      const ok = cs.indexOf("success");
+      const streak = ok < 0 ? cs.length : ok;
+      return streak >= 3 ? [{ name, streak }] : [];
+    });
+    if (red.length === 0) o("ok   main.scheduled — no scheduled workflow red three runs running");
+    for (const r of red) o(`warn main.scheduled — ${r.name}: red ${r.streak} runs running on the default branch`);
+  }
+  const rules = (await gh.get(kit.host, `repos/${kit.slug}/rules/branches/${kit.defaultBranch}`)) as
+    | { type?: string }[]
+    | undefined;
+  const sets = (await gh.get(kit.host, `repos/${kit.slug}/rulesets?includes_parents=true`)) as
+    | { name?: string; enforcement?: string }[]
+    | undefined;
+  if (!Array.isArray(rules) || !Array.isArray(sets)) {
+    o("warn main.gates — not measured: could not read the default branch's rules");
+    return;
+  }
+  const types = new Set(rules.map((r) => r.type ?? ""));
+  const lacking = ["pull_request", "required_status_checks"].filter((t) => !types.has(t));
+  const off = sets.filter((r) => r.enforcement && r.enforcement !== "active").map((r) => r.name ?? "?");
+  if (lacking.length === 0 && off.length === 0) o("ok   main.gates — the default branch requires review and checks");
+  if (lacking.length > 0) o(`warn main.gates — the default branch's rules lack ${lacking.join(", ")}`);
+  if (off.length > 0) o(`warn main.gates — ruleset(s) not enforced: ${off.join(", ")}`);
+}
 
 function countNfs(dir: string): number {
   let n = 0;

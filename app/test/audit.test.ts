@@ -128,3 +128,69 @@ test("the backup holds the current CONFIG.md", () =>
     s.github.on(/contents\/CONFIG\.md/, undefined);
     assert.match((await s.run(audit, [])).out, /warn backup\.config — not measured/);
   }));
+
+test("every required check that did not pass is red, a cause in two runs is one problem, and main's health is read", () =>
+  inSandbox(async (s) => {
+    s.onboarded();
+    origin(s, s.read("VERSION").trim());
+    live(s);
+    const a = (m: number) => s.clock.ago(m);
+    s.write(
+      "work/TICK.log",
+      [
+        `${a(3000)} checked session=a issue=3 slot=1 pr=4 minutes=0 check=verify_exclusive result=skipped commit=abc cause="image build: UnknownIssuer"`,
+        `${a(2000)} checked session=b issue=5 slot=2 pr=6 minutes=0 check=verify_exclusive result=skipped commit=def cause="image build: UnknownIssuer"`,
+        `${a(1000)} checked session=c issue=7 slot=1 pr=8 minutes=0 check=verify_exclusive result=pass commit=fed`,
+        "",
+      ].join("\n"),
+    );
+    s.github
+      .on(/^search\/issues/, { items: [] })
+      .on(/^search\/issues\?q=[^&]*created/, {
+        items: [
+          {
+            number: 4,
+            body: "## Testing\n\n- `verify_exclusive` (cluster e2e) did not run: unit tests cover it.\n\nFixes #3",
+          },
+          { number: 8, body: "## Testing\n\n- `verify_exclusive`: passed.\n\nFixes #7" },
+        ],
+      })
+      .on(/^repos\/acme\/widgets\/actions\/runs/, {
+        workflow_runs: [
+          { name: "nightly", conclusion: "failure" },
+          { name: "nightly", conclusion: "failure" },
+          { name: "nightly", conclusion: "failure" },
+          { name: "nightly", conclusion: "success" },
+          { name: "codeql", conclusion: "success" },
+        ],
+      })
+      .on(/^repos\/acme\/widgets\/rules\/branches\//, [{ type: "pull_request" }])
+      .on(/^repos\/acme\/widgets\/rulesets/, [{ name: "main-protection", enforcement: "disabled" }]);
+    const r = await s.run(audit, []);
+    assert.match(r.out, /FAIL checks\.required — verify_exclusive did not run on #3: image build: UnknownIssuer/);
+    assert.match(r.out, /FAIL checks\.required — verify_exclusive did not run on #5/);
+    assert.doesNotMatch(r.out, /checks\.required — .*#7/, "a pass is not red");
+    assert.match(r.out, /FAIL checks\.repeated — verify_exclusive: image build: UnknownIssuer — in 2 runs this week/);
+    assert.match(
+      r.out,
+      /FAIL checks\.skipped — #4: `verify_exclusive` \(cluster e2e\) did not run: unit tests cover it\./,
+    );
+    assert.doesNotMatch(r.out, /checks\.skipped — #8/);
+    assert.match(r.out, /warn main\.scheduled — nightly: red 3 runs running/);
+    assert.doesNotMatch(r.out, /main\.scheduled — codeql/);
+    assert.match(r.out, /warn main\.gates — the default branch's rules lack required_status_checks/);
+    assert.match(r.out, /warn main\.gates — ruleset\(s\) not enforced: main-protection/);
+  }));
+
+test("a week with nothing recorded is ok, and an unread week of pull requests is not measured", () =>
+  inSandbox(async (s) => {
+    s.onboarded();
+    origin(s, s.read("VERSION").trim());
+    live(s);
+    s.github.on(/^search\/issues/, { items: [] }).on(/^search\/issues\?q=[^&]*created/, undefined);
+    const r = await s.run(audit, []);
+    assert.match(r.out, /ok {3}checks\.required — no required check recorded this week/);
+    assert.match(r.out, /warn checks\.skipped — not measured/);
+    assert.match(r.out, /warn main\.scheduled — not measured/);
+    assert.match(r.out, /warn main\.gates — not measured/);
+  }));

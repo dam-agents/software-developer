@@ -13,7 +13,15 @@ Missing, or Slack not connected to this agent: post nothing, say nothing.
 | Pull request approved, green, mergeable | `park`, once per pull request | ✅ `<repo>#<pr>` is ready to merge — `<title>` |
 | A question for a person | `finish needs-info` | ❓ `<repo>#<n>` needs info — the question, in one line |
 | Cannot go on | `finish blocked` | 🛑 `<repo>#<n>` is blocked — what fails, in one line |
-| Weekly audit | the audit's report | the report's header and its **Action needed** lines |
+| A required check that did not pass | `checked … fail\|skipped`, once a week per cause | 🚨 `<repo>#<n>`: `<check>` failed / did not run — the cause, in one line |
+| Weekly audit | the audit's report | the report's header and its **Action needed** lines; a 🚨 first when it has a red line |
+
+## A required check that did not pass
+
+Posted the moment `checked` prints its `notify:` line, before the run goes
+on, top-level in `slack_channel` — not in the item's thread, so nobody misses
+it. Starts with 🚨, says which check, on what, the cause, and what would let it
+run. Without `slack_channel`, say it in the turn and on the pull request.
 
 Nothing else: no claims, pushes, review rounds, `nothing` ticks or a pull
 request closed without merging. Each post carries the link to the issue or pull

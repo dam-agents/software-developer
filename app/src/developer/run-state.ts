@@ -31,6 +31,10 @@
 //                             what is left first (1, on stderr): the Stop hook
 //   lock                      take the exclusive lock, or record waiting for it
 //   unlock                    give the exclusive lock back
+//   checked <check> <result> [cause]
+//                             the required check's result on the slot's HEAD:
+//                             pass, fail or skipped, the cause for the last two;
+//                             park and finish read it (app/src/developer/checks.ts)
 //   finish <outcome> [pr]...  the run's last act, on every way out: refused
 //                             until the work is pushed and reported on GitHub;
 //                             then backs work/ up, and with slack_channel set
@@ -51,6 +55,7 @@ import { BOOKING_GRACE_MIN, MESSAGE_GRACE_MIN, waiterAlive } from "../factory/lo
 import { ATTENDED } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
 import { persistTo } from "./backup.ts";
+import { parseChecked, RESULTS, requiredChanges } from "./checks.ts";
 import { GATE_KEYS, ITEM_KEYS, Kit, OUTCOMES, type Outcome, PARK_FOR_SECONDS, WRITER } from "./kit.ts";
 import {
   type Comment,
@@ -67,7 +72,7 @@ import { ours, reported, slackThread } from "./reports.ts";
 import { alsoDirs, prepare } from "./slots.ts";
 
 const USAGE =
-  "usage: run-state.sh start|also|phase|wait|park|booked|may-stop|lock|unlock|finish|sweep|held|live|quiet|diagnosed|show";
+  "usage: run-state.sh start|also|phase|wait|park|booked|may-stop|lock|unlock|checked|finish|sweep|held|live|quiet|diagnosed|show";
 
 class RunState {
   readonly kit: Kit;
@@ -555,6 +560,14 @@ class RunState {
           return 1;
         }
       }
+      const missing = this.requiredMissing(item, slot);
+      if (missing) {
+        this.say(`not ready for review: ${missing}.`);
+        this.say(
+          "Make the pull request a draft (gh pr ready <pr> --undo), say on it why, finish blocked — docs/babysit.md → The required check.",
+        );
+        return 1;
+      }
     }
     const since = this.locks.read(`item-${item}`)?.owner.since ?? "";
     const r = await reported(this.kit, item, "pr-updated", prs, since);
@@ -745,9 +758,22 @@ class RunState {
     return 1;
   }
 
-  async lock(): Promise<number> {
+  async lock(args: readonly string[] = []): Promise<number> {
     this.needSession();
     const item = this.myItem();
+    if (!item && args[0] === "--main") {
+      // the weekly audit's run of the required check on the default branch: no item, no slot, no waiting
+      await this.sweep(false);
+      if (this.locks.take("exclusive", { item: "main" })) {
+        this.out("lock: yours, for the default branch's check.");
+        return 0;
+      }
+      const o = this.locks.read("exclusive")?.owner;
+      this.say(
+        `the exclusive lock is held for #${o?.item ?? ""}, at "${o?.phase ?? ""}": the check on main is not measured this week.`,
+      );
+      return 1;
+    }
     if (!item) {
       this.say("this session holds no item — call start first");
       return 1;
@@ -779,6 +805,108 @@ class RunState {
     return 0;
   }
 
+  /**
+   * Records the required check's result on the slot's HEAD, on the item and in
+   * TICK.log: the gate park and finish read, and the audit's count of every
+   * check that did not pass.
+   */
+  checked(args: readonly string[]): number {
+    this.needSession();
+    const onMain =
+      !this.myItem() && this.locks.mine("exclusive") && this.locks.read("exclusive")?.owner.item === "main";
+    const item = onMain ? "main" : this.myItem();
+    const slot = onMain ? "" : this.mySlot();
+    if (!item || (!slot && !onMain)) {
+      this.say("this session holds no item and slot — call start first, or lock --main for the default branch");
+      return 1;
+    }
+    const [check = "", result = "", ...why] = args;
+    const cause = why.join(" ").replace(/\s+/g, " ").trim();
+    if (
+      !["verify", "verify_exclusive", "verify_environment"].includes(check) ||
+      !(RESULTS as readonly string[]).includes(result)
+    ) {
+      this.say("usage: checked verify|verify_exclusive|verify_environment pass|fail|skipped [cause]");
+      return 2;
+    }
+    if (result !== "pass" && !cause) {
+      this.say(`checked ${check} ${result} needs its cause, in a few words: the next run and the audit group by it`);
+      return 2;
+    }
+    const dir = onMain ? this.kit.checkout : join(this.kit.slots, slot);
+    const commit = this.kit.git.line(dir, ["rev-parse", "--short=12", "HEAD"]);
+    if (!commit) {
+      this.say(`could not read the HEAD of ${onMain ? "the checkout" : `slot ${slot}`}`);
+      return 1;
+    }
+    // said once a week per check and cause: a cause that keeps coming back is the audit's to connect
+    const cutoff = iso(new Date((nowSeconds(this.deps.clock) - 7 * 86400) * 1000));
+    const quoted = `cause="${cause.replaceAll('"', "'")}"`;
+    const seen = readText(this.kit.log)
+      .split("\n")
+      .some(
+        (l) =>
+          (l.split(" ")[0] ?? "") > cutoff &&
+          l.includes(" checked ") &&
+          l.includes(`check=${check} `) &&
+          l.includes(quoted),
+      );
+    if (!onMain)
+      this.writeItem(item, {
+        checked: `${check} ${result} ${commit}${cause ? ` ${cause}` : ""}`,
+        updated_at: this.now(),
+      });
+    this.logLine(
+      "checked",
+      this.kit.me,
+      item,
+      slot,
+      this.itemKey(item, "pr").split(/\s+/).filter(Boolean).join(","),
+      this.now(),
+      `check=${check} result=${result} commit=${commit}${cause ? ` ${quoted}` : ""}`,
+    );
+    if (result !== "pass" && seen)
+      this.say(
+        `${check} ${result === "fail" ? "failed" : "did not run"} for this cause before this week: link the issue that tracks it, post nothing new (docs/notify.md → A required check that did not pass)`,
+      );
+    else if (result !== "pass") {
+      const chat = this.kit.cfg.get("slack_channel");
+      this.say(
+        `notify: post 🚨 that ${check} ${result === "fail" ? "failed" : "did not run"} on ${onMain ? "the default branch" : `#${item}`} — ${cause}${chat ? ` — to slack_channel ${chat}` : ""} (docs/notify.md → A required check that did not pass)`,
+      );
+    }
+    return 0;
+  }
+
+  /**
+   * Whether the slot's branch, as pushed, may go to review: a change on
+   * `verify_required_paths` needs the required check passed on HEAD.
+   * "" when it may; else what is missing.
+   */
+  requiredMissing(item: string, slot: string): string {
+    const check = this.kit.requiredCheck;
+    const paths = this.kit.requiredPaths;
+    if (!slot || !check || paths.length === 0) return "";
+    const dir = join(this.kit.slots, slot);
+    const hit = requiredChanges(this.kit.git, dir, paths);
+    if (hit === undefined)
+      return `could not read what the branch changes, so whether it needs ${check} was not measured`;
+    if (hit.length === 0) return "";
+    const head = this.kit.git.line(dir, ["rev-parse", "--short=12", "HEAD"]);
+    const rec = parseChecked(this.itemKey(item, "checked"));
+    const on = `the branch changes ${hit.slice(0, 3).join(", ")}${hit.length > 3 ? ` and ${hit.length - 3} more` : ""}, under verify_required_paths`;
+    if (
+      !rec ||
+      rec.check !== check ||
+      !head.startsWith(rec.commit.slice(0, 7)) ||
+      !rec.commit.startsWith(head.slice(0, 7))
+    )
+      return `${on}, and no ${check} result is recorded on ${head}: run it, then run-state.sh checked ${check} <result> [cause]`;
+    if (rec.result !== "pass")
+      return `${on}, and ${check} ${rec.result === "fail" ? "failed" : "did not run"} on ${head}: ${rec.cause}`;
+    return "";
+  }
+
   async finish(args: readonly string[]): Promise<number> {
     const outcome = args[0] as Outcome | undefined;
     if (!outcome) {
@@ -807,6 +935,16 @@ class RunState {
       }
     }
     let report = "";
+    if (item && slot && (outcome === "pr-opened" || outcome === "pr-updated")) {
+      const missing = this.requiredMissing(item, slot);
+      if (missing) {
+        this.say(`not ready for review: ${missing}.`);
+        this.say(
+          "Make the pull request a draft (gh pr ready <pr> --undo), say on it why, finish blocked — docs/babysit.md → The required check.",
+        );
+        return 1;
+      }
+    }
     if (item) {
       if (!pr) pr = this.itemKey(item, "pr");
       // interactive, the operator holds the pull request: no later run would
@@ -1076,9 +1214,11 @@ export const runState: Command = async (deps, args) => {
     case "may-stop":
       return rs.mayStop();
     case "lock":
-      return rs.lock();
+      return rs.lock(rest);
     case "unlock":
       return rs.unlock();
+    case "checked":
+      return rs.checked(rest);
     case "finish":
       return rs.finish(rest);
     case "sweep":

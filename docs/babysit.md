@@ -64,6 +64,28 @@ and the pull request. `TICK.log` says which happened — `messaged`, then
 `resumed … cause=waiter|booking|operator`, or `cause=fresh prev=<session>` —
 and the weekly audit counts them.
 
+## The required check
+
+A change on `verify_required_paths` goes to review only once
+`verify_environment` — else `verify_exclusive` — passed on its head. After every
+run of it, `run-state.sh checked <check> pass|fail|skipped [cause]` records the
+result on the item and in `TICK.log`; `park` and `finish pr-opened|pr-updated`
+read it, and refuse while it is missing, failed or skipped, or on another
+commit.
+
+- **Refused:** the check cannot pass now — what it needs is broken in this
+  sandbox, or the default branch breaks it too. Make the pull request a draft
+  (`gh pr ready <pr> --undo`), say on it in one line which check, the cause,
+  and what would let it run; swap the claim for the failed label, and
+  `finish blocked`. A person decides what happens next.
+- **Off those paths**, a check that did not pass still never stays silent:
+  record it with `checked`, say it in the body, and post what `checked`
+  prints.
+- **The default branch breaks it**, not your change: run the check on a
+  fresh slot of the default branch to prove it, then file one issue for it in
+  `repo`, without the hand-off label — once: `checked` says when the cause
+  was seen this week already, and then the issue is linked instead.
+
 ## Each time you hold one
 
 Read its state — `gh pr view <n> --json reviewDecision,mergeable,statusCheckRollup,headRefOid`,
