@@ -14,7 +14,8 @@ direct session.
 **A long check is watched, not just awaited.** Its log is read every few
 minutes, a failed setup stops it at once and is fixed before any rerun, and in
 an issue's Environment a failure is hunted on the warm Environment with only
-the failing test; the whole check runs once more, last. Nothing to do.
+the failing test, through whatever the repository's tooling offers to install
+or run less; the whole check runs once more, last. Nothing to do.
 
 ## 6.9.0 — 2026-10-27
 
