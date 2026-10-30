@@ -18,6 +18,16 @@ something else is still shared ([exclusive.md](exclusive.md)).
 - **Run it** in the slot, in the background like `verify`: `$RS phase
   "verify_environment"`, then the command with `{environment}` replaced by the
   name, then `run-state.sh checked verify_environment <result> [cause]`.
+- **Set up once, then narrow.** Its setup — building and installing into the
+  Environment — is paid once per push, not per attempt: while you hunt a
+  failure, rerun only the failing test against the warm Environment, or
+  reproduce it by hand in it and read its logs with timestamps. The whole
+  command runs once more, last, on the final commit, and that run is the one
+  `checked` records. A setup that fails is fixed before anything reruns.
+  Where the repository's own tooling can do less — install only what changed,
+  skip an install that is already current, run one test or one file, rebuild
+  one component — use it, as its skills and task help say: never deploy the
+  same commit twice, and never rebuild what did not change.
 - **Linked from its pull request.** The body carries, on lines of their own,
   `Environment: <its first endpoint's address>` and
   `<!-- environment: issue-<n> -->`, so a reviewer opens the change and the

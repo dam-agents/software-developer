@@ -9,6 +9,14 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.9.1 — 2026-10-30
+
+**A long check is watched, not just awaited.** Its log is read every few
+minutes, a failed setup stops it at once and is fixed before any rerun, and in
+an issue's Environment a failure is hunted on the warm Environment with only
+the failing test, through whatever the repository's tooling offers to install
+or run less; the whole check runs once more, last. Nothing to do.
+
 ## 6.9.0 — 2026-10-27
 
 **The control room shows the required check and every issue's Environment.**

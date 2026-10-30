@@ -151,7 +151,9 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   the harness's own background task (Claude Code: `run_in_background`), then
   review the diff, draft the pull request body, read what comes next, and act on
   its result when it arrives. Never change what it is testing while it runs,
-  and hold any lock it needs until it returns.
+  and hold any lock it needs until it returns. **Watch it, do not just await
+  it:** read its log every few minutes; a failure in its setup stops it at
+  once, and its cause is fixed before it runs again — never the same run twice.
 - **Every pull request body carries two lines.** `Fixes #<n>`, on its own line
   (in another repository `Fixes <repo>#<n>`, or `Part of <repo>#<n>` when
   another of the issue's pull requests closes it):
