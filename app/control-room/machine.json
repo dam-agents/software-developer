@@ -21,14 +21,14 @@
    "id": "verifying",
    "label": "Verifying",
    "zone": "reactor",
-   "holds": "item · slot · exclusive",
+   "holds": "item · slot · lock or Env",
    "stages": [
     "verifying"
    ]
   },
   {
    "id": "waiting-lock",
-   "label": "Waiting for lock · Env",
+   "label": "Waiting · lock, Env",
    "zone": "reactor",
    "holds": "no locks",
    "stages": [
@@ -128,7 +128,7 @@
   {
    "from": "working",
    "to": "waiting-lock",
-   "by": "finish waiting-lock|waiting-env",
+   "by": "finish waiting-lock · waiting-env",
    "who": "run"
   },
   {

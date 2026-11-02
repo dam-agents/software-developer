@@ -51,6 +51,19 @@ test("a slot running its Environment check reads as verifying, with no exclusive
     assert.equal(snap.config.verify_environment, "make e2e ENV={environment}");
   }));
 
+test("the page reads how many Environments may be held, and the review label, from the config", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.config("- verify_environment: make e2e ENV={environment}");
+    let snap = (await room(s).snapshot(true)) as Snap;
+    assert.equal(snap.config.environments_max, 5, "the install's default");
+    assert.equal(snap.config.label_ui_review, "");
+    s.config("- verify_environment: make e2e ENV={environment}\n- environments_max: 8\n- label_ui_review: ui-review");
+    snap = (await room(s).snapshot(true)) as Snap;
+    assert.equal(snap.config.environments_max, 8);
+    assert.equal(snap.config.label_ui_review, "ui-review");
+  }));
+
 test("each slot shows the Environment of the issue it works on, which outlives the slot", () =>
   inSandbox(async (s) => {
     world(s);
