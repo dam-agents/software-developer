@@ -9,6 +9,20 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.12.0 — 2026-11-02
+
+**The plant draws the Environments as cooling towers.** One tower per
+Environment the agent may hold (`environments_max`): steam while awake, hot
+steam and the reactor's tag while a run checks in it, still while asleep,
+dashed when free; a click opens it. The status strip counts them — held of
+`environments_max`, awake and asleep — and the fan turns while any check runs,
+under the exclusive lock or in an Environment. Labels no longer overlap or
+overflow their stations, the plant's type is a little smaller, and every scroll
+box fills its panel.
+
+**Upgrade:** restart the control room — `rc-service --user control-room
+restart` — and republish its page.
+
 ## 6.11.0 — 2026-11-02
 
 **A pull request a person reviews in its Environment is announced in Slack.**

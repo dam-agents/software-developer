@@ -583,6 +583,8 @@ export class ControlRoom {
         exclusive: kit.cfg.get("exclusive"),
         verify_exclusive: kit.cfg.get("verify_exclusive"),
         verify_environment: kit.cfg.get("verify_environment"),
+        environments_max: kit.environmentsMax,
+        label_ui_review: kit.labelUiReview,
         verify_required_paths: kit.cfg.get("verify_required_paths"),
         schedules: kit.cfg.get("schedules"),
         slots: n,
