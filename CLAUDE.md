@@ -73,7 +73,8 @@ a line in any other shape is invisible, not wrong.
   [`docs/slack.md`](docs/slack.md)). `skill_grill`, `skill_file_issue` — the
   repository's skills for those; missing: `.agents/defaults/`. `slack_handoff`
   — who there may file or hand off an issue: `anyone` (agents too), `people`, or
-  `off`; missing: anyone.
+  `off`; missing: anyone. `slack_ui_review` — the chat told, once, of each
+  `label_ui_review` pull request out of draft; missing: none.
 - `repos_also` — `owner/name` or `owner/*`, by spaces or commas: the other
   repositories an issue of `repo` may need changed too, in any run
   ([`docs/runs.md`](docs/runs.md) → **Other repositories**). Missing: `repo` alone.

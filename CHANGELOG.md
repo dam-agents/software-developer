@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.11.0 — 2026-11-02
+
+**A pull request a person reviews in its Environment is announced in Slack.**
+With `slack_ui_review` naming a chat, `park` says to post 🎨 there, once per
+set of pull requests, for each one labelled `label_ui_review` and out of draft:
+its link, title and Environment (`docs/notify.md` → **A review in the
+Environment**). New key: `slack_ui_review` (missing: no such post). And a Slack
+request to change what or where you post is a definition pull request, never a
+refusal (`docs/slack.md` → **Routing**).
+
+**Upgrade:** with `label_ui_review` and Slack set, offer `slack_ui_review` — the
+chat whoever reviews in the Environment reads — and, on a yes, add
+`- slack_ui_review: <chat id>` to `work/CONFIG.md`; operator only, in the direct
+session. Then `bash scripts/verify-onboarding.sh --live`.
+
 ## 6.10.0 — 2026-11-02
 
 **At the Environment limit, an issue takes one back or waits, and says who can
