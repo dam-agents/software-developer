@@ -582,6 +582,7 @@ body:not(.details) .det { display: none !important; }
     "in-review": { lamp: "park", txt: "IN REVIEW" },
     "awaiting-merge": { lamp: "ok", txt: "AWAITING MERGE" },
     "waiting-lock": { lamp: "info", txt: "WAITING LOCK" },
+    "waiting-env": { lamp: "adv", txt: "WAITING ENV" },
     "needs-info": { lamp: "info", txt: "NEEDS INFO" },
     blocked:   { lamp: "alarm", txt: "BLOCKED" },
     "held-back": { lamp: "alarm", txt: "HELD BACK" },
@@ -671,6 +672,7 @@ body:not(.details) .det { display: none !important; }
       if (x.checked && x.checked.result !== "pass") return; // its check did not pass: in Needs you
       const changes = p.some((q) => q.decision === "CHANGES_REQUESTED"), red = p.some((q) => q.checks === "failed");
       const why = x.stage === "waiting-lock" ? "waiting for the exclusive lock"
+        : x.stage === "waiting-env" ? "waiting for an Environment: every one is held — review or merge what holds them"
         : red ? `checks failed on ${p.filter((q) => q.checks === "failed").map((q) => q.ref).join(" ")}: a run fixes it`
         : changes ? `changes requested on ${p.map((q) => q.ref).join(" ")}: the next round answers it`
         : p.length ? `in review: ${p.map((q) => q.ref).join(" ")}` : x.stage === "orphan" ? "claimed, no pull request and no run on it" : x.stage;
@@ -1578,7 +1580,7 @@ body:not(.details) .det { display: none !important; }
   function renderLog() {
     const L = S.log || [];
     $("l-tag").textContent = `last ${L.length} · newest first`;
-    const col = (o, r) => o === "checked" ? (r.result === "pass" ? "ok" : "alarm") : ({ released: "ok", "pr-opened": "info", "pr-updated": "info", abandoned: "alarm", blocked: "alarm", "needs-info": "adv", "waiting-lock": "adv", diagnostic: "adv" }[o] || "off");
+    const col = (o, r) => o === "checked" ? (r.result === "pass" ? "ok" : "alarm") : ({ released: "ok", "pr-opened": "info", "pr-updated": "info", abandoned: "alarm", blocked: "alarm", "needs-info": "adv", "waiting-lock": "adv", "waiting-env": "adv", diagnostic: "adv" }[o] || "off");
     const what = (r) => r.outcome === "checked" ? `${r.result === "pass" ? "" : "🚨 "}${r.check || "check"} ${r.result || ""}` : r.outcome;
     $("log").innerHTML = L.length ? L.map((r) => `<div><span class="dimmer">${esc(String(r.at || "").replace("T", " ").replace("Z", ""))}</span>
       <span><span class="pill st-${col(r.outcome, r)}" title="${esc(r.cause || "")}">${esc(what(r))}</span></span>

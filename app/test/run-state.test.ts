@@ -1092,3 +1092,86 @@ test("start passes a closed slot by, and a closed slot's own run keeps it", () =
     assert.equal(r.rc, 0, "a second start reuses its own slot");
     assert.match(r.out, /slot 2: /);
   }));
+
+const ENV = (name: string, createdAt = "2026-01-01T00:00:00Z") => ({
+  name,
+  state: "running",
+  expiresAt: "",
+  createdAt,
+  endpoints: [],
+});
+const OPEN = /^search\/issues\?q=[^&]*is%3Aopen/;
+const linked = (n: number, issue: number, extra: Record<string, unknown> = {}) => ({
+  number: n,
+  draft: false,
+  labels: [],
+  body: `Fixes #${issue}\nEnvironment: https://x\n<!-- environment: issue-${issue} -->`,
+  ...extra,
+});
+
+test("room: the issue's own is reused, and a free place makes one", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config("- verify_environment: make e2e ENV={environment}");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    s.runtime.envs = [ENV("issue-7")];
+    let r = await as(s, "sess-a", "room");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /issue-7 is there/);
+    s.runtime.envs = [ENV("issue-3")];
+    r = await as(s, "sess-a", "room");
+    assert.match(r.out, /1 of 5 held — create issue-7/);
+    assert.equal(s.github.count(/search\/issues/), 0, "no GitHub read under the limit");
+  }));
+
+test("room at the limit takes back the cheapest: unlinked, then an idle draft, then approved without UI review", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config("- verify_environment: make e2e ENV={environment}\n- environments_max: 3\n- label_ui_review: qa:design");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    s.runtime.envs = [ENV("issue-1", "2026-01-03T00:00:00Z"), ENV("issue-2", "2026-01-01T00:00:00Z"), ENV("issue-3")];
+    // 1: approved, UI review · 2: approved, none · 3: a draft no run holds
+    s.github.on(OPEN, {
+      items: [linked(11, 1, { labels: [{ name: "qa:design" }] }), linked(12, 2), linked(13, 3, { draft: true })],
+    });
+    s.github.prViews = [{ reviewDecision: "APPROVED" }];
+    let r = await as(s, "sess-a", "room");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /delete_environment issue-3 \(#13 is a draft no run is working on\), say so on #13/);
+    s.github.on(OPEN, {
+      items: [linked(11, 1, { labels: [{ name: "qa:design" }] }), linked(12, 2)],
+    });
+    r = await as(s, "sess-a", "room");
+    assert.match(r.out, /delete_environment issue-3 \(no open pull request links it\)/);
+    s.runtime.envs = [ENV("issue-1"), ENV("issue-2")];
+    s.setConfig("environments_max", "2");
+    r = await as(s, "sess-a", "room");
+    assert.match(r.out, /delete_environment issue-2 \(#12 is approved and needs no review in it\)/);
+  }));
+
+test("room with nothing to take back waits, and says once a day which pull requests a person can move", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config(
+      "- verify_environment: make e2e ENV={environment}\n- environments_max: 2\n- label_ui_review: qa:design\n- slack_channel: C0123ABCD",
+    );
+    s.lock("item-2", { session: "sess-b", item: "2", since: s.clock.ago(30), parked_at: s.clock.ago(20) });
+    await as(s, "sess-a", "start", "7", "feat/7");
+    s.runtime.envs = [ENV("issue-1"), ENV("issue-2")];
+    s.github.on(OPEN, { items: [linked(11, 1), linked(12, 2, { draft: true })] });
+    s.github.prViews = [{ reviewDecision: "REVIEW_REQUIRED" }];
+    let r = await as(s, "sess-a", "room");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /#11: review it/);
+    assert.match(r.err, /#12: a draft a run is working on/, "a parked run's draft is not taken");
+    assert.match(r.err, /notify: post 🧱 that #7 waits for an Environment.*slack_channel C0123ABCD/);
+    assert.equal(s.field("items/7.md", "state"), "waiting-env");
+    r = await as(s, "sess-a", "room");
+    assert.doesNotMatch(r.err, /notify:/, "the same wall, said once a day");
+    s.github.on(OPEN, { items: [linked(11, 1), linked(14, 2, { draft: true })] });
+    r = await as(s, "sess-a", "room");
+    assert.match(r.err, /notify:/, "what holds them changed");
+  }));

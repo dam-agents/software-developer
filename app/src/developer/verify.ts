@@ -34,11 +34,13 @@ export const KNOWN = [
   "label_review",
   "label_needs_info",
   "label_mine",
+  "label_ui_review",
   "verify",
   "exclusive",
   "verify_exclusive",
   "verify_environment",
   "verify_required_paths",
+  "environments_max",
   "slots",
   "slots_closed",
   "babysit_max_hours",
@@ -519,6 +521,7 @@ async function liveChecks(deps: Deps, kit: Kit, r: Report): Promise<void> {
         "label_review",
         "label_needs_info",
         "label_mine",
+        "label_ui_review",
       ]) {
         let l = cfg.get(k);
         if (k === "label_needs_info" && cfg.mode() !== "interactive") l ||= "agent/needs-info";

@@ -28,11 +28,12 @@
   },
   {
    "id": "waiting-lock",
-   "label": "Waiting for lock",
+   "label": "Waiting for lock · Env",
    "zone": "reactor",
    "holds": "no locks",
    "stages": [
-    "waiting-lock"
+    "waiting-lock",
+    "waiting-env"
    ]
   },
   {
@@ -127,14 +128,14 @@
   {
    "from": "working",
    "to": "waiting-lock",
-   "by": "finish waiting-lock",
+   "by": "finish waiting-lock|waiting-env",
    "who": "run"
   },
   {
    "from": "waiting-lock",
    "to": "working",
    "by": "start",
-   "who": "tick, once the lock is free"
+   "who": "tick, once the lock or an Environment is free"
   },
   {
    "from": "working",

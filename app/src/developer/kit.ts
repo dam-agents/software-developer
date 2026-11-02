@@ -33,7 +33,13 @@ export const ITEM_KEYS = [
   "updated_at",
 ] as const;
 
-export const GATE_KEYS = ["diagnosed_at", "diagnoses"] as const;
+export const GATE_KEYS = [
+  "diagnosed_at",
+  "diagnoses",
+  // the last "every Environment is held" post: when, and which pull requests it asked about
+  "env_full_at",
+  "env_full",
+] as const;
 
 /** The outcomes a run finishes with, and what each leaves on the item. */
 export const OUTCOMES = [
@@ -43,6 +49,7 @@ export const OUTCOMES = [
   "released",
   "blocked",
   "waiting-lock",
+  "waiting-env",
   "needs-info",
 ] as const;
 export type Outcome = (typeof OUTCOMES)[number];
@@ -129,6 +136,14 @@ export class Kit {
   }
   get labelMine(): string {
     return this.cfg.get("label_mine");
+  }
+  /** How many Environments the platform lets this agent hold: an install's setting it does not tell. */
+  get environmentsMax(): number {
+    return this.cfg.int("environments_max", 5, 1);
+  }
+  /** The label of a pull request a person reviews in its Environment: kept the longest. */
+  get labelUiReview(): string {
+    return this.cfg.get("label_ui_review");
   }
   get author(): string {
     return this.cfg.get("author");

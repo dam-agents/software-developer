@@ -23,6 +23,8 @@ export interface EnvironmentInfo {
   readonly name: string;
   readonly state: string;
   readonly expiresAt: string;
+  /** "" when the platform does not say. */
+  readonly createdAt?: string;
   readonly endpoints: readonly { readonly name: string; readonly url: string | null }[];
 }
 
@@ -177,6 +179,7 @@ export function environmentsOf(body: string): EnvironmentInfo[] | undefined {
           name: o.name,
           state: typeof o.state === "string" ? o.state : "",
           expiresAt: typeof o.expiresAt === "string" ? o.expiresAt : "",
+          createdAt: typeof o.createdAt === "string" ? o.createdAt : "",
           endpoints,
         },
       ];

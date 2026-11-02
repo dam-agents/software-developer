@@ -9,6 +9,25 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.10.0 — 2026-11-02
+
+**At the Environment limit, an issue takes one back or waits, and says who can
+free one.** Before an issue's first `verify_environment`, `run-state.sh room`
+says to reuse its Environment, make it, or delete one first, cheapest first:
+unlinked, a draft no run holds, approved and not labelled `label_ui_review`,
+approved and reviewed. None to take back: the item finishes `waiting-env`, the
+precheck wakes it once one is free, and with `slack_channel` set a 🧱 post
+names each pull request holding one, to review or merge, once a day per set
+(`docs/environments.md` → **At the limit**). New keys: `environments_max`
+(default 5, the install's limit) and `label_ui_review` (missing: every pull
+request is reviewed in its Environment).
+
+**Upgrade:** with `verify_environment` set, offer `label_ui_review` — the label
+that marks a pull request a person reviews in its Environment — and, on a
+yes, add `- label_ui_review: <label>` to `work/CONFIG.md`; operator only, in
+the direct session. With an install limit other than 5, add
+`- environments_max: <n>`. Then `bash scripts/verify-onboarding.sh --live`.
+
 ## 6.9.1 — 2026-10-30
 
 **A long check is watched, not just awaited.** Its log is read every few
