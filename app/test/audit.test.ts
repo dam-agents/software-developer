@@ -127,6 +127,12 @@ test("the backup holds the current CONFIG.md", () =>
     assert.match((await s.run(audit, [])).out, /warn backup\.config — acme\/widgets-work holds another CONFIG\.md/);
     s.github.on(/contents\/CONFIG\.md/, undefined);
     assert.match((await s.run(audit, [])).out, /warn backup\.config — not measured/);
+    s.github.on(/contents\/CONFIG\.md/, { content: Buffer.from(s.read("work/CONFIG.md")).toString("base64") });
+    s.config("- work_account: backup-bot");
+    assert.match((await s.run(audit, [])).out, /warn backup\.config — not measured/, "an account it does not hold");
+    s.github.accounts.add("backup-bot");
+    s.github.on(/contents\/CONFIG\.md/, { content: Buffer.from(s.read("work/CONFIG.md")).toString("base64") });
+    assert.match((await s.run(audit, [])).out, /ok {3}backup\.config/);
   }));
 
 test("every required check that did not pass is red, a cause in two runs is one problem, and main's health is read", () =>

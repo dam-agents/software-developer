@@ -41,7 +41,11 @@ confirming or correcting rather than composing from nothing.
   private repository `work/` is backed up to, suggesting `<owner>/<agent>-work`;
   the user creates it, and the connection needs write on its contents. "None"
   is an answer: there is no backup, and `work_repo` stays out. Otherwise write
-  `- work_repo: <owner/name>` to `work/CONFIG.md` and restore:
+  `- work_repo: <owner/name>` to `work/CONFIG.md`. With more than one GitHub
+  account in `gh auth status`, find the one that reaches it —
+  `GH_TOKEN="$(gh auth token --user <account>)" gh api repos/<owner/name> --jq .permissions.push`
+  for each — and, when it is not the active one, write it as
+  `- work_account: <account>`. Then restore:
 
   ```sh
   bash "$HOME/scripts/work-backup.sh" restore; echo "exit $?"
@@ -198,6 +202,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - babysit_max_hours: 4
 - stuck_after_min: 120
 - work_repo: owner/name-work
+- work_account: <the GitHub account that reaches work_repo, when not the active one>
 - slack_channel: C0123ABCD
 - slack_handoff: anyone
 - slack_ui_review: C0123ABCD
@@ -216,7 +221,7 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `verify_exclusive` out; with no check in an Environment, `verify_environment`; with
 neither, or no path that needs one, `verify_required_paths` and
 `label_ui_review`; with no
-review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel`, `slack_handoff` and `slack_ui_review`;
+review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff` and `slack_ui_review`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
 

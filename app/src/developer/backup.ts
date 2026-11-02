@@ -13,6 +13,10 @@
 // LICENSE belongs to the backup repository itself and stays. A carried file
 // that looks like it holds a credential stops the push.
 //
+// With `work_account` set, every git call acts as that GitHub account — the
+// one connection that reaches work_repo when it is not the one that reaches
+// repo; missing, as the active account.
+//
 // All git happens in a clone on tmpfs, never in work/: the home volume is
 // virtiofs over NFS, and a .git there corrupts under concurrent runs
 // (docs/persistence.md). The clone is scratch, re-seeded from the remote on
@@ -40,6 +44,7 @@ import { dirname, join } from "node:path";
 import { Config } from "../factory/config.ts";
 import type { Command, Deps } from "../factory/context.ts";
 import { Git } from "../factory/git.ts";
+import { accountEnv } from "../factory/github.ts";
 import { readText } from "../factory/kv.ts";
 import { iso, nowSeconds } from "../factory/time.ts";
 
@@ -68,12 +73,19 @@ interface Backup {
 function setup(deps: Deps, say: (s: string) => void): Backup | undefined {
   const env = deps.env;
   const work = join(env.HOME ?? "/home/agent", "work");
-  const workRepo = Config.load(work).get("work_repo");
+  const cfg = Config.load(work);
+  const workRepo = cfg.get("work_repo");
   if (!workRepo) {
     say("no work_repo in work/CONFIG.md — work/ is not backed up.");
     return undefined;
   }
   const ref = workRepo.split("/").length >= 3 ? workRepo : `github.com/${workRepo}`;
+  const account = cfg.get("work_account");
+  const gitEnv = account ? accountEnv(env, ref.split("/")[0] ?? "github.com", account) : env;
+  if (!gitEnv) {
+    say(`work_account '${account}' is no GitHub account this agent holds (gh auth status) — work/ is not backed up.`);
+    return undefined;
+  }
   const local = env.WORK_BACKUP_LOCAL || "/dev/shm/software-developer-work";
   return {
     deps,
@@ -83,7 +95,7 @@ function setup(deps: Deps, say: (s: string) => void): Backup | undefined {
     branch: env.WORK_BACKUP_BRANCH || "main",
     remote: env.WORK_BACKUP_REMOTE || `https://${ref}`,
     ref,
-    git: new Git(env),
+    git: new Git(gitEnv),
     say,
   };
 }

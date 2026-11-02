@@ -164,6 +164,13 @@ export class FakeGitHub implements GitHub {
     return run("git", ["clone", "-q", join(this.cloneRoot, `${slug}.git`), dir]).code === 0;
   }
 
+  /** The accounts `as` knows; any other is one the agent does not hold. */
+  accounts = new Set<string>();
+  as(_host: string, account: string): GitHub | undefined {
+    this.calls.push(`as ${account}`);
+    return this.accounts.has(account) ? this : undefined;
+  }
+
   count(re: RegExp): number {
     return this.calls.filter((c) => re.test(c)).length;
   }

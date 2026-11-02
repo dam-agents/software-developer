@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { Report } from "../factory/checks.ts";
 import { splitRepo } from "../factory/config.ts";
 import type { Command, Deps } from "../factory/context.ts";
+import type { GitHub } from "../factory/github.ts";
 import { bulletKeys, readText } from "../factory/kv.ts";
 import { hookInstalled } from "./harness.ts";
 import { GATE_KEYS, ITEM_KEYS, Kit } from "./kit.ts";
@@ -46,6 +47,7 @@ export const KNOWN = [
   "babysit_max_hours",
   "stuck_after_min",
   "work_repo",
+  "work_account",
   "slack_channel",
   "slack_handoff",
   "slack_ui_review",
@@ -442,12 +444,40 @@ export function kitSchedules(home: string): string[] {
   return [...text.slice(start).matchAll(/^ {2}- name: (\S+)/gm)].map((m) => m[1] ?? "");
 }
 
+/** Whether `work_repo` takes a push, as `work_account` when it is set: the account the backup pushes as. */
+async function workRepoPush(gh: GitHub, account: string, workRepo: string, r: Report): Promise<void> {
+  const w = splitRepo(workRepo);
+  const as = account ? gh.as(w.host, account) : gh;
+  if (!as) {
+    r.fail(
+      "live.work_repo",
+      `work_account '${account}' is no GitHub account this agent holds — every backup fails`,
+      "set `- work_account:` to an account `gh auth status` lists, or leave it out to push as the active one",
+    );
+    return;
+  }
+  const wpush = String(
+    ((await as.get(w.host, `repos/${w.slug}`)) as { permissions?: { push?: boolean } } | undefined)?.permissions
+      ?.push ?? "",
+  );
+  const who = account ? ` as ${account}` : "";
+  if (wpush === "true") r.ok("live.work_repo", `${workRepo} takes a push${who}`);
+  else
+    r.fail(
+      "live.work_repo",
+      `no push to ${workRepo}${who} (${wpush || "no answer"}) — every backup fails`,
+      account
+        ? "operator-only: grant that account write on its contents, or set `- work_account:` to the one that has it"
+        : "operator-only: create it private, and grant the connection write on its contents — or, when another of the agent's GitHub accounts has it, name that one as `- work_account:`",
+    );
+}
+
 async function liveChecks(deps: Deps, kit: Kit, r: Report): Promise<void> {
   const gh = deps.github;
   const cfg = kit.cfg;
   const { host, slug } = kit;
   const workRepo = cfg.get("work_repo");
-  const w = splitRepo(workRepo);
+  const workAccount = cfg.get("work_account");
   // A GitHub App installation token has no user to answer as, and reports no
   // permissions on a repository: its identity and its reach are not measured.
   const user = (await gh.get(host, "user")) as { login?: string } | undefined;
@@ -475,13 +505,16 @@ async function liveChecks(deps: Deps, kit: Kit, r: Report): Promise<void> {
       `set \`- author: ${loginName}\``,
     );
   if (slug) {
-    const want = workRepo ? 2 : 1;
+    // work_repo counts against this connection only when the backup pushes through it
+    const shared = workRepo !== "" && workAccount === "";
+    const want = shared ? 2 : 1;
     let reach = "";
     if (app) {
       r.warn(
         "live.push",
-        `not measured: a GitHub App reports no permissions — check it has write on contents, pull requests and issues of ${kit.repo}${workRepo ? `, and contents of ${workRepo}` : ""}`,
+        `not measured: a GitHub App reports no permissions — check it has write on contents, pull requests and issues of ${kit.repo}${shared ? `, and contents of ${workRepo}` : ""}`,
       );
+      if (workRepo && workAccount) await workRepoPush(gh, workAccount, workRepo, r);
       reach = app;
     } else {
       const push = String(
@@ -495,19 +528,7 @@ async function liveChecks(deps: Deps, kit: Kit, r: Report): Promise<void> {
           `no push to ${kit.repo} (${push || "no answer"})`,
           "operator-only: the connection needs write on contents, pull requests and issues",
         );
-      if (workRepo) {
-        const wpush = String(
-          ((await gh.get(w.host, `repos/${w.slug}`)) as { permissions?: { push?: boolean } } | undefined)?.permissions
-            ?.push ?? "",
-        );
-        if (wpush === "true") r.ok("live.work_repo", `${workRepo} takes a push`);
-        else
-          r.fail(
-            "live.work_repo",
-            `no push to ${workRepo} (${wpush || "no answer"}) — every backup fails`,
-            "operator-only: create it private, and grant the connection write on its contents",
-          );
-      }
+      if (workRepo) await workRepoPush(gh, workAccount, workRepo, r);
       const repos = await gh.get(host, "user/repos?per_page=100");
       reach = Array.isArray(repos)
         ? String(repos.filter((x) => (x as { permissions?: { push?: boolean } }).permissions?.push).length)
@@ -516,7 +537,7 @@ async function liveChecks(deps: Deps, kit: Kit, r: Report): Promise<void> {
           : "";
     }
     if (reach === String(want))
-      r.ok("live.scope", `the connection pushes to repo${want === 2 ? " and work_repo" : ""} alone`);
+      r.ok("live.scope", `the connection pushes to repo${shared ? " and work_repo" : ""} alone`);
     else if (!/^[0-9]+$/.test(reach))
       r.warn("live.scope", "could not count the repositories the connection can push to");
     else

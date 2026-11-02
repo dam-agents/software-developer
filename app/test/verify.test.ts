@@ -216,6 +216,27 @@ test("work_repo is checked when set", () =>
     assert.match((await v(s, "--config")).out, /FAIL config\.work_repo — is repo itself/);
   }));
 
+test("work_account: work_repo is checked as that account, and does not count against the connection's scope", () =>
+  inSandbox(async (s) => {
+    s.onboarded();
+    s.config("- work_repo: acme/widgets-work\n- work_account: backup-bot");
+    gh(s, { reach: 1 });
+    s.github.accounts.add("backup-bot");
+    let r = await v(s, "--live");
+    assert.equal(r.rc, 0, r.out);
+    assert.match(r.out, /ok {3}live\.work_repo — acme\/widgets-work takes a push as backup-bot/);
+    assert.match(r.out, /ok {3}live\.scope — the connection pushes to repo alone/);
+    assert.ok(s.github.calls.includes("as backup-bot"));
+    s.setConfig("work_account", "someone-else");
+    r = await v(s, "--live");
+    assert.match(r.out, /FAIL live\.work_repo — work_account 'someone-else' is no GitHub account this agent holds/);
+    s.setConfig("work_account", null);
+    gh(s, { reach: 1, workPush: false });
+    r = await v(s, "--live");
+    assert.match(r.out, /FAIL live\.work_repo — no push to acme\/widgets-work \(false\)/);
+    assert.match(r.out, /name that one as `- work_account:`/);
+  }));
+
 test("--live: a GitHub App's login and reach are not measured, and it is told about label_mine", () =>
   inSandbox(async (s) => {
     s.onboarded();

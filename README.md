@@ -97,7 +97,9 @@ else** — a GitHub App installed on that one repository, or a fine-grained toke
 limited to it — with read and write on contents, pull requests and issues. The
 agent is told never to act on another repository; a connection that cannot is
 what keeps that true when an issue body tries to talk it into one. The one
-addition is the backup repository, when there is one: write on its contents.
+addition is the backup repository, when there is one: write on its contents —
+through this connection, or through a second one granted to the agent and
+named as `work_account`.
 
 Use a machine account rather than your own: otherwise the pull requests it
 opens are indistinguishable from yours.
