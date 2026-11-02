@@ -106,7 +106,8 @@ but a warm slot. The precheck uses it to
 
 - wake a pull request only for a review or failed check newer than `seen_at`,
   whichever run looked at it last;
-- list an item `waiting-lock` once the lock is free;
+- list an item `waiting-lock` once the lock is free, and `waiting-env` once an
+  Environment is ([environments.md](environments.md) → **At the limit**);
 - say how often a run died on a claimed issue — the second time, release it.
 
 ## The exclusive lock
@@ -155,7 +156,7 @@ says `report=unverified`.
 the item stands, what happens next and who acts — the agent on its next run, a
 reviewer, the issue's author. A pull request's own round comment
 ([babysit.md](babysit.md)) is that report. For outcomes that have nothing else
-to post — `waiting-lock`, `nothing`, a resumed run's progress — keep one
+to post — `waiting-lock`, `waiting-env`, `nothing`, a resumed run's progress — keep one
 status comment per issue and edit it in place rather than adding a new one:
 its first line `<!-- software-developer:status -->`, then the state and this
 run's link.

@@ -47,6 +47,8 @@ a line in any other shape is invisible, not wrong.
 - `label_handoff`, `label_claimed`, `label_needs_info` — missing means
   `agent/implement`, `agent/in-progress`, `agent/needs-info`; `label_failed`;
   `label_review` — missing: review is requested some other way.
+  `label_ui_review` — a pull request a person reviews in its Environment,
+  whose Environment is taken back last; missing: every one is.
 - `verify` — what builds, checks and tests in a slot alone, alongside the
   others. `exclusive` — what every slot shares and one uses at a time, in plain
   words; missing: nothing is. `verify_exclusive` — the check on it a pull
@@ -54,6 +56,8 @@ a line in any other shape is invisible, not wrong.
   `verify_environment` — one in the issue's own Environment, `issue-<n>` its
   `{environment}`, kept and linked from its pull request until it is merged, with
   no lock; missing: none ([`docs/environments.md`](docs/environments.md)).
+  `environments_max` — default 5: how many the platform lets you hold, each
+  counted.
   `verify_required_paths` — paths a change on which may not go to review until
   that check passed on its head; missing: none ([`docs/babysit.md`](docs/babysit.md)
   → **The required check**).
@@ -116,7 +120,7 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
   running ([`docs/babysit.md`](docs/babysit.md) → **Held, then parked**).
 - **Last, on every way out:** push everything, report on GitHub, then
   `run-state.sh finish <outcome> [pr]` — `nothing`, `pr-opened`, `pr-updated`,
-  `released`, `blocked`, `waiting-lock` or `needs-info`. It refuses until the
+  `released`, `blocked`, `waiting-lock`, `waiting-env` or `needs-info`. It refuses until the
   slot is pushed and this run's report is on the issue or its pull request
   ([`docs/runs.md`](docs/runs.md) → **Reports**); then it frees the item and the
   slot, and backs `work/` up. A `Stop` hook keeps an unattended run's turn

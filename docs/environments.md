@@ -11,10 +11,11 @@ something else is still shared ([exclusive.md](exclusive.md)).
   belongs to the issue, not to the slot: a run in any slot reuses it, and a
   freed slot leaves it running for the reviewer. What the last run left is the
   last push's, and the command sets it up for yours.
-- **Made on first use.** `list_environments` first; missing, make it with
-  `create_environment`, with the endpoints the repository's instructions name
-  for this, and `expires` at the platform's default. How a check runs in one is
-  the repository's to document, as the exclusive's setup is.
+- **Made on first use**, after `run-state.sh room`: it says to reuse it, to
+  make it (`create_environment`, with the endpoints the repository's
+  instructions name for this, and `expires` at the platform's default), or what
+  to delete first (**At the limit**, below). How a check runs in one is the
+  repository's to document, as the exclusive's setup is.
 - **Run it** in the slot, in the background like `verify`: `$RS phase
   "verify_environment"`, then the command with `{environment}` replaced by the
   name, then `run-state.sh checked verify_environment <result> [cause]`.
@@ -39,10 +40,33 @@ something else is still shared ([exclusive.md](exclusive.md)).
 - **Deleted when its pull request is done** — merged or closed: before
   `finish released`, `delete_environment issue-<n>`. The weekly audit names
   any Environment whose issue has no open pull request left.
-- **The agent's limit reached:** delete the Environment of the oldest pull
-  request of yours that is approved, say so on that pull request in one line,
-  and make yours. None approved: report it on the issue and finish `blocked`.
 - **It sleeps** after the platform's idle time, keeping its disk, and wakes on
   the next use; while a command holds its link open, neither machine sleeps.
 - **Refused** — a container agent, Environments off: report it on the issue and
-  finish `blocked`, as for any tool you are refused.
+  finish `blocked`, as for any tool you are refused. Refused for the limit
+  after `room` said there was room: run `room` again.
+
+## At the limit
+
+The platform lets the agent hold `environments_max` (default 5: the install's
+setting, which the agent cannot change), and every Environment counts. With all
+held, `room` names the one cheapest to take back, oldest first within each:
+
+1. one **no open pull request links**: its pull request is done;
+2. a **draft no run holds** — blocked, held back, set aside: `room` on resume
+   makes it anew, at the cost of one setup;
+3. an **approved pull request's that needs no review in it**: not labelled
+   `label_ui_review`;
+4. an **approved one's whose review is done**, labelled `label_ui_review`.
+
+Without `label_ui_review`, every pull request counts as one a person reviews
+in its Environment. Never taken: one a run works on now, a parked draft's, a
+ready pull request's still in review. Delete it, say so on its pull request in
+one line, and make yours; a later round there makes it again.
+
+**None to take back:** `room` marks the item `waiting-env` and prints what
+frees one — each pull request holding an Environment, to review or to merge.
+Push, say on the issue it waits for an Environment, and finish `waiting-env`;
+the precheck lists it again once one is free. With `slack_channel` set, `room`
+says to post that list ([notify.md](notify.md)), once a day while the same pull
+requests hold them.

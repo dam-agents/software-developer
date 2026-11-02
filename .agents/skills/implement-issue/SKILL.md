@@ -117,6 +117,7 @@ misbehaves. When `verify_environment` is set, run it too, in the issue's own
 Environment, `issue-<n>`, and with no lock ([`docs/environments.md`](../../../docs/environments.md)):
 
 ```sh
+$RS room                       # reuse, create, or delete one first; refused: push, finish waiting-env
 $RS phase "verify_environment"
 <verify_environment, {environment} as issue-<n>>
 $RS checked verify_environment pass|fail|skipped [cause]
@@ -128,6 +129,7 @@ $RS checked verify_environment pass|fail|skipped [cause]
 git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>" [--label <label_mine>]
 gh pr edit <pr> -R <repo> --add-label <label_review>   # when set
+gh pr edit <pr> -R <repo> --add-label <label_ui_review>   # when set, and a person sees the change in the UI
 $RS park <pr>...               # every pull request of the issue; then its waiter, below
 ```
 

@@ -521,3 +521,17 @@ test("closed slots count as taken: every open one held declines, a free open one
     s.setConfig("slots_closed", "5");
     assert.equal((await pc(s)).rc, 0, "slot 4 opened");
   }));
+
+test("an item waiting for an Environment is listed once one is free, and the platform is asked only then", () =>
+  inSandbox(async (s) => {
+    s.config("- verify_environment: make e2e ENV={environment}\n- environments_max: 1");
+    s.item("7", { state: "waiting-env", branch: "feat/7", seen_at: s.clock.ago(30) });
+    gql(s, [], [], [{ number: 7, title: "Seven", url: "https://gh/7", labels: [{ name: "agent/in-progress" }] }]);
+    s.runtime.envs = [{ name: "issue-3", state: "running", expiresAt: "", endpoints: [] }];
+    let r = await pc(s);
+    assert.equal(r.rc, 1, "every one held: not woken, not resumed");
+    s.runtime.envs = [];
+    r = await pc(s);
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /Waiting for an Environment, and one is free now:\n- #7 on feat\/7/);
+  }));

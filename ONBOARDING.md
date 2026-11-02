@@ -101,7 +101,10 @@ confirming or correcting rather than composing from nothing.
   ([`docs/environments.md`](docs/environments.md)). Then ask which changes
   must pass that check before review, whatever else covers them — the web UI,
   the install, the end-to-end suite — and record those paths as
-  `verify_required_paths`: `dir/` for a tree, `*` and `**` for patterns.
+  `verify_required_paths`: `dir/` for a tree, `*` and `**` for patterns. Ask
+  too whether a label marks a pull request a person reviews in its
+  Environment — a visible change, a design pass: `label_ui_review`; its
+  Environment is kept the longest when they run short.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here. Also record
@@ -180,11 +183,13 @@ that is not one of them fails verification, because nothing would ever read it:
 - label_review: needs-review
 - label_needs_info: agent/needs-info
 - label_mine: agent/agent-0123456789abcdef
+- label_ui_review: needs-ui-review
 - verify: <the repository's check-and-test command>
 - exclusive: the local cluster — anything that installs onto it or runs against it
 - verify_exclusive: <its end-to-end command, setup included>
 - verify_environment: <its end-to-end command against {environment}, setup included>
 - verify_required_paths: <paths a change on which needs that check, e.g. ui/ deploy/**>
+- environments_max: 5
 - schedules: tick audit
 - slots: 3
 - slots_closed: <slot numbers that take no new work yet, e.g. 4 5>
@@ -206,13 +211,14 @@ merge (by default you may not).
 Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `label_review` and `schedules`. With nothing shared, leave `exclusive` and
 `verify_exclusive` out; with no check in an Environment, `verify_environment`; with
-neither, or no path that needs one, `verify_required_paths`; with no
+neither, or no path that needs one, `verify_required_paths` and
+`label_ui_review`; with no
 review label, `label_review`; with no backup, leave out `work_repo`; with no Slack, leave out `slack_channel` and `slack_handoff`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
 
-`slots`, `babysit_max_hours` and `stuck_after_min` are not questions for the
-user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;
+`slots`, `babysit_max_hours`, `stuck_after_min` and `environments_max` are not
+questions for the user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;
 raise `stuck_after_min` when one build step can run longer than two hours. Get `repo`,
 `label_handoff` and `label_claimed` right in particular: the precheck decides
 whether the agent wakes at all, and a wrong label there means either waking for

@@ -31,6 +31,9 @@
 //                             what is left first (1, on stderr): the Stop hook
 //   lock                      take the exclusive lock, or record waiting for it
 //   unlock                    give the exclusive lock back
+//   room                      before the issue's first verify_environment: its
+//                             Environment is there, may be made, needs another
+//                             deleted first, or waits (finish waiting-env)
 //   checked <check> <result> [cause]
 //                             the required check's result on the slot's HEAD:
 //                             pass, fail or skipped, the cause for the last two;
@@ -56,6 +59,7 @@ import { ATTENDED } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
 import { persistTo } from "./backup.ts";
 import { parseChecked, RESULTS, requiredChanges } from "./checks.ts";
+import { asks, room } from "./environments.ts";
 import { GATE_KEYS, ITEM_KEYS, Kit, OUTCOMES, type Outcome, PARK_FOR_SECONDS, WRITER } from "./kit.ts";
 import {
   type Comment,
@@ -72,7 +76,7 @@ import { ours, reported, slackThread } from "./reports.ts";
 import { alsoDirs, prepare } from "./slots.ts";
 
 const USAGE =
-  "usage: run-state.sh start|also|phase|wait|park|booked|may-stop|lock|unlock|checked|finish|sweep|held|live|quiet|diagnosed|show";
+  "usage: run-state.sh start|also|phase|wait|park|booked|may-stop|lock|unlock|room|checked|finish|sweep|held|live|quiet|diagnosed|show";
 
 class RunState {
   readonly kit: Kit;
@@ -807,6 +811,63 @@ class RunState {
   }
 
   /**
+   * Whether this run's issue may have its Environment, issue-<n>, now: it has
+   * one, there is room, or one may be taken back first (docs/environments.md
+   * → At the limit). None: the item waits for a person to review or merge
+   * what holds them, said once a day for the same pull requests (notify:).
+   */
+  async room(): Promise<number> {
+    this.needSession();
+    const item = this.myItem();
+    if (!item || item.startsWith("pr")) {
+      this.say("this session holds no issue — call start first");
+      return 1;
+    }
+    await this.sweep(false);
+    const held = new Set(this.locks.ofKind("item-").map((h) => h.name.slice("item-".length)));
+    const working = new Set(this.locks.ofKind("slot-").map((h) => h.owner.item));
+    const r = await room(this.kit, item, held, working);
+    const name = `issue-${item}`;
+    if (r.kind === "has") {
+      this.out(`room: ${name} is there — reuse it.`);
+      return 0;
+    }
+    if (r.kind === "free") {
+      this.out(`room: ${r.count} of ${this.kit.environmentsMax} held — create ${name}.`);
+      return 0;
+    }
+    if (r.kind === "unread") {
+      this.say(`room: not measured — ${r.why}. Try create_environment ${name}; refused for the limit, run room again.`);
+      return 0;
+    }
+    if (r.kind === "evict") {
+      const pr = r.victim.pr ? `#${r.victim.pr.number}` : `#${r.victim.item}`;
+      this.out(`room: every one of ${this.kit.environmentsMax} is held — make room first:`);
+      this.out(`delete_environment ${r.victim.name} (${r.why}), say so on ${pr} in one line, then create ${name}.`);
+      return 0;
+    }
+    this.writeItem(item, { state: "waiting-env", updated_at: this.now() });
+    const lines = asks(r.holders);
+    this.say(`every one of ${this.kit.environmentsMax} Environments is held, and none can be taken back:`);
+    for (const l of lines) this.say(`  ${l}`);
+    this.say(
+      "Push what you have, say on the issue it waits for an Environment, and finish waiting-env: the precheck wakes it once one frees.",
+    );
+    const chat = this.kit.cfg.get("slack_channel");
+    if (!chat) return 1;
+    // said once a day for the same pull requests: a change in what holds them is news, the same wall is not
+    const key = r.holders.map((h) => h.pr?.number ?? h.name).join(" ");
+    const last = epoch(kv(this.kit.gate, "env_full_at"));
+    const fresh = last !== undefined && nowSeconds(this.deps.clock) - last < 86400;
+    if (fresh && kv(this.kit.gate, "env_full") === key) return 1;
+    writeKv(this.kit.gate, GATE_KEYS, { env_full_at: this.now(), env_full: key }, undefined, WRITER);
+    this.say(
+      `notify: post 🧱 that #${item} waits for an Environment, and what a person can do — ${lines.join("; ")} — top-level to slack_channel ${chat} (docs/notify.md → Every Environment held)`,
+    );
+    return 1;
+  }
+
+  /**
    * Records the required check's result on the slot's HEAD, on the item and in
    * TICK.log: the gate park and finish read, and the audit's count of every
    * check that did not pass.
@@ -980,7 +1041,11 @@ class RunState {
     this.unlock();
     if (item) {
       const state =
-        outcome === "waiting-lock" || outcome === "needs-info" || outcome === "released" || outcome === "blocked"
+        outcome === "waiting-lock" ||
+        outcome === "waiting-env" ||
+        outcome === "needs-info" ||
+        outcome === "released" ||
+        outcome === "blocked"
           ? outcome
           : "parked";
       // the session that last held it stays on record: the next start says whether it came back
@@ -1221,6 +1286,8 @@ export const runState: Command = async (deps, args) => {
       return rs.lock(rest);
     case "unlock":
       return rs.unlock();
+    case "room":
+      return rs.room();
     case "checked":
       return rs.checked(rest);
     case "finish":

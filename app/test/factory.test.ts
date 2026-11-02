@@ -115,6 +115,7 @@ test("the Environments are what list_environments answers, and a failed answer i
       name: "slot-1",
       state: "hibernated",
       expiresAt: "2026-11-02T15:35:24.761Z",
+      createdAt: "2026-10-26T15:35:24.761Z",
       endpoints: [
         { name: "app", port: 4400, url: "https://app-slot-1-abc.env.example.com" },
         { name: "db", port: 5432, url: null },
@@ -127,6 +128,7 @@ test("the Environments are what list_environments answers, and a failed answer i
       name: "slot-1",
       state: "hibernated",
       expiresAt: "2026-11-02T15:35:24.761Z",
+      createdAt: "2026-10-26T15:35:24.761Z",
       endpoints: [
         { name: "app", url: "https://app-slot-1-abc.env.example.com" },
         { name: "db", url: null },

@@ -247,6 +247,7 @@ export function worklist(
   since: string,
   author: string,
   lockFree: boolean,
+  envFree = false,
 ) {
   const root = kit.slug;
   // A pull request is babysat until it is merged (docs/babysit.md). It wakes
@@ -294,6 +295,14 @@ export function worklist(
         .sort((a, b) => (a[1].seen < b[1].seen ? -1 : a[1].seen > b[1].seen ? 1 : 0))
         .map(([k, v]) => `- #${k} on ${v.branch} — run its exclusive step`)
     : [];
+  // Items that found every Environment held and none to take back: due again
+  // once one frees — a merge, a closed pull request, a deletion.
+  const envWork = envFree
+    ? [...items.entries()]
+        .filter(([k, v]) => v.state === "waiting-env" && !held.has(k))
+        .sort((a, b) => (a[1].seen < b[1].seen ? -1 : a[1].seen > b[1].seen ? 1 : 0))
+        .map(([k, v]) => `- #${k} on ${v.branch} — an Environment is free: run room, then its check`)
+    : [];
   const blockers = [kit.labelClaimed, kit.labelNeedsInfo, kit.labelFailed];
   const issueWork = snap.handoff
     .filter((i) => !i.labels.some((l) => blockers.includes(l)))
@@ -325,7 +334,7 @@ export function worklist(
     .filter((i) => !held.has(String(i.number)))
     .filter(
       (i) =>
-        !["waiting-lock", "waiting-cluster", "blocked", "needs-info"].includes(
+        !["waiting-lock", "waiting-cluster", "waiting-env", "blocked", "needs-info"].includes(
           items.get(String(i.number))?.state ?? "",
         ),
     )
@@ -333,7 +342,7 @@ export function worklist(
       const a = items.get(String(i.number))?.abandoned ?? 0;
       return `- #${i.number} ${i.title}${a > 0 ? ` — a run died on it ${a} time(s)` : ""}\n  ${i.url}`;
     });
-  return { prWork, lockWork, issueWork, resumeWork, releaseWork };
+  return { prWork, lockWork, envWork, issueWork, resumeWork, releaseWork };
 }
 
 export const precheck: Command = async (deps, _args) => {
@@ -382,9 +391,16 @@ export const precheck: Command = async (deps, _args) => {
     notes.push(
       `GitHub's GraphQL budget would not answer (${snap.restBecause.replaceAll("\n", " ").slice(0, 160)}), so this list was read over REST. Prefer \`gh api\` (REST) to \`gh pr\` / \`gh issue\` this run.`,
     );
-  const w = worklist(kit, snap, readItems(kit.items), held, deps.env.PLATFORM_LAST_RUN_AT ?? "", author, lockFree);
-  if (w.prWork.length + w.lockWork.length + w.issueWork.length + w.resumeWork.length + w.releaseWork.length === 0)
-    return 1;
+  const cached = readItems(kit.items);
+  // the platform asked only while an item waits for an Environment: one call, and none on most ticks
+  let envFree = false;
+  if ([...cached.values()].some((v) => v.state === "waiting-env")) {
+    const envs = await deps.runtime.environments();
+    envFree = envs !== undefined && envs.length < kit.environmentsMax;
+  }
+  const w = worklist(kit, snap, cached, held, deps.env.PLATFORM_LAST_RUN_AT ?? "", author, lockFree, envFree);
+  const n = w.prWork.length + w.lockWork.length + w.envWork.length + w.issueWork.length;
+  if (n + w.resumeWork.length + w.releaseWork.length === 0) return 1;
   const o = (s: string) => deps.io.out(s);
   o(`Repository: ${repo}`);
   o("Take the first item below that `run-state.sh start` gives you, and that one alone; another run takes the next.");
@@ -401,6 +417,7 @@ export const precheck: Command = async (deps, _args) => {
   section("Your open pull requests needing attention:", w.prWork);
   section("Merged or closed while parked — release:", w.releaseWork);
   section("Waiting for the exclusive lock, which is free now:", w.lockWork);
+  section("Waiting for an Environment, and one is free now:", w.envWork);
   section("Claimed, with no pull request and no run on it — finish or release:", w.resumeWork);
   section(`Unclaimed issues labelled ${kit.labelHandoff}, oldest first:`, w.issueWork);
   return 0;

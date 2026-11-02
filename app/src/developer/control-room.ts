@@ -431,7 +431,7 @@ export class ControlRoom {
         else if (state === "blocked" && (parseChecked(it.get("checked") ?? "")?.result ?? "pass") !== "pass")
           stage = "held-back";
         else if (ps.length > 0) stage = ps.every((p) => p.decision === "APPROVED") ? "awaiting-merge" : "in-review";
-        else if (["waiting-lock", "needs-info", "blocked"].includes(state)) stage = state;
+        else if (["waiting-lock", "waiting-env", "needs-info", "blocked"].includes(state)) stage = state;
         else stage = "orphan";
         const iss = claimed.find((i) => String(i.number) === k);
         return {
