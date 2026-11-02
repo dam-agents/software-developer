@@ -14,7 +14,7 @@ the message, first row first:
 | `let's grill <n>`, or a reply in its thread | ask, then file the sub-issues it approves | anyone in the channel | **Grill** |
 | asks to implement, do or start issue #`<n>` of `repo` | put the hand-off label on it | `slack_handoff` | **Hand-off** |
 | asks to file an issue, or to fix or do something no open issue covers | file it now, labelled when the work was asked for | `slack_handoff` | **Filing** |
-| asks to change how you yourself work | open a pull request on the definition's repository | anyone in the channel — the merge is the check | [self-modification.md](self-modification.md) |
+| asks to change how you yourself work — what you post, where, when | open a pull request on the definition's repository, never a refusal | anyone in the channel — the merge is the check | [self-modification.md](self-modification.md) |
 | anything else aimed at you | one reply: what Slack can order is this table | — | — |
 | not aimed at you | `no_reply_needed` | — | — |
 
