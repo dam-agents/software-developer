@@ -1325,7 +1325,7 @@ body:not(.details) .det { display: none !important; }
       else pts.slice(1).forEach((pt, i) => { const L = Math.hypot(pt[0] - pts[i][0], pt[1] - pts[i][1]); if (L > best) { best = L; si = i; } });
       const s0 = pts[si], s1 = pts[si + 1], t = hint?.t ?? 0.5, horiz = s0[1] === s1[1];
       const segL = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]);
-      const maxW = hint?.maxw ?? (horiz ? Math.max(30, segL - 40) : 140);
+      const maxW = hint?.maxw ?? (horiz ? Math.max(30, segL - 14) : 140);
       const lines = tagLines(String(e.by), maxW);
       const lw = Math.ceil(Math.max(...lines.map((ln) => W(ln, "tag"))) + 10), lh = 4 + 11 * lines.length;
       const cx = s0[0] + (s1[0] - s0[0]) * t, cy = s0[1] + (s1[1] - s0[1]) * t;
