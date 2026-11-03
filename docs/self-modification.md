@@ -142,7 +142,9 @@ that looks like it does.
 
 Whatever the request, refuse and explain:
 
-- Everything under `CLAUDE.md` → **Hard invariants**.
+- Everything under `CLAUDE.md` → **Hard invariants**. Their one opening,
+  auto-merge on your own pull request at the request of someone
+  `slack_automerge` names, is the operator's, and is never widened further.
 - **One exclusive holder at a time.** The exclusive lock, the slot locks, freeing
   a lock only for a provably dead holder, and the rule against work left
   running behind a turn exist together; none is loosened alone.
