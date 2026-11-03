@@ -9,6 +9,24 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.15.0 — 2026-11-03
+
+**An issue's Environment can be a demo, not a check.** A new key,
+`demo_environment`, names the install of the branch into `{environment}`. A
+change a person can see, or labelled `label_ui_review`, gets it once its pull
+request is ready for review: screenshots taken there and a `## Demo` section in
+the body. It never holds a pull request back — no room or a failed install is
+one line in the body. With `verify_environment` set too, both use the one
+Environment and its one install (`docs/environments.md`).
+
+**Upgrade:**
+
+1. Operator only: offer `demo_environment`. On a yes, write
+   `- demo_environment: <the install into {environment}>` to `work/CONFIG.md`;
+   to make the demo the only use of Environments, drop `verify_environment`
+   and, with no `verify_exclusive`, `verify_required_paths` too.
+2. Run `bash "$HOME/scripts/verify-onboarding.sh" --config`.
+
 ## 6.14.0 — 2026-11-03
 
 **Slack may ask for auto-merge on a pull request of yours.** A new key,

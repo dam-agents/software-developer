@@ -108,7 +108,11 @@ confirming or correcting rather than composing from nothing.
   `verify_required_paths`: `dir/` for a tree, `*` and `**` for patterns. Ask
   too whether a label marks a pull request a person reviews in its
   Environment — a visible change, a design pass: `label_ui_review`; its
-  Environment is kept the longest when they run short.
+  Environment is kept the longest when they run short. On a vm agent with
+  Environments, ask too whether a change a person can see should be installed
+  into one for screenshots and a demo, not as a check: its install command,
+  with `{environment}`, is `demo_environment`; with `verify_environment` set
+  as well, that one runs on the same install.
 - **Access** — run `gh api repos/<slug> --jq .permissions.push`. If it comes
   back anything but `true`, say so plainly and leave `access` unticked: the
   user has to fix the connection, and you cannot do it from here. Also record
@@ -198,6 +202,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - exclusive: the local cluster — anything that installs onto it or runs against it
 - verify_exclusive: <its end-to-end command, setup included>
 - verify_environment: <its end-to-end command against {environment}, setup included>
+- demo_environment: <the install of the branch into {environment}, for a demo>
 - verify_required_paths: <paths a change on which needs that check, e.g. ui/ deploy/**>
 - environments_max: 5
 - schedules: tick audit
@@ -224,8 +229,9 @@ merge (by default you may not).
 Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `label_review` and `schedules`. With nothing shared, leave `exclusive` and
 `verify_exclusive` out; with no check in an Environment, `verify_environment`; with
-neither, or no path that needs one, `verify_required_paths` and
-`label_ui_review`; with no
+no demo, `demo_environment`; with
+neither check, or no path that needs one, `verify_required_paths`; with no
+Environment at all, `label_ui_review`; with no
 review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_ui_review` and `slack_automerge`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.

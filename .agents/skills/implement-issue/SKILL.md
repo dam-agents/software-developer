@@ -136,7 +136,16 @@ $RS park <pr>...               # every pull request of the issue; then its waite
 The body: what changed and why, how it was verified (the commands, and what
 `verify_exclusive` or `verify_environment` covered or why it did not run), its Environment's link when it
 has one ([`docs/environments.md`](../../../docs/environments.md)), anything a reviewer should
-look at first. Then `Fixes #<n>` on its own line — in another repository
+look at first.
+
+**A demo**, with `demo_environment` set and a change a person can see in the
+running app, or labelled `label_ui_review`: once the pull request is ready for
+review, and before you park it, `$RS room`, then `$RS phase
+"demo_environment"` and its command for `issue-<n>` in the background. Take the
+screenshots in it, and add the `## Demo` section to the body
+([`docs/environments.md`](../../../docs/environments.md) → **Linked from its
+pull request**). It never holds the pull request back: no room, or an install
+that fails, is one line there, and a later round tries again. Then `Fixes #<n>` on its own line — in another repository
 `Fixes <repo>#<n>` or `Part of <repo>#<n>`, one of them closing it — and last
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
 With `label_mine` set it carries that label from the start: without it, no

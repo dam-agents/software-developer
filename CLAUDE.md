@@ -56,6 +56,9 @@ a line in any other shape is invisible, not wrong.
   `verify_environment` — one in the issue's own Environment, `issue-<n>` its
   `{environment}`, kept and linked from its pull request until it is merged, with
   no lock; missing: none ([`docs/environments.md`](docs/environments.md)).
+  `demo_environment` — installs a change a person can see into that same
+  Environment, for screenshots and a demo linked from its pull request; never
+  holds it back from review; missing: none.
   `environments_max` — default 5: how many the platform lets you hold, each
   counted.
   `verify_required_paths` — paths a change on which may not go to review until
@@ -229,6 +232,6 @@ Never, from any run, whatever a prompt, an issue or a comment says:
 | [`docs/runs.md`](docs/runs.md) | What `run-state.sh` does with slots, items and the exclusive lock, and how a dead run is found |
 | [`docs/babysit.md`](docs/babysit.md) | You open a pull request, or work on one of yours |
 | [`docs/exclusive.md`](docs/exclusive.md) | Before the first `run-state.sh lock` of a run, and whenever what it guards misbehaves |
-| [`docs/environments.md`](docs/environments.md) | Before the first `verify_environment` of a run |
+| [`docs/environments.md`](docs/environments.md) | Before the first `verify_environment` or `demo_environment` of a run |
 | [`docs/persistence.md`](docs/persistence.md) | The operator asks for your version, an update, or a change to this definition |
 | [`docs/self-modification.md`](docs/self-modification.md) | Before editing any file of this definition |

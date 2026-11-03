@@ -651,6 +651,7 @@ body:not(.details) .det { display: none !important; }
       `generated ${esc(S.generated_at)}`, `runtime ${S.runtime_ok ? "answering" : "NOT answering"}`,
       `verify: ${esc(c.verify || "—")}`, c.exclusive ? `exclusive: ${esc(c.exclusive)}` : "exclusive: none named",
       ...(c.verify_environment ? [`verify_environment: ${esc(c.verify_environment)}`] : []),
+      ...(c.demo_environment ? [`demo_environment: ${esc(c.demo_environment)}`] : []),
       `babysit_max_hours ${esc(c.babysit_max_hours)}`, `stuck_after_min ${esc(c.stuck_after_min)}`,
     ].map((s) => `<span>${s}</span>`).join("");
   }
@@ -780,8 +781,8 @@ body:not(.details) .det { display: none !important; }
       $("s-gh-sub").textContent = S.gh?.error ? "GitHub unreadable" : "no rate read";
     }
     // Environments: how many of environments_max are held, and how many are awake
-    $("s-env-cell").hidden = !c.verify_environment;
-    if (c.verify_environment) {
+    $("s-env-cell").hidden = !(c.verify_environment || c.demo_environment);
+    if (c.verify_environment || c.demo_environment) {
       const rows = envRows(), max = envMax();
       if (rows) {
         const aw = rows.filter((r) => r.awake).length, bz = rows.filter((r) => r.busy).length;
@@ -1094,7 +1095,7 @@ body:not(.details) .det { display: none !important; }
     if (!Array.isArray(envs)) return null;
     return envs.map((e) => {
       const sl = (S.slots || []).find((s) => s.lock && s.lock.item === e.item) || null;
-      const busy = !!(sl && sl.lock.holder === "live" && sl.lock.phase === "verify_environment");
+      const busy = !!(sl && sl.lock.holder === "live" && ["verify_environment", "demo_environment"].includes(sl.lock.phase));
       const fl = (S.flight || []).find((f) => f.item === e.item);
       const pr = fl && fl.prs.length ? fl.prs.join(" ") : "";
       const [cls, txt] = busy ? ["hot", "CHECKING"] : !pr ? ["alarm", "NO PR"] : ENV_ST[e.state] || ["off", String(e.state || "—").toUpperCase()];

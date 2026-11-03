@@ -158,6 +158,10 @@ export class Kit {
         ? "verify_exclusive"
         : "";
   }
+  /** Whether issues get an Environment of their own, issue-<n>: to verify in, or for a person to try the change in. */
+  get usesEnvironments(): boolean {
+    return this.cfg.get("verify_environment") !== "" || this.cfg.get("demo_environment") !== "";
+  }
   /** The default branch of `repo`, from its checkout: main when that cannot say. */
   get defaultBranch(): string {
     return this.git.defaultBranch(this.checkout);

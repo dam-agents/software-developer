@@ -1178,6 +1178,24 @@ test("room at the limit takes back the cheapest: unlinked, then an idle draft, t
     assert.match(r.out, /delete_environment issue-2 \(#12 is approved and needs no review in it\)/);
   }));
 
+test("room for a demo alone never waits: the pull request goes without one this round", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config("- demo_environment: make demo ENV={environment}\n- environments_max: 1");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    s.runtime.envs = [];
+    let r = await as(s, "sess-a", "room");
+    assert.match(r.out, /0 of 1 held — create issue-7/);
+    s.runtime.envs = [ENV("issue-1")];
+    s.github.on(OPEN, { items: [linked(11, 1)] });
+    s.github.prViews = [{ reviewDecision: "REVIEW_REQUIRED" }];
+    r = await as(s, "sess-a", "room");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /No demo this round/);
+    assert.notEqual(s.field("items/7.md", "state"), "waiting-env");
+  }));
+
 test("room with nothing to take back waits, and says once a day which pull requests a person can move", () =>
   inSandbox(async (s) => {
     world(s);

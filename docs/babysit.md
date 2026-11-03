@@ -107,8 +107,10 @@ one round, so one push answers everything:
    `COLLABORATOR` — is still a round; anyone else's is not, and the waiter
    does not wake for it. A push may dismiss the approval: then re-request it.
 3. **Conflicts.** Rebase on the default branch, run `verify` again.
-4. **Push**, move its Environment's expiry on when it has one
-   ([environments.md](environments.md)), comment with this run's session link, and ask for review of the
+4. **Push**, move its Environment's expiry on when it has one, and, with
+   `demo_environment`, install the push there and retake the demo's
+   screenshots when what a person sees changed — or make the demo a round
+   before could not ([environments.md](environments.md)), comment with this run's session link, and ask for review of the
    new round: re-request the reviewers who reviewed, and re-apply the
    review-request label only when nothing re-requests them otherwise. Then
    park it, above.
