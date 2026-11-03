@@ -140,6 +140,10 @@ confirming or correcting rather than composing from nothing.
   `people` or `off`, and record it as `slack_handoff`. With `label_ui_review`
   set, offer a chat told of each such pull request once it is out of draft,
   for whoever reviews it in its Environment: `slack_ui_review`.
+  Ask, too, whether anyone there may ask for auto-merge on your pull requests
+  — the default is no: `off`, `people`, or the Slack user ids of who may,
+  from `describe_channel_users`; whoever it names may in effect merge.
+  Record it as `slack_automerge`, and say so in **Bounds**.
   Look in the repository's skills for one that grills a plan and one that
   files issues; offer them as `skill_grill` and `skill_file_issue`, or the
   definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's
@@ -206,6 +210,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - slack_channel: C0123ABCD
 - slack_handoff: anyone
 - slack_ui_review: C0123ABCD
+- slack_automerge: off
 - skill_grill: grill-me
 - skill_file_issue: file-issue
 - repos_also: owner/*
@@ -221,7 +226,7 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 `verify_exclusive` out; with no check in an Environment, `verify_environment`; with
 neither, or no path that needs one, `verify_required_paths` and
 `label_ui_review`; with no
-review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff` and `slack_ui_review`;
+review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_ui_review` and `slack_automerge`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`.
 
