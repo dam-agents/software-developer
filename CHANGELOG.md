@@ -9,6 +9,22 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.13.0 — 2026-11-02
+
+**The backup can go through a connection of its own.** `work_account` names the
+GitHub account (`gh auth status`) that reaches `work_repo`, when it is not the
+active one: `work-backup.sh`, `verify-onboarding.sh --live` and the audit's
+`backup.config` act as it, and `live.scope` no longer counts `work_repo`
+against `repo`'s connection. Missing, everything acts as the active account,
+as before.
+
+**Upgrade:** with `work_repo` set and more than one account in `gh auth
+status`, check which one reaches it (`ONBOARDING.md` → **2. Ask** →
+**Backup**); when it is not the active one, add `- work_account: <account>`
+to `work/CONFIG.md` (direct session), then run
+`bash "$HOME/scripts/verify-onboarding.sh" --live` and
+`bash "$HOME/scripts/work-backup.sh" persist`.
+
 ## 6.12.0 — 2026-11-02
 
 **The plant draws the Environments as cooling towers.** One tower per

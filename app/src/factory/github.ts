@@ -28,6 +28,8 @@ export interface GitHub {
   /** `gh pr view --json <fields>`: one GraphQL read; undefined when it could not be read. */
   prView(host: string, slug: string, n: number, fields: string): Promise<unknown>;
   clone(host: string, slug: string, dir: string): Promise<boolean>;
+  /** The same GitHub, read as another of the agent's accounts (`gh auth status` names them); undefined: none by that name. */
+  as(host: string, account: string): GitHub | undefined;
 }
 
 /** `gh api` and `gh repo clone`, with the environment of the command that asked. */
@@ -104,6 +106,28 @@ export class GhCli implements GitHub {
   async clone(host: string, slug: string, dir: string): Promise<boolean> {
     return this.gh(["repo", "clone", `${host}/${slug}`, dir, "--", "-q"]).code === 0;
   }
+
+  as(host: string, account: string): GitHub | undefined {
+    const env = accountEnv(this.env, host, account);
+    return env ? new GhCli(env) : undefined;
+  }
+}
+
+/**
+ * The environment that makes gh, and git through gh's credential helper, act
+ * as one named account. What `gh auth token` prints here is the gateway's
+ * placeholder for the account, never a real token. undefined: the agent holds
+ * no account by that name.
+ */
+export function accountEnv(
+  env: Readonly<Record<string, string | undefined>>,
+  host: string,
+  account: string,
+): Record<string, string | undefined> | undefined {
+  const r = run("gh", ["auth", "token", "--hostname", host, "--user", account], { env, timeoutMs: 60_000 });
+  const token = r.code === 0 ? r.stdout.trim() : "";
+  if (!token) return undefined;
+  return host === "github.com" ? { ...env, GH_TOKEN: token } : { ...env, GH_ENTERPRISE_TOKEN: token, GH_HOST: host };
 }
 
 /** JSON documents written back to back, as `gh api --paginate` prints pages. */

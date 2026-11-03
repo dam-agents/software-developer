@@ -27,7 +27,8 @@ an item no run has started on yet, and a lock (`work/locks`) is only ever held b
 `TICK.log` and `AUDIT.log`. With `work_repo` set, those travel to a private
 repository of their own through `scripts/work-backup.sh`, which pushes straight
 to its default branch — a repository of data, never of changes for review, and
-the only one a script pushes to. Its header says exactly what travels, and why
+the only one a script pushes to — as `work_account` when it is set, the
+GitHub account of a second connection. Its header says exactly what travels, and why
 the git never happens in `work/` itself. Only the files it names travel — the
 backup's `.gitignore` shuts out everything else — and a file that looks like it
 holds a credential stops the push:

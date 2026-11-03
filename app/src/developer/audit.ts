@@ -127,9 +127,9 @@ export const audit: Command = async (deps) => {
   const workRepo = kit.cfg.get("work_repo");
   if (workRepo) {
     const w = splitRepo(workRepo);
-    const file = (await deps.github.get(w.host, `repos/${w.slug}/contents/CONFIG.md`)) as
-      | { content?: string }
-      | undefined;
+    const account = kit.cfg.get("work_account");
+    const as = account ? deps.github.as(w.host, account) : deps.github;
+    const file = (await as?.get(w.host, `repos/${w.slug}/contents/CONFIG.md`)) as { content?: string } | undefined;
     const held = file?.content ? Buffer.from(file.content, "base64").toString("utf8") : "";
     if (!held) o(`warn backup.config — not measured: could not read CONFIG.md from ${workRepo}`);
     else if (held === kit.cfg.text) o(`ok   backup.config — ${workRepo} holds the current CONFIG.md`);

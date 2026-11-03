@@ -164,3 +164,31 @@ test("a bad mode is a usage error", () =>
     assert.equal((await backup(s, "sideways")).rc, 2);
     assert.ok(readFileSync(join(s.work, "CONFIG.md")));
   }));
+
+/** A `gh` on PATH that holds one account, `backup-bot`, and logs what it is asked. */
+function ghHolding(s: Sandbox): void {
+  mkdirSync(join(s.home, "bin"));
+  writeFileSync(
+    join(s.home, "bin/gh"),
+    `#!/bin/sh\necho "$*" >> "${join(s.home, "gh.log")}"\ncase "$*" in *"--user backup-bot"*) echo platform:conn:backup ;; *) exit 1 ;; esac\n`,
+    { mode: 0o755 },
+  );
+  s.env.PATH = `${join(s.home, "bin")}:${s.env.PATH}`;
+}
+
+test("work_account: the backup acts as that account, and one the agent does not hold backs nothing up", () =>
+  inSandbox(async (s) => {
+    backed(s);
+    ghHolding(s);
+    s.config("- work_account: backup-bot");
+    let r = await backup(s, "persist");
+    assert.match(r.out, /backed up/);
+    assert.match(readFileSync(join(s.home, "gh.log"), "utf8"), /auth token --hostname github\.com --user backup-bot/);
+    s.setConfig("work_account", "someone-else");
+    w(s, "TICK.log", "1 line\n");
+    r = await backup(s, "persist");
+    assert.equal(r.rc, 0, "persist never fails the run");
+    assert.match(r.out, /work_account 'someone-else' is no GitHub account this agent holds/);
+    assert.equal(commits(s), 1, "nothing was pushed");
+    assert.equal((await backup(s, "restore")).rc, 2);
+  }));

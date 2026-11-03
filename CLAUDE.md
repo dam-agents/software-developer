@@ -69,6 +69,8 @@ a line in any other shape is invisible, not wrong.
   run silent this long lets a diagnostic run through.
 - `work_repo` — `owner/name`, private, holding the backup of `work/`
   ([`docs/persistence.md`](docs/persistence.md) → **Backup**). Missing: none.
+  `work_account` — the GitHub account (`gh auth status`) the backup acts as,
+  when another connection than `repo`'s reaches it; missing: the active one.
 - `slack_channel` — the chat id for Slack posts and grilling ([`docs/notify.md`](docs/notify.md),
   [`docs/slack.md`](docs/slack.md)). `skill_grill`, `skill_file_issue` — the
   repository's skills for those; missing: `.agents/defaults/`. `slack_handoff`
