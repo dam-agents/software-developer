@@ -289,9 +289,9 @@ export class ControlRoom {
     const listed = await this.deps.runtime.sessions();
     const sessions = listed && new Map(listed.map((s) => [s.id, s]));
     // The Environment of the issue a slot works on, issue-<n>, when the instance
-    // verifies in them: null for one not made yet, undefined when the platform
+    // uses them: null for one not made yet, undefined when the platform
     // did not answer.
-    const perSlot = kit.cfg.get("verify_environment") !== "";
+    const perSlot = kit.usesEnvironments;
     const envs = perSlot ? await this.deps.runtime.environments() : [];
     const issueOf = (k: string) => kit.locks.read(`slot-${k}`)?.owner.item ?? "";
     const envOf = (k: string) =>
@@ -583,6 +583,7 @@ export class ControlRoom {
         exclusive: kit.cfg.get("exclusive"),
         verify_exclusive: kit.cfg.get("verify_exclusive"),
         verify_environment: kit.cfg.get("verify_environment"),
+        demo_environment: kit.cfg.get("demo_environment"),
         environments_max: kit.environmentsMax,
         label_ui_review: kit.labelUiReview,
         verify_required_paths: kit.cfg.get("verify_required_paths"),

@@ -31,9 +31,10 @@
 //                             what is left first (1, on stderr): the Stop hook
 //   lock                      take the exclusive lock, or record waiting for it
 //   unlock                    give the exclusive lock back
-//   room                      before the issue's first verify_environment: its
-//                             Environment is there, may be made, needs another
-//                             deleted first, or waits (finish waiting-env)
+//   room                      before the issue's first verify_environment or
+//                             demo_environment: its Environment is there, may be
+//                             made, needs another deleted first, or waits
+//                             (finish waiting-env) — a demo alone goes without
 //   checked <check> <result> [cause]
 //                             the required check's result on the slot's HEAD:
 //                             pass, fail or skipped, the cause for the last two;
@@ -861,8 +862,17 @@ class RunState {
       this.out(`delete_environment ${r.victim.name} (${r.why}), say so on ${pr} in one line, then create ${name}.`);
       return 0;
     }
-    this.writeItem(item, { state: "waiting-env", updated_at: this.now() });
     const lines = asks(r.holders);
+    if (!this.kit.cfg.get("verify_environment")) {
+      // a demo never holds a pull request back: it goes without one this round
+      this.say(`every one of ${this.kit.environmentsMax} Environments is held, and none can be taken back:`);
+      for (const l of lines) this.say(`  ${l}`);
+      this.say(
+        "No demo this round: say so in the pull request body in one line, and go on — a later round runs room again (docs/environments.md → At the limit).",
+      );
+      return 1;
+    }
+    this.writeItem(item, { state: "waiting-env", updated_at: this.now() });
     this.say(`every one of ${this.kit.environmentsMax} Environments is held, and none can be taken back:`);
     for (const l of lines) this.say(`  ${l}`);
     this.say(

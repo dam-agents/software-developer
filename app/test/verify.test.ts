@@ -153,6 +153,8 @@ test("verify_environment names the slot's Environment", () =>
     assert.match((await v(s, "--config")).out, /FAIL config\.verify_environment — names no \{environment\}/);
     s.setConfig("verify_environment", "make e2e ENV={environment}");
     assert.doesNotMatch((await v(s, "--config")).out, /config\.verify_environment/);
+    s.config("- demo_environment: make demo");
+    assert.match((await v(s, "--config")).out, /FAIL config\.demo_environment — names no \{environment\}/);
   }));
 
 test("slack_channel is a chat id when set", () =>

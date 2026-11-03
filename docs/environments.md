@@ -1,13 +1,25 @@
 # An issue's own Environment
 
-Only when `verify_environment` in `work/CONFIG.md` names a command: the check
-a pull request must pass, run in a platform Environment of the issue's own
-instead of on something every slot shares. Each issue has its own, so the check
-runs beside the other slots' with no lock, and `exclusive` stays out unless
-something else is still shared ([exclusive.md](exclusive.md)).
+When `verify_environment` or `demo_environment` in `work/CONFIG.md` names a
+command, an issue gets a platform Environment of its own, `issue-<n>`. One per
+issue, whichever keys are set: the install is paid once, and one Environment
+serves both uses.
 
-- **One per issue, named `issue-<n>`**, made on the issue's first
-  `verify_environment` and kept until its pull request is merged or closed. It
+- **`demo_environment`** installs the branch into it, for a person to try the
+  change and for its screenshots. It is no check: nothing it does holds a pull
+  request back from review. Made only for a change a person can see in the
+  running app — the UI, or behavior the UI shows — or one labelled
+  `label_ui_review`.
+- **`verify_environment`** is the check a pull request must pass, run there
+  instead of on something every slot shares, so it runs beside the other
+  slots' with no lock, and `exclusive` stays out unless something else is still
+  shared ([exclusive.md](exclusive.md)). With both set, it runs against the
+  install `demo_environment` made — write it to skip its own install — and
+  the same Environment is then the demo.
+
+## Its life
+
+- **One per issue, named `issue-<n>`**, made on the issue's first use and kept until its pull request is merged or closed. It
   belongs to the issue, not to the slot: a run in any slot reuses it, and a
   freed slot leaves it running for the reviewer. What the last run left is the
   last push's, and the command sets it up for yours.
@@ -16,9 +28,12 @@ something else is still shared ([exclusive.md](exclusive.md)).
   instructions name for this, and `expires` at the platform's default), or what
   to delete first (**At the limit**, below). How a check runs in one is the
   repository's to document, as the exclusive's setup is.
-- **Run it** in the slot, in the background like `verify`: `$RS phase
-  "verify_environment"`, then the command with `{environment}` replaced by the
-  name, then `run-state.sh checked verify_environment <result> [cause]`.
+- **Run it** in the slot, in the background like `verify`, `{environment}`
+  replaced by the name: `$RS phase "demo_environment"` and its command, then
+  `$RS phase "verify_environment"` and that one, then `run-state.sh checked
+  verify_environment <result> [cause]`. A demo alone is made once the pull
+  request is ready for review, never before it; one that fails to install, or
+  finds no room, is one line in the body, and a later round tries again.
 - **Set up once, then narrow.** Its setup — building and installing into the
   Environment — is paid once per push, not per attempt: while you hunt a
   failure, rerun only the failing test against the warm Environment, or
@@ -32,7 +47,9 @@ something else is still shared ([exclusive.md](exclusive.md)).
 - **Linked from its pull request.** The body carries, on lines of their own,
   `Environment: <its first endpoint's address>` and
   `<!-- environment: issue-<n> -->`, so a reviewer opens the change and the
-  scripts find whose it is. Opening it takes the owner's access list, as the
+  scripts find whose it is. For a demo, they open a `## Demo` section that
+  also holds screenshots taken in it and two to four steps to try the change
+  there; a round that changes what a person sees takes them again. Opening it takes the owner's access list, as the
   session link does: the address is the one internal host a body may carry.
 - **Kept alive while the pull request waits**: each round moves its expiry on
   with `update_environment` (`expires` at the platform's default), so it never
@@ -64,7 +81,9 @@ in its Environment. Never taken: one a run works on now, a parked draft's, a
 ready pull request's still in review. Delete it, say so on its pull request in
 one line, and make yours; a later round there makes it again.
 
-**None to take back:** `room` marks the item `waiting-env` and prints what
+**None to take back, for a demo alone** (no `verify_environment`): the pull
+request goes without one — one line in its body says so — and a later round
+runs `room` again. **With `verify_environment`:** `room` marks the item `waiting-env` and prints what
 frees one — each pull request holding an Environment, to review or to merge.
 Push, say on the issue it waits for an Environment, and finish `waiting-env`;
 the precheck lists it again once one is free. With `slack_channel` set, `room`

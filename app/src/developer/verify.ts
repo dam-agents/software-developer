@@ -40,6 +40,7 @@ export const KNOWN = [
   "exclusive",
   "verify_exclusive",
   "verify_environment",
+  "demo_environment",
   "verify_required_paths",
   "environments_max",
   "slots",
@@ -214,13 +215,15 @@ function configChecks(kit: Kit, r: Report): void {
       "set, but neither verify_exclusive nor verify_environment names the check it requires",
       "add the check, or drop verify_required_paths",
     );
-  const inEnvironment = cfg.get("verify_environment");
-  if (inEnvironment && !inEnvironment.includes("{environment}"))
-    r.fail(
-      "config.verify_environment",
-      "names no {environment} — every slot's check would run against the same place",
-      "write `{environment}` where the command takes the Environment's name (docs/environments.md)",
-    );
+  for (const key of ["verify_environment", "demo_environment"]) {
+    const inEnvironment = cfg.get(key);
+    if (inEnvironment && !inEnvironment.includes("{environment}"))
+      r.fail(
+        `config.${key}`,
+        "names no {environment} — every issue's would run against the same place",
+        "write `{environment}` where the command takes the Environment's name (docs/environments.md)",
+      );
+  }
   const m = cfg.get("mode");
   if (["autonomous", "interactive"].includes(m.toLowerCase())) r.ok("config.mode", m);
   else if (!m)

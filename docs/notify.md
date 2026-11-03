@@ -15,7 +15,7 @@ Missing, or Slack not connected to this agent: post nothing, say nothing.
 | Cannot go on | `finish blocked` | 🛑 `<repo>#<n>` is blocked — what fails, in one line |
 | A required check that did not pass | `checked … fail\|skipped`, once a week per cause | 🚨 `<repo>#<n>`: `<check>` failed / did not run — the cause, in one line |
 | A pull request labelled `label_ui_review`, out of draft | `park`, once per set of pull requests | 🎨 `<repo>#<pr>` waits for a review in its Environment — `<title>`, its Environment's URL — to `slack_ui_review` |
-| Every Environment held, none to take back | `room`, once a day per set of pull requests | 🧱 `<repo>#<n>` waits for an Environment — then each pull request holding one: review it, or merge it |
+| Every Environment held, none to take back, with `verify_environment` | `room`, once a day per set of pull requests | 🧱 `<repo>#<n>` waits for an Environment — then each pull request holding one: review it, or merge it |
 | Weekly audit | the audit's report | the report's header and its **Action needed** lines; a 🚨 first when it has a red line |
 
 ## A required check that did not pass

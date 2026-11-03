@@ -263,7 +263,7 @@ async function mainHealth(deps: Deps, kit: Kit, o: (s: string) => void): Promise
  * left is a deletion a run missed.
  */
 async function leftEnvironments(deps: Deps, kit: Kit, o: (s: string) => void): Promise<void> {
-  if (!kit.cfg.get("verify_environment")) return;
+  if (!kit.usesEnvironments) return;
   const envs = await deps.runtime.environments();
   if (envs === undefined) {
     o("warn environments.left — not measured: the platform did not list Environments");
