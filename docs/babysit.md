@@ -123,6 +123,8 @@ re-request review if the fix was more than mechanical. You never merge.
 **Merged** is finished: drop the claim from its issue, comment the issue with
 the pull request link, delete its Environment when it has one
 ([environments.md](environments.md)), and finish `released` (`finish released <pr>`).
+None of it needs a worktree, so `start` takes no slot for an item whose pull
+requests are all merged or closed, and every slot in use never holds it back.
 
 **Closed without merging**, the issue still claimed: someone decided against
 it. Read why on the pull request; drop the claim, comment the issue, finish

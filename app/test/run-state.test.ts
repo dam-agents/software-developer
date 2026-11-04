@@ -985,6 +985,41 @@ test("a parked item woken while every slot is busy stays parked, not freed", () 
     assert.equal((await as(s, "sess-e", "start", "7", "feat/7")).rc, 1, "no other run takes it");
   }));
 
+test("a parked item whose pull request merged is released with every slot busy", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    for (const [sess, n] of [
+      ["sess-b", "8"],
+      ["sess-c", "9"],
+      ["sess-d", "10"],
+    ] as const) {
+      s.runtime.running.add(sess);
+      assert.equal((await as(s, sess, "start", n, `feat/${n}`)).rc, 0);
+    }
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
+    let r = await as(s, "sess-a", "start", "7");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /no slot needed/);
+    assert.doesNotMatch(s.read("locks/item-7/owner"), /^- (slot|parked_at): /m, "back from parked, on no slot");
+    r = await as(s, "sess-a", "finish", "released", "21");
+    assert.equal(r.rc, 0, r.err);
+    assert.ok(!existsSync(join(s.locks, "item-7")));
+    assert.equal(s.field("items/7.md", "state"), "released");
+    assert.match(s.read("work/TICK.log"), /resumed session=sess-a issue=7 slot=- .*cause=released/);
+    assert.deepEqual(
+      locks(s)
+        .filter((l) => l.startsWith("slot-"))
+        .sort(),
+      ["slot-1", "slot-2", "slot-3"],
+      "the busy slots stay theirs",
+    );
+  }));
+
 test("wait refuses while the exclusive lock is held", () =>
   inSandbox(async (s) => {
     world(s);
