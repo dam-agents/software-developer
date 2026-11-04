@@ -9,6 +9,14 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.15.1 — 2026-11-04
+
+**Releasing a merged item takes no slot.** `start` on an item whose pull
+requests are all merged or closed takes the item alone, so its release no longer
+waits for a free slot.
+
+**Upgrade:** nothing.
+
 ## 6.15.0 — 2026-11-03
 
 **An issue's Environment can be a demo, not a check.** A new key,

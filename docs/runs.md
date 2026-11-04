@@ -14,7 +14,7 @@ apart is three kinds of lock, taken atomically in `work/locks`:
 | Lock | Taken by | Held for |
 | --- | --- | --- |
 | item `<n>` | `start <n>` | until its pull request merges, parked between turns — no two runs on one issue |
-| slot `<k>` | `start <n>` | the turn's work — one worktree, one run; `park` or `finish` gives it back |
+| slot `<k>` | `start <n>`, unless all its pull requests are merged or closed | the turn's work — one worktree, one run; `park` or `finish` gives it back |
 | exclusive | `lock` | the steps on what `exclusive` names; `unlock`, `park` or `finish` gives it back |
 
 An item is held until its pull request is merged, not until it is opened or

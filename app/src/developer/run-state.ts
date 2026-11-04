@@ -144,6 +144,39 @@ class RunState {
     }
   }
 
+  /** Back from parked: the item lock is the turn's again, its waiter and booking spent. */
+  resume(item: string, slot: string, phase: string): void {
+    this.locks.update(`item-${item}`, {
+      slot,
+      phase,
+      phase_at: this.now(),
+      parked_at: "-",
+      waiter: "-",
+      waiter_boot: "-",
+      wake_at: "-",
+      booking: "-",
+      woke: "-",
+      messaged_at: "-",
+    });
+  }
+
+  prsOf(item: string): string[] {
+    return this.itemKey(item, "pr").split(/\s+/).filter(Boolean);
+  }
+
+  /** Every pull request on the item's record is merged or closed; one unread is not. */
+  async allDone(item: string): Promise<boolean> {
+    const refs = this.prsOf(item).flatMap((a) => parsePrRef(a, this.kit.slug) ?? []);
+    if (refs.length === 0) return false;
+    for (const ref of refs) {
+      const view = (await this.deps.github.prView(this.kit.host, ref.slug, ref.number, "state")) as
+        | { state?: string }
+        | undefined;
+      if (view?.state !== "MERGED" && view?.state !== "CLOSED") return false;
+    }
+    return true;
+  }
+
   // ------------------------------------------------------------------ verbs
 
   async start(args: readonly string[]): Promise<number> {
@@ -183,6 +216,24 @@ class RunState {
       this.say(`item #${item} is held by session ${o?.session ?? ""}, at "${o?.phase ?? ""}" — take the next one.`);
       return 1;
     }
+    // an item whose pull requests all merged or closed only needs its release
+    // — labels, a comment, finish released — and no worktree: it takes no
+    // slot, so a full house never holds it back (docs/babysit.md → Merged)
+    if (!this.mySlot() && (await this.allDone(item))) {
+      this.resume(item, "-", "releasing");
+      this.logLine("resumed", this.kit.me, item, "-", this.prsOf(item).join(","), this.now(), "cause=released");
+      this.writeItem(item, {
+        item,
+        state: "active",
+        session: this.kit.me,
+        seen_at: this.now(),
+        updated_at: this.now(),
+      });
+      this.out(
+        `#${item}: every pull request is merged or closed — no slot needed. Release it (docs/babysit.md → Merged), then finish released.`,
+      );
+      return 0;
+    }
     // a run holds one slot: one already ours (a second start) is reused; else
     // the item's last slot, whose build output is its own, then any free one —
     // an open one: a closed slot (slots_closed) finishes what it holds and takes nothing new
@@ -212,19 +263,7 @@ class RunState {
       return 1;
     }
     this.locks.update(`slot-${k}`, { item, slot: k });
-    // back from parked: the item lock is the turn's again, its waiter and booking spent
-    this.locks.update(`item-${item}`, {
-      slot: k,
-      phase: "started",
-      phase_at: this.now(),
-      parked_at: "-",
-      waiter: "-",
-      waiter_boot: "-",
-      wake_at: "-",
-      booking: "-",
-      woke: "-",
-      messaged_at: "-",
-    });
+    this.resume(item, k, "started");
     const p = prepare({
       git: this.kit.git,
       work: this.kit.work,
