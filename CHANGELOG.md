@@ -9,6 +9,16 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.15.2 — 2026-11-05
+
+**A demo shows the change for real, or there is none.** A demo Environment
+holds a working example of what the change is about, made through the app, and
+its steps work for a person who opens the link cold. A change the install
+cannot show without faking its data in the page gets no demo: its Environment
+is not made, or is deleted, and the body says why in one line.
+
+**Upgrade:** nothing.
+
 ## 6.15.1 — 2026-11-04
 
 **Releasing a merged item takes no slot.** `start` on an item whose pull

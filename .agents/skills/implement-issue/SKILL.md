@@ -139,7 +139,8 @@ has one ([`docs/environments.md`](../../../docs/environments.md)), anything a re
 look at first.
 
 **A demo**, with `demo_environment` set and a change a person can see in the
-running app, or labelled `label_ui_review`: once the pull request is ready for
+running app, or labelled `label_ui_review`, that the install can show for real
+([`docs/environments.md`](../../../docs/environments.md)): once the pull request is ready for
 review, and before you park it, `$RS room`, then `$RS phase
 "demo_environment"` and its command for `issue-<n>` in the background. Take the
 screenshots in it, and add the `## Demo` section to the body
