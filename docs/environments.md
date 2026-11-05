@@ -9,7 +9,14 @@ serves both uses.
   change and for its screenshots. It is no check: nothing it does holds a pull
   request back from review. Made only for a change a person can see in the
   running app — the UI, or behavior the UI shows — or one labelled
-  `label_ui_review`.
+  `label_ui_review`, and only when it can be shown there **for real**: the
+  install holds a working example of what the change is about, made through
+  the app as a person would make it — the objects it lists, the state it
+  shows — so the link opens on the change itself. A demo that needs its data
+  faked in the page (the install cannot make it: a service it lacks, an
+  Environment inside an Environment) is no demo: make none, or delete the one
+  made for it, and say in one line of the body why there is none.
+  Screenshots taken some other way are marked as such where they stand.
 - **`verify_environment`** is the check a pull request must pass, run there
   instead of on something every slot shares, so it runs beside the other
   slots' with no lock, and `exclusive` stays out unless something else is still
@@ -49,7 +56,9 @@ serves both uses.
   `<!-- environment: issue-<n> -->`, so a reviewer opens the change and the
   scripts find whose it is. For a demo, they open a `## Demo` section that
   also holds screenshots taken in it and two to four steps to try the change
-  there; a round that changes what a person sees takes them again. Opening it takes the owner's access list, as the
+  there — how to sign in, where the example is — that work for a person who
+  opens the link cold; a round that changes what a person sees takes them
+  again. Opening it takes the owner's access list, as the
   session link does: the address is the one internal host a body may carry.
 - **Kept alive while the pull request waits**: each round moves its expiry on
   with `update_environment` (`expires` at the platform's default), so it never
