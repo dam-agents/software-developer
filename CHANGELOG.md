@@ -9,6 +9,16 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.15.3 — 2026-11-06
+
+**An item with work pushed past its merged pull requests is not done.** `start`
+releases an item whose recorded pull requests are all merged or closed only
+when the branch it starts on holds nothing the default branch lacks. An issue
+planned as several pull requests keeps its next one's work on a branch of its
+own, and `start` now takes a slot for it there instead of releasing the item.
+
+**Upgrade:** nothing.
+
 ## 6.15.2 — 2026-11-05
 
 **A demo shows the change for real, or there is none.** A demo Environment
