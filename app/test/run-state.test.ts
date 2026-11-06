@@ -1020,6 +1020,42 @@ test("a parked item whose pull request merged is released with every slot busy",
     );
   }));
 
+test("an item whose recorded pull request merged, with more work pushed on its branch, takes a slot", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
+    const part2 = join(s.home, "part2");
+    s.git(["clone", "-q", join(s.home, "widgets.git"), part2]);
+    s.git(["checkout", "-q", "-b", "feat/7-part2"], part2);
+    writeFileSync(join(part2, "part2.txt"), "the second pull request\n");
+    s.git(["add", "-A"], part2);
+    s.git(["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "part 2"], part2);
+    s.git(["push", "-q", "origin", "feat/7-part2"], part2);
+    const r = await as(s, "sess-a", "start", "7", "feat/7-part2");
+    assert.equal(r.rc, 0, r.err);
+    assert.doesNotMatch(r.out, /no slot needed/);
+    assert.equal(s.slot(1), "feat/7-part2", "the slot is on the branch with the work");
+  }));
+
+test("an item whose recorded pull request merged, on a branch with nothing new, needs no slot", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.github.prViews = [view("MERGED", "APPROVED", "UNKNOWN", GREEN)];
+    const r = await as(s, "sess-a", "start", "7");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /no slot needed/);
+  }));
+
 test("wait refuses while the exclusive lock is held", () =>
   inSandbox(async (s) => {
     world(s);

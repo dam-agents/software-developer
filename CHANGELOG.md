@@ -9,6 +9,16 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.16.2 — 2026-11-10
+
+**An item with work pushed past its merged pull requests is not done.** `start`
+releases an item whose recorded pull requests are all merged or closed only
+when the branch it starts on holds nothing the default branch lacks. An issue
+planned as several pull requests keeps its next one's work on a branch of its
+own, and `start` now takes a slot for it there instead of releasing the item.
+
+**Upgrade:** nothing.
+
 ## 6.16.1 — 2026-11-10
 
 **A run asks for review with the reviewer's own label, and never creates one.**
@@ -34,7 +44,6 @@ nothing changes.
 
 **Upgrade:** optional, in the direct session — add `- prune: <command>` to
 `work/CONFIG.md`.
-
 ## 6.15.2 — 2026-11-05
 
 **A demo shows the change for real, or there is none.** A demo Environment
