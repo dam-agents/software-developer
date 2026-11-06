@@ -77,6 +77,20 @@ export class Git {
     this.run(dir, ["switch", "-q", "--detach", ...onto]);
   }
 
+  /**
+   * Whether a branch on origin holds work the default branch lacks: merging it
+   * into the default branch would change something. A branch whose pull
+   * request merged by squash, or that never moved, holds nothing new. A branch
+   * that is not on origin holds nothing to lose here.
+   */
+  remoteAhead(co: string, branch: string): boolean {
+    const ref = `origin/${branch}`;
+    if (!this.hasRef(co, ref)) return false;
+    const dflt = `origin/${this.defaultBranch(co)}`;
+    const merged = this.line(co, ["merge-tree", "--write-tree", dflt, ref]);
+    return merged === "" || merged !== this.line(co, ["rev-parse", `${dflt}^{tree}`]);
+  }
+
   /** The default branch: origin/HEAD, else what the remote says, else main. */
   defaultBranch(co: string): string {
     const head = this.line(co, ["rev-parse", "--abbrev-ref", "origin/HEAD"]).replace(/^origin\//, "");
