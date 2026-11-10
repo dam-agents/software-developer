@@ -47,6 +47,8 @@ export const KNOWN = [
   "slots_closed",
   "babysit_max_hours",
   "stuck_after_min",
+  "prune",
+  "prune_below_gb",
   "work_repo",
   "work_account",
   "slack_channel",
@@ -191,6 +193,7 @@ function configChecks(kit: Kit, r: Report): void {
   };
   whole("stuck_after_min", true, "a whole number of minutes", "write 120, or more");
   whole("babysit_max_hours", false, "a whole number of hours", "write 4, or leave it out");
+  whole("prune_below_gb", true, "a whole number of GiB", "write 20, or leave it out");
   whole("slots", false, "a whole number of slots", "write 3, or leave it out");
   const closed = cfg.list("slots_closed");
   const most = cfg.int("slots", 3, 1);

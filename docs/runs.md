@@ -50,6 +50,11 @@ removes untracked files there, never ignored ones. It prefers the slot the item
 last used. `finish` detaches a saved slot, so the branch is free for any slot
 next time.
 
+That build output fills the disk. With `prune` set and less than
+`prune_below_gb` GiB free, `start` runs `prune` in the checkout and in every
+other slot no run holds, taking each slot's lock while it runs; a held slot is
+its run's, and is left alone. `prune` deletes only what a build makes again.
+
 **A closed slot**, one `slots_closed` names, finishes what it holds and takes
 no new item: `start` passes it by, and the precheck counts only the open ones
 as free. It keeps its worktree and its build output, so opening it again is

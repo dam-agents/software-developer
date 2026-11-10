@@ -9,6 +9,18 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.16.0 — 2026-11-10
+
+**Prune the free slots' build output when the disk runs low.** Two optional
+keys: `prune`, the command that deletes a checkout's rebuildable build output,
+and `prune_below_gb`, default 20. With less free than that, `start` runs
+`prune` in the checkout and in every slot no run holds, each slot locked while
+it runs; a held slot and the run's own are left alone. Without `prune`,
+nothing changes.
+
+**Upgrade:** optional, in the direct session — add `- prune: <command>` to
+`work/CONFIG.md`.
+
 ## 6.15.2 — 2026-11-05
 
 **A demo shows the change for real, or there is none.** A demo Environment

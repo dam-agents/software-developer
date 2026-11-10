@@ -1255,3 +1255,35 @@ test("room with nothing to take back waits, and says once a day which pull reque
     r = await as(s, "sess-a", "room");
     assert.match(r.err, /notify:/, "what holds them changed");
   }));
+
+test("with prune set and the disk low, start prunes the checkout and the free slots, never a held one", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.config("- prune: touch .pruned");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-b", "start", "8", "feat/8");
+    await as(s, "sess-b", "finish", "nothing");
+    // room enough: nothing is touched
+    let r = await s.run(runState, ["start", "9", "feat/9"], { CLAUDE_CODE_SESSION_ID: "sess-c", SD_FREE_GB: "50" });
+    assert.equal(r.rc, 0, r.err);
+    assert.ok(!existsSync(join(s.work, "slots", "2", ".pruned")));
+    await as(s, "sess-c", "finish", "nothing");
+    // low: the checkout and free slot 2 are pruned; held slot 1 and the run's own slot are kept
+    r = await s.run(runState, ["start", "9", "feat/9"], { CLAUDE_CODE_SESSION_ID: "sess-c", SD_FREE_GB: "5" });
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.err, /5 GiB free, under 20/);
+    const mine = /slot (\d+):/.exec(r.out)?.[1] ?? "";
+    assert.ok(existsSync(join(s.work, "widgets", ".pruned")), "checkout not pruned");
+    assert.ok(!existsSync(join(s.work, "slots", "1", ".pruned")), "pruned a held slot");
+    assert.ok(!existsSync(join(s.work, "slots", mine, ".pruned")), "pruned the run's own slot");
+    for (const k of ["2", "3"].filter((k) => k !== mine && existsSync(join(s.work, "slots", k))))
+      assert.ok(existsSync(join(s.work, "slots", k, ".pruned")), `free slot ${k} not pruned`);
+    assert.deepEqual(
+      locks(s)
+        .filter((l) => l.startsWith("slot-"))
+        .sort(),
+      ["slot-1", `slot-${mine}`].sort(),
+      "a prune lock was left behind",
+    );
+  }));

@@ -70,6 +70,8 @@ a line in any other shape is invisible, not wrong.
   take no new item; missing: none ([`docs/runs.md`](docs/runs.md) → **Slots**).
   `babysit_max_hours` — default 4: how long a run may `wait` in its turn. `stuck_after_min` — default 120: every slot held and a
   run silent this long lets a diagnostic run through.
+  `prune` — deletes a slot's rebuildable output, below `prune_below_gb` (default 20)
+  GiB free ([`docs/runs.md`](docs/runs.md) → **Slots**); missing: nothing is.
 - `work_repo` — `owner/name`, private, holding the backup of `work/`
   ([`docs/persistence.md`](docs/persistence.md) → **Backup**). Missing: none.
   `work_account` — the GitHub account (`gh auth status`) the backup acts as,
