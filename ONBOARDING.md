@@ -210,6 +210,8 @@ that is not one of them fails verification, because nothing would ever read it:
 - slots_closed: <slot numbers that take no new work yet, e.g. 4 5>
 - babysit_max_hours: 4
 - stuck_after_min: 120
+- prune: <what deletes a checkout's rebuildable build output>
+- prune_below_gb: 20
 - work_repo: owner/name-work
 - work_account: <the GitHub account that reaches work_repo, when not the active one>
 - slack_channel: C0123ABCD
@@ -234,7 +236,8 @@ neither check, or no path that needs one, `verify_required_paths`; with no
 Environment at all, `label_ui_review`; with no
 review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_ui_review` and `slack_automerge`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
-`repos_also` out when the work never leaves `repo`.
+`repos_also` out when the work never leaves `repo`; leave `prune` and
+`prune_below_gb` out when builds leave little behind.
 
 `slots`, `babysit_max_hours`, `stuck_after_min` and `environments_max` are not
 questions for the user: write the defaults. Lower `slots` when the sandbox cannot run that many builds at once;

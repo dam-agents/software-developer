@@ -49,13 +49,14 @@
 //   quiet                     live runs silent for stuck_after_min, one a line
 //   diagnosed                 the precheck let a diagnostic run through
 //   show                      all of it, for a human
-import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, statfsSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Command, Deps } from "../factory/context.ts";
 import { Exit } from "../factory/context.ts";
 import type { Conditional } from "../factory/github.ts";
 import { kv, readText, writeKv } from "../factory/kv.ts";
 import { BOOKING_GRACE_MIN, MESSAGE_GRACE_MIN, waiterAlive } from "../factory/locks.ts";
+import { run } from "../factory/proc.ts";
 import { ATTENDED } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
 import { persistTo } from "./backup.ts";
@@ -319,8 +320,52 @@ class RunState {
       babysat_out: "-",
       updated_at: now,
     });
+    this.pruneFree(k);
     this.out(`slot ${k}: ${join(this.kit.slots, k)} on ${branch}`);
     return 0;
+  }
+
+  /** Whole GiB free on the disk work/ is on; undefined when it cannot be read. */
+  private freeGb(): number | undefined {
+    const fake = this.deps.env.SD_FREE_GB;
+    if (fake !== undefined && fake !== "") return /^[0-9]+$/.test(fake) ? Number(fake) : undefined;
+    try {
+      const f = statfsSync(this.kit.work);
+      return Math.floor((f.bavail * f.bsize) / 1024 ** 3);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * With `prune` set and the disk below `prune_below_gb`, `prune` runs in the
+   * checkout and in every other slot no run holds, each slot taken for it so
+   * no run starts there meanwhile. A held slot's build output is its run's,
+   * and the run's own slot is about to be used: neither is touched.
+   */
+  private pruneFree(mine: string): void {
+    const cmd = this.kit.cfg.get("prune");
+    if (!cmd) return;
+    const min = this.kit.cfg.int("prune_below_gb", 20);
+    const free = this.freeGb();
+    if (free === undefined) {
+      this.say("free disk was not measured — prune skipped");
+      return;
+    }
+    if (free >= min) return;
+    this.say(`${String(free)} GiB free, under ${String(min)} — pruning the checkout and the free slots`);
+    const prune = (cwd: string) => run("bash", ["-c", cmd], { cwd, env: this.deps.env }).code === 0;
+    if (!prune(this.kit.checkout)) this.say("prune failed in the checkout");
+    for (let j = 1; j <= this.kit.slotCount; j++) {
+      const c = String(j);
+      const dir = join(this.kit.slots, c);
+      if (c === mine || !existsSync(dir)) continue;
+      if (!this.locks.take(`slot-${c}`, { slot: c })) continue;
+      if (!prune(dir)) this.say(`prune failed in slot ${c}`);
+      this.locks.drop(`slot-${c}`);
+    }
+    const after = this.freeGb();
+    if (after !== undefined) this.say(`${String(after)} GiB free after the prune`);
   }
 
   /** One more repository a run takes beside its slot, in a worktree of its own on the slot's branch. */
