@@ -165,10 +165,19 @@ class RunState {
     return this.itemKey(item, "pr").split(/\s+/).filter(Boolean);
   }
 
-  /** Every pull request on the item's record is merged or closed; one unread is not. */
-  async allDone(item: string): Promise<boolean> {
+  /**
+   * Every pull request on the item's record is merged or closed, and the
+   * branch the run starts on holds nothing the default branch lacks; one
+   * unread is not. An issue planned as several pull requests keeps its later
+   * work on a branch of its own before that pull request is opened, and that
+   * work is not done because the earlier ones merged.
+   */
+  async allDone(item: string, branch: string): Promise<boolean> {
     const refs = this.prsOf(item).flatMap((a) => parsePrRef(a, this.kit.slug) ?? []);
     if (refs.length === 0) return false;
+    const co = this.kit.checkout;
+    for (const ref of [this.kit.git.defaultBranch(co), branch]) this.kit.git.run(co, ["fetch", "-q", "origin", ref]);
+    if (this.kit.git.remoteAhead(co, branch)) return false;
     for (const ref of refs) {
       const view = (await this.deps.github.prView(this.kit.host, ref.slug, ref.number, "state")) as
         | { state?: string }
@@ -220,7 +229,7 @@ class RunState {
     // an item whose pull requests all merged or closed only needs its release
     // — labels, a comment, finish released — and no worktree: it takes no
     // slot, so a full house never holds it back (docs/babysit.md → Merged)
-    if (!this.mySlot() && (await this.allDone(item))) {
+    if (!this.mySlot() && (await this.allDone(item, branch))) {
       this.resume(item, "-", "releasing");
       this.logLine("resumed", this.kit.me, item, "-", this.prsOf(item).join(","), this.now(), "cause=released");
       this.writeItem(item, {
