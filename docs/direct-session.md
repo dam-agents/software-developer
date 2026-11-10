@@ -26,6 +26,7 @@ precheck wakes nothing. What changes for a run:
 
 - **The session carries its pull request to the merge.** Open it, give the
   operator its link, then park it with its waiter running and a wake-up booked
+  — nothing watches it but the waiter
   ([babysit.md](babysit.md) → **Held, then parked**): a review, a comment — after
   approval too — a red check or the merge wakes this same session, and so does
   the operator typing here. No tick takes it over. `finish pr-opened <pr>`

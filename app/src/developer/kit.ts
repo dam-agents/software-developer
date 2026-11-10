@@ -121,6 +121,12 @@ export class Kit {
   get stuckMin(): number {
     return this.cfg.int("stuck_after_min", 120);
   }
+  /** Whether the tick's precheck runs, and so watches a parked item: autonomous, with the tick among `schedules`. */
+  get precheckWatches(): boolean {
+    if (this.cfg.mode() !== "autonomous") return false;
+    const on = this.cfg.list("schedules");
+    return on.length === 0 || on.includes("tick");
+  }
   get babysitMaxHours(): number {
     return this.cfg.int("babysit_max_hours", 4);
   }

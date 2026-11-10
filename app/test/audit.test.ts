@@ -83,7 +83,7 @@ test("a busy week, counted", () =>
     assert.match(r.out, /median 1, longest 40/);
     assert.match(
       r.out,
-      /resumes: 2 continued in their own session \(waiter 1, booked wake-up 0, a person 1\), 1 taken over by a fresh one/,
+      /resumes: 2 continued in their own session \(precheck 0, waiter 1, booked wake-up 0, a person 1\), 1 taken over by a fresh one/,
     );
     assert.doesNotMatch(r.out, /warn runs\.resumed/, "most kept their context");
     assert.match(r.out, /warn runs\.abandoned — 1 run\(s\)/);

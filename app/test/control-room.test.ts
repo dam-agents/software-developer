@@ -191,6 +191,7 @@ test("the resume counts and the log come from TICK.log", () => {
   ].join("\n");
   assert.deepEqual(resumeCounts(log, "2026-09-21T00:00:00Z"), {
     total: 2,
+    precheck: 0,
     waiter: 0,
     messaged: 0,
     booking: 0,

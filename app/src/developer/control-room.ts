@@ -22,7 +22,7 @@ import { join } from "node:path";
 import type { Command, Deps } from "../factory/context.ts";
 import { issueRefs, login } from "../factory/github.ts";
 import { parseKv, readText } from "../factory/kv.ts";
-import type { Held } from "../factory/locks.ts";
+import type { Held, ParkedHolder } from "../factory/locks.ts";
 import { run } from "../factory/proc.ts";
 import type { SessionInfo } from "../factory/runtime.ts";
 import { epoch, iso, nowSeconds } from "../factory/time.ts";
@@ -84,9 +84,9 @@ export interface LockView {
   readonly silent_min: number | null;
   readonly stop_blocks: number;
   readonly holder: Holder;
-  /** A parked item lock: when, and what keeps it — its waiter, a booked wake-up, a message asking its session back, or nothing. */
+  /** A parked item lock: when, and what keeps it — the precheck, its waiter, a booked wake-up, a message asking its session back, or nothing. */
   readonly parked_at: string;
-  readonly kept_by: "waiter" | "booking" | "message" | "";
+  readonly kept_by: ParkedHolder;
   readonly wake_at: string;
 }
 
@@ -227,6 +227,7 @@ export function resumeCounts(text: string, sinceIso: string) {
   const by = (c: string) => lines.filter((l) => new RegExp(`cause=${c}( |$)`).test(l)).length;
   return {
     total: lines.length,
+    precheck: by("precheck"),
     waiter: by("waiter"),
     booking: by("booking"),
     messaged: text.split("\n").filter((l) => l.split(" ")[1] === "messaged" && (l.split(" ")[0] ?? "") > sinceIso)

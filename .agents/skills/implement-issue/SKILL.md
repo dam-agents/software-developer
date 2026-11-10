@@ -130,7 +130,7 @@ git push
 gh pr create -R <repo> --title "<type>: <what>" --body "<body>" [--label <label_mine>]
 gh pr edit <pr> -R <repo> --add-label <label_review>   # when set
 gh pr edit <pr> -R <repo> --add-label <label_ui_review>   # when set, and a person sees the change in the UI
-$RS park <pr>...               # every pull request of the issue; then its waiter, below
+$RS park <pr>...               # every pull request of the issue; then end the turn as it says
 ```
 
 The body: what changed and why, how it was verified (the commands, and what
@@ -151,8 +151,8 @@ that fails, is one line there, and a later round tries again. Then `Fixes #<n>` 
 `Written by this agent — <link>` from `bash "$HOME/scripts/session-link.sh"`.
 With `label_mine` set it carries that label from the start: without it, no
 later run finds the pull request, and `finish` refuses `pr-opened`.
-Then **babysit it in this session** until it is merged: park it, start
-`$RS wait --park` as a background task and end the turn; when the waiter wakes
+Then **babysit it in this session** until it is merged: park it and end the
+turn as `park` says; when the precheck (or, without a tick, the waiter) wakes
 the session, `start` the item, handle what landed, push, park again —
 [`docs/babysit.md`](../../../docs/babysit.md). The run ends `released` once it is
 merged or closed, and `blocked` when it cannot get green.

@@ -26,6 +26,9 @@ function world(s: Sandbox): void {
 }
 const as = (s: Sandbox, session: string, ...args: string[]) =>
   s.run(runState, args, { CLAUDE_CODE_SESSION_ID: session, SD_WAIT_FOR: "3", SD_WAIT_POLL: "1" });
+/** No tick runs, so nothing but a waiter watches a parked item. */
+const noTick = (s: Sandbox) =>
+  s.write("work/CONFIG.md", s.read("work/CONFIG.md").replace("\n## Bounds", "- schedules: audit\n\n## Bounds"));
 const locks = (s: Sandbox) => (existsSync(s.locks) ? readdirSync(s.locks) : []);
 
 test("start takes the item and a slot, on a new branch", () =>
@@ -722,6 +725,7 @@ const COMMENTS21 = /^repos\/[^/]+\/[^/]+\/issues\/21\/comments/;
 test("park frees the slot and the exclusive lock, keeps the item, and needs the round reported", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -779,6 +783,7 @@ test("approved, it parks awaiting the merge", () =>
 test("the waiter wakes its session for a comment after approval, and for the merge", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
@@ -828,6 +833,7 @@ test("the waiter wakes its session for a comment after approval, and for the mer
 test("a second waiter steps aside, and a waiter whose session took its item back stops", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -846,9 +852,80 @@ test("a second waiter steps aside, and a waiter whose session took its item back
     assert.equal(w.rc, 1, "nothing parked any more");
   }));
 
+test("with the tick on, park leaves the precheck watching: no waiter, and a restart frees nothing", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    const r = await as(s, "sess-a", "park", "21");
+    assert.equal(r.rc, 0, r.err);
+    assert.match(r.out, /end the turn, with nothing left running: the precheck watches it/);
+    assert.doesNotMatch(r.out, /wait --park/);
+    assert.match(s.read("locks/item-7/owner"), /^- watched: precheck$/m);
+    assert.equal((await as(s, "sess-a", "may-stop")).rc, 0, "at rest with nothing running");
+    s.runtime.running.delete("sess-a");
+    s.clock.advance(6 * 3600);
+    await as(s, "sess-b", "sweep");
+    assert.ok(existsSync(join(s.locks, "item-7")), "the precheck holds it: not abandoned");
+    assert.equal(s.runtime.messages.length, 0, "nobody is asked to restart anything");
+    assert.equal((await as(s, "sess-b", "start", "7", "feat/7")).rc, 1, "no other run takes it");
+  }));
+
+test("an item parked with a waiter is handed to the precheck: its lost waiter, or wait --park", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    // as a version before this one parked it: a waiter and no watch
+    s.write("locks/item-7/owner", s.read("locks/item-7/owner").replace(/^- watched: .*\n/m, ""));
+    s.runtime.running.delete("sess-a");
+    await as(s, "sess-b", "sweep");
+    assert.ok(existsSync(join(s.locks, "item-7")), "its waiter lost to a restart: watched, not abandoned");
+    assert.equal(s.runtime.messages.length, 0, "no message to start a waiter");
+    assert.match(s.read("locks/item-7/owner"), /^- watched: precheck$/m);
+    // one that starts its waiter anyway hands it over at once
+    s.write("locks/item-7/owner", s.read("locks/item-7/owner").replace(/^- watched: .*\n/m, ""));
+    s.runtime.running.add("sess-a");
+    const r = await s.run(runState, ["wait", "--park"], { CLAUDE_CODE_SESSION_ID: "sess-a", SD_WAITER_PID: "777" });
+    assert.equal(r.rc, 5);
+    assert.match(r.out, /the precheck watches it/);
+    assert.match(s.read("locks/item-7/owner"), /^- watched: precheck$/m);
+    assert.doesNotMatch(s.read("locks/item-7/owner"), /^- waiter:/m);
+  }));
+
+test("woken by the precheck while every slot is busy, it stays parked and watched", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
+    await as(s, "sess-a", "start", "7", "feat/7");
+    await as(s, "sess-a", "park", "21");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- messaged_at: ${s.clock.ago(1)}\n`);
+    for (const [sess, n] of [
+      ["sess-b", "8"],
+      ["sess-c", "9"],
+      ["sess-d", "10"],
+    ] as const) {
+      s.runtime.running.add(sess);
+      assert.equal((await as(s, sess, "start", n, `feat/${n}`)).rc, 0);
+    }
+    const r = await as(s, "sess-a", "start", "7");
+    assert.equal(r.rc, 1);
+    assert.match(r.err, /the precheck wakes this session again once a slot is free/);
+    assert.doesNotMatch(s.read("locks/item-7/owner"), /^- messaged_at:/m, "watched again, not waiting out a grace");
+    assert.equal((await as(s, "sess-a", "may-stop")).rc, 0);
+  }));
+
 test("a booked wake-up holds a parked item across a restart, and resumes the same session", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -869,6 +946,7 @@ test("a booked wake-up holds a parked item across a restart, and resumes the sam
 test("a parked item with nothing left to wake it is handed on, and its next run says so", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -889,6 +967,7 @@ test("a parked item with nothing left to wake it is handed on, and its next run 
 test("a parked item whose waiter a restart killed asks its own session to start it again, once", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -919,6 +998,7 @@ test("a parked item whose waiter a restart killed asks its own session to start 
 test("a session messaged that starts no waiter in time is handed on to a fresh run", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -937,6 +1017,7 @@ test("a session messaged that starts no waiter in time is handed on to a fresh r
 test("a message the platform does not queue, or a person's session, hands the item on at once", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -963,6 +1044,7 @@ test("a message the platform does not queue, or a person's session, hands the it
 test("a parked item woken while every slot is busy stays parked, not freed", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];
@@ -1071,6 +1153,7 @@ test("wait refuses while the exclusive lock is held", () =>
 test("may-stop: a held run may not; at rest it may", () =>
   inSandbox(async (s) => {
     world(s);
+    noTick(s);
     s.originCheckout();
     s.github.on(PULL, PULL21);
     s.github.prViews = [view("OPEN", "REVIEW_REQUIRED", "MERGEABLE", GREEN)];

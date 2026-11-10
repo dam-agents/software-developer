@@ -208,6 +208,8 @@ async function readRest(gh: GitHub, kit: Kit, author: string, mine: string, also
 
 interface ItemCache {
   readonly seen: string;
+  /** When the session that parked it came back from its last round: what lands after it wakes that session. */
+  readonly round: string;
   readonly state: string;
   readonly abandoned: number;
   readonly branch: string;
@@ -230,12 +232,23 @@ export function readItems(dir: string): Map<string, ItemCache> {
     const m = parseKv(readText(join(dir, f)));
     out.set(f.slice(0, -3), {
       seen: m.get("seen_at") ?? "",
+      round: m.get("round_at") ?? "",
       state: m.get("state") ?? "",
       abandoned: Number(m.get("abandoned") ?? 0) || 0,
       branch: m.get("branch") ?? "",
     });
   }
   return out;
+}
+
+/** A parked item the precheck watches, and what landed on its pull requests: its session is messaged. */
+export interface Wake {
+  readonly item: string;
+  readonly what: string;
+  /** The worklist line a fresh run gets when the session cannot be reached. */
+  readonly line: string;
+  /** Every pull request of it merged or closed, as far as the open ones show: `start` reads GitHub again. */
+  readonly done?: boolean;
 }
 
 /** The worklist, by section, from what GitHub and the cache say. */
@@ -248,24 +261,32 @@ export function worklist(
   author: string,
   lockFree: boolean,
   envFree = false,
+  watched: ReadonlySet<string> = new Set(),
 ) {
   const root = kit.slug;
   // A pull request is babysat until it is merged (docs/babysit.md). It wakes
   // a run for what happened to it since a run last looked: a review, a
   // person's comment — on an approved one, a maintainer's — or a check that
   // failed, once, so what the agent could not fix is not reported every tick.
-  // Its item is the issue of `repo` its body names, and an item held — by a
-  // live run, or parked with its session's waiter or wake-up still to come —
-  // is left out: that session answers it, with the context that wrote it. One
-  // in another repository that names none is not this instance's work.
+  // Its item is the issue of `repo` its body names, and an item held by a
+  // live run, or parked with its session's waiter or wake-up still to come,
+  // is left out. One parked with the precheck watching it (`watched`) is a
+  // wake instead: its session is messaged, so the context that wrote the
+  // change answers it — from its last round on, and a conflict in review too,
+  // as a waiter would. One in another repository that names none is not this
+  // instance's work.
   const prWork: string[] = [];
+  const wakes = new Map<string, { what: string[]; lines: string[] }>();
   for (const p of snap.prs) {
     const repo = p.repo || root;
     const other = repo.toLowerCase() !== root.toLowerCase();
     const item = issueRefs(p.body, root, repo)[0] ?? (other ? undefined : `pr${String(p.number)}`);
-    if (item === undefined || held.has(item)) continue;
+    if (item === undefined) continue;
+    const wake = watched.has(item);
+    if (held.has(item) && !wake) continue;
     const ref = other ? `${repo}#${String(p.number)}` : `#${String(p.number)}`;
-    const s = items.get(item)?.seen || since;
+    const cached = items.get(item);
+    const s = (wake ? cached?.round || cached?.seen : cached?.seen) || since;
     const approved = p.reviewDecision === "APPROVED";
     const latest = reviewsSince(p, "", author)
       .filter((r) => !approved || r.state !== "APPROVED")
@@ -274,18 +295,24 @@ export function worklist(
       .at(-1);
     const reviewed = (latest ?? "") > s;
     const commented = commentsSince(p.comments ?? [], s, approved).length > 0;
-    const failed = failedSince(p, s);
-    const conflict = p.mergeable === "CONFLICTING" && items.get(item)?.state === "awaiting-merge";
+    const failed = failedSince(p, s, wake);
+    const conflict = p.mergeable === "CONFLICTING" && (wake || cached?.state === "awaiting-merge");
     if (!reviewed && !commented && failed.length === 0 && !conflict) continue;
     const what = [
       ...(reviewed ? ["reviewed; resolve every finding and re-request review"] : []),
       ...(commented ? [`commented${approved ? " after approval" : ""}; answer every comment`] : []),
       ...(failed.length > 0 ? [`checks failed: ${failed.join(", ")}`] : []),
-      ...(conflict ? ["approved, now conflicting: rebase"] : []),
+      ...(conflict ? [`${approved ? "approved, now " : ""}conflicting: rebase`] : []),
     ].join("; ");
-    prWork.push(
-      `- ${item.startsWith("pr") ? item : `#${item}`} — PR ${ref} ${p.title ?? ""} — ${what} — docs/babysit.md\n  ${p.url ?? ""}`,
-    );
+    const line = `- ${item.startsWith("pr") ? item : `#${item}`} — PR ${ref} ${p.title ?? ""} — ${what} — docs/babysit.md\n  ${p.url ?? ""}`;
+    if (!wake) {
+      prWork.push(line);
+      continue;
+    }
+    const w = wakes.get(item) ?? { what: [], lines: [] };
+    w.what.push(`PR ${ref} ${what}`);
+    w.lines.push(line);
+    wakes.set(item, w);
   }
   // Items a run parked because the exclusive lock was taken: due again once
   // it is free. `waiting-cluster` is the same state as written before 3.0.0.
@@ -322,12 +349,20 @@ export function worklist(
       issueRefs(p.body, root, p.repo || root).concat(p.repo && p.repo !== root ? [] : [`pr${String(p.number)}`]),
     ),
   );
+  const releaseLine = (k: string) =>
+    `- ${k.startsWith("pr") ? k : `#${k}`} — its pull request is merged or closed: release the issue — docs/babysit.md`;
   const releaseWork = [...items.entries()]
     .filter(([k, v]) => (v.state === "in-review" || v.state === "awaiting-merge") && !held.has(k) && !openNamed.has(k))
-    .map(
-      ([k]) =>
-        `- ${k.startsWith("pr") ? k : `#${k}`} — its pull request is merged or closed: release the issue — docs/babysit.md`,
-    );
+    .map(([k]) => releaseLine(k));
+  // a watched item with no open pull request left: merged or closed, its session woken to release it
+  const wakeWork: Wake[] = [...wakes.entries()].map(([item, w]) => ({
+    item,
+    what: w.what.join("; "),
+    line: w.lines.join("\n"),
+  }));
+  for (const k of watched)
+    if (!openNamed.has(k) && !wakes.has(k))
+      wakeWork.push({ item: k, what: "merged or closed: release the issue", line: releaseLine(k), done: true });
   const resumeWork = snap.claimed
     .filter((i) => mine === "" || i.labels.includes(mine))
     .filter((i) => !named.has(String(i.number)))
@@ -342,7 +377,7 @@ export function worklist(
       const a = items.get(String(i.number))?.abandoned ?? 0;
       return `- #${i.number} ${i.title}${a > 0 ? ` — a run died on it ${a} time(s)` : ""}\n  ${i.url}`;
     });
-  return { prWork, lockWork, envWork, issueWork, resumeWork, releaseWork };
+  return { prWork, lockWork, envWork, issueWork, resumeWork, releaseWork, wakeWork };
 }
 
 export const precheck: Command = async (deps, _args) => {
@@ -366,6 +401,15 @@ export const precheck: Command = async (deps, _args) => {
     lockFree = kit.locks.read("exclusive") === undefined;
   }
   const held = new Set(kit.locks.ofKind("item-").map((h) => h.name.slice("item-".length)));
+  // parked items the precheck watches, their sessions not yet messaged: what lands on them is a message, not a run
+  const watched = new Set(
+    probe
+      ? []
+      : kit.locks
+          .ofKind("item-")
+          .filter((h) => h.owner.parked_at !== "" && kit.locks.parkedHolder(h.owner) === "precheck")
+          .map((h) => h.name.slice("item-".length)),
+  );
   if (!kit.repo) {
     // Nothing to work on — CONFIG.md lost or never written. Letting a run
     // through to say so would repeat every ten minutes into a chat nobody
@@ -398,7 +442,26 @@ export const precheck: Command = async (deps, _args) => {
     const envs = await deps.runtime.environments();
     envFree = envs !== undefined && envs.length < kit.environmentsMax;
   }
-  const w = worklist(kit, snap, cached, held, deps.env.PLATFORM_LAST_RUN_AT ?? "", author, lockFree, envFree);
+  const w = worklist(kit, snap, cached, held, deps.env.PLATFORM_LAST_RUN_AT ?? "", author, lockFree, envFree, watched);
+  // Each watched item something landed on: its session is messaged, a turn
+  // there and none here. Not reached, the item is handed on, and its line
+  // joins the list for a fresh run. A pull request missing from the open ones
+  // is read once more, so a search that lags never wakes a session for a
+  // merge that did not happen.
+  if (w.wakeWork.length > 0) {
+    const rs = new RunState(silenced(deps));
+    const handedOn: string[] = [];
+    for (const x of w.wakeWork) {
+      if (x.done && !(await rs.prsClosed(x.item))) continue;
+      if (await rs.wakeParked(x.item, x.what)) continue;
+      handedOn.push(`#${x.item.replace(/^pr/, "")}`);
+      (x.done ? w.releaseWork : w.prWork).push(x.line);
+    }
+    if (handedOn.length > 0)
+      notes.push(
+        `${handedOn.join(" ")} parked, and its session could not be reached to answer what landed: take it over from its branch and pull request.`,
+      );
+  }
   const n = w.prWork.length + w.lockWork.length + w.envWork.length + w.issueWork.length;
   if (n + w.resumeWork.length + w.releaseWork.length === 0) return 1;
   const o = (s: string) => deps.io.out(s);
