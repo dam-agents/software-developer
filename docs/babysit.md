@@ -112,8 +112,11 @@ one round, so one push answers everything:
    screenshots when what a person sees changed — or make the demo a round
    before could not ([environments.md](environments.md)), comment with this run's session link, and ask for review of the
    new round: re-request the reviewers who reviewed, and re-apply the
-   review-request label only when nothing re-requests them otherwise. Then
-   park it, above.
+   review-request label only when nothing re-requests them otherwise — the
+   label the reviewer itself names, when its review names one (a delta label
+   for the new commits wins over a full review). A label is never created to
+   ask for review: one missing from the repository is the wrong name, and a run
+   reports it instead. Then park it, above.
 
 **Approved, green and mergeable** is parked `awaiting-merge`: with
 `slack_channel` set, `park` says to post that it is ready to merge
