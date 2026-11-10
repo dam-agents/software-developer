@@ -77,6 +77,17 @@ test("a parked item with its waiter running stops; parked with nothing to wake i
     assert.equal((await stop(s, "sess-a", [], { SD_LIVE_PIDS: "" })).rc, 0, "a wake-up is booked");
   }));
 
+test("parked with the precheck watching stops with nothing running; woken by it, it does not", () =>
+  inSandbox(async (s) => {
+    s.runtime.running.add("sess-a");
+    s.lock("item-7", { session: "sess-a", item: "7", parked_at: s.clock.ago(1), watched: "precheck" });
+    assert.equal((await stop(s, "sess-a")).rc, 0, "no waiter, no booking: the precheck watches it");
+    s.write("locks/item-7/owner", `${s.read("locks/item-7/owner")}- messaged_at: ${s.clock.ago(1)}\n`);
+    const r = await stop(s, "sess-a");
+    assert.equal(r.rc, 2, "the message is what woke this turn");
+    assert.match(r.err, /the precheck woke this session .* start 7/s);
+  }));
+
 test("parked does not excuse a slot or the exclusive lock still held", () =>
   inSandbox(async (s) => {
     s.runtime.running.add("sess-a");

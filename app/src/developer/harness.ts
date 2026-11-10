@@ -32,12 +32,13 @@ const WAITER = /run-state(\.sh)?["']?\s+wait\s+--park/;
  * hook asks. Nobody watches a scheduled run, so a turn that ends mid-work —
  * a summary, a question, "I'll continue next time" — is work nobody hears
  * about until a later run finds it dead. A run whose pull request waits on a
- * person is at rest once it is parked and something will wake it: then the
- * turn ends, and the waiter brings it back. Exit 2 keeps the turn going and
- * shows the model stderr: what is left, and how.
+ * person is at rest once it is parked and something will wake it — the
+ * precheck, which watches it, or else its waiter: then the turn ends with
+ * nothing running, and a message brings it back. Exit 2 keeps the turn going
+ * and shows the model stderr: what is left, and how.
  *
- * A waiter the harness lists as a running background task counts as one even
- * before it has written its pid: the model may end the turn the moment it
+ * A waiter, where one is still started, the harness lists as a running
+ * background task counts as one even before it has written its pid: the model may end the turn the moment it
  * starts it. The hook counts its own blocks on the item's lock; after
  * MAX_BLOCKS it lets the stop through — the harness ends a turn after eight
  * blocks anyway — and the next precheck finds the run dead and hands its item
@@ -88,8 +89,7 @@ export const enforceFinish: Command = async (deps) => {
     e("- Waiting on a person — a review, a merge? Push, comment the pull request");
     e("  with this run's session link, then:");
     e('    bash "$HOME/scripts/run-state.sh" park <pr>...');
-    e('    bash "$HOME/scripts/run-state.sh" wait --park     (a background task)');
-    e("  and end the turn: the waiter wakes this session when something lands.");
+    e("  and end the turn as it says: this session is woken when something lands.");
     e("- Done, or cannot go on: push, report on the issue or its pull request with");
     e('  the session link (bash "$HOME/scripts/session-link.sh"), then');
     e('    bash "$HOME/scripts/run-state.sh" finish <outcome> [pr]');

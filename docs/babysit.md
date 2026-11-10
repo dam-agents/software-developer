@@ -13,56 +13,57 @@ what it holds besides changes with whose move it is:
 | | Whose move | Holds | The turn |
 | --- | --- | --- | --- |
 | **Held** | yours: writing, checking, a review round | the item, a slot, the exclusive lock while you use it | runs; the Stop hook keeps it going |
-| **Parked** | a person's: a review, a merge | the item alone | ends; a waiter wakes the session |
+| **Parked** | a person's: a review, a merge | the item alone | ends, nothing running; the precheck wakes the session |
 
 **Park** once the round is pushed and reported and a person moves next:
 
 ```sh
 bash "$HOME/scripts/run-state.sh" park <pr>...
-bash "$HOME/scripts/run-state.sh" wait --park      # as a background task
 ```
 
 `park` refuses until the slot is pushed and this round's comment is on the pull
 request, like `finish`. Then it gives the slot and the exclusive lock back —
 nothing shared waits on a person — and marks the item `in-review`, or
-`awaiting-merge` once every pull request is approved. Start its waiter as the
-harness's own background task (Claude Code: `run_in_background`) and end the
-turn: the Stop hook lets a parked turn end once its waiter runs.
+`awaiting-merge` once every pull request is approved. End the turn with
+nothing left running: the Stop hook lets a parked turn end.
 
-**The waiter** looks at the pull requests once a minute — an unchanged one
-costs nothing (`app/src/factory/github.ts`) — for up to two hours. It exits
-when one needs you: a review, **a person's comment** in the conversation or on
-a line, a failed check, a conflict, or the merge. The harness hands its output
-to the session as a new turn: `start` the item again — it takes a slot, back
-to Held — and handle what woke you, in the next section. Exit `3` is two hours
-of nothing: start it again, and end the turn. **A person typing in the
-session** wakes it the same way: `start` the item.
+**The precheck watches it.** Every tick it reads your open pull requests anyway,
+at no model cost; for a parked item it looks for what came after your last
+round: a review, **a person's comment** in the conversation, a failed check, a
+conflict, or the merge. One of them **messages the session** — a turn there, none in the
+tick — with what landed: `start` the item again — it takes a slot, back to
+Held — and handle it, in the next section. Asked once: not back within fifteen
+minutes, or the message not queued, **a later run takes it over** — the
+precheck lists it like a run that stopped, and a fresh session babysits it from
+the branch and the pull request. Every slot in use, `start` says so and the item
+stays parked, watched: end the turn, and the precheck asks again once a slot
+frees. A restart loses nothing: no process waits in the sandbox. **A person
+typing in the session** wakes it the same way: `start` the item. `TICK.log`
+says which happened — `messaged`, then `resumed … cause=precheck|operator`, or
+`cause=fresh prev=<session>` — and the weekly audit counts them.
+
+**Without a tick to watch it** — the direct session, a Slack session, or
+`schedules` without `tick` — `park` says to start its **waiter**, `run-state.sh
+wait --park`, as the harness's own background task (Claude Code:
+`run_in_background`, `timeout` two hours), then end the turn. It looks at the
+pull requests once a minute — an unchanged one costs nothing
+(`app/src/factory/github.ts`) — for up to two hours, wakes the session for the
+same events, and exits `3` after two hours of nothing: start it again. A
+restart kills it: in the direct session book a wake-up too —
+`schedule_once` with `inSession: "continue"`, a little over two hours ahead,
+then `run-state.sh booked <its time> <its id>` — and delete the booking when
+the waiter wakes you first (`start` reminds you). An item parked by a version
+before the precheck watched hands itself over: the sweep finds its waiter gone,
+and `wait --park` ends at once where the precheck watches.
 
 **A short wait** — checks that finish in minutes — needs no parking:
 `run-state.sh wait <pr>...` blocks up to nine minutes in the turn, the slot
 kept. Exit `3` is nothing yet: call it again. `wait` refuses while you hold the
 exclusive lock: `unlock` first.
 
-An item with pull requests in more than one repository parks and waits on them
-all ([runs.md](runs.md) → **Other repositories**), and is merged only once
-every one is.
-
-**A restart kills the waiter.** In the direct session, book a wake-up too, so
-the same session comes back: `schedule_once` with `inSession: "continue"`, a
-little over two hours ahead, then `run-state.sh booked <its time> <its id>`.
-Woken by the waiter first, delete the booking (`start` reminds you). A
-scheduled run may not change the platform's schedules (`CLAUDE.md` → **Hard
-invariants**): its waiter alone holds the item. After a restart, **the sweep
-asks the session to start it again**: it finds the parked item with nothing
-left to wake it, sends its session a message (`send_session_message`), and
-holds the item fifteen minutes for it. The message is a turn there: start the
-waiter again, as it says, and end the turn — it looks from your last round on,
-so what landed meanwhile wakes you at once. The message not queued, or no
-waiter in time, **a later run takes it over** — the precheck lists it like a
-run that stopped, and a fresh session babysits it from the top, from the branch
-and the pull request. `TICK.log` says which happened — `messaged`, then
-`resumed … cause=waiter|booking|operator`, or `cause=fresh prev=<session>` —
-and the weekly audit counts them.
+An item with pull requests in more than one repository parks on them all
+([runs.md](runs.md) → **Other repositories**), and is merged only once every
+one is.
 
 ## The required check
 
@@ -104,8 +105,8 @@ one round, so one push answers everything:
    (`CLAUDE.md` → **Trust boundary**). **A person's comment is findings
    too**, in the conversation or on a line. **After approval**, a review with
    findings or a comment from a maintainer — `OWNER`, `MEMBER` or
-   `COLLABORATOR` — is still a round; anyone else's is not, and the waiter
-   does not wake for it. A push may dismiss the approval: then re-request it.
+   `COLLABORATOR` — is still a round; anyone else's is not, and nothing
+   wakes you for it. A push may dismiss the approval: then re-request it.
 3. **Conflicts.** Rebase on the default branch, run `verify` again.
 4. **Push**, move its Environment's expiry on when it has one, and, with
    `demo_environment`, install the push there and retake the demo's
@@ -139,7 +140,7 @@ skill, `CONTRIBUTING` — follow it, within the **Hard invariants**, for what
 one round does: how to mark it ready, whom to ask, how to answer findings.
 **Its waiting goes through `park` and `wait`.** Where it says to watch, poll or
 loop until a review or a check arrives, park instead (**Held, then parked**,
-above): it frees what other runs need, and the waiter brings the session back.
+above): it frees what other runs need, and the precheck brings the session back.
 
 **When you cannot get it green**, say so on the pull request — what fails, what
 you tried — and finish the run `blocked`. The precheck does not wake for the

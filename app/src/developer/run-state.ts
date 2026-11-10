@@ -21,11 +21,14 @@
 //                             <owner/name>#<n> elsewhere
 //   park <pr>...              the run's part is done and a person moves next:
 //                             frees the slot and the exclusive lock, keeps the
-//                             item, so the session may end its turn
-//   wait --park               the parked item's waiter, a background task: blocks
-//                             up to ~2 hours until a pull request needs the run
-//                             (0, and the harness wakes the session), it merged
-//                             (0), or nothing came (3: start it again)
+//                             item, so the session may end its turn; the
+//                             precheck watches it, and messages the session
+//                             when something lands
+//   wait --park               in a person's session, or with no tick to watch:
+//                             the parked item's waiter, a background task,
+//                             blocks up to ~2 hours until a pull request needs
+//                             the run (0, and the harness wakes the session),
+//                             it merged (0), or nothing came (3: start it again)
 //   booked <iso> [id]         a wake-up booked on the platform for the parked item
 //   may-stop                  whether this session may end its turn now (0), or
 //                             what is left first (1, on stderr): the Stop hook
@@ -145,13 +148,14 @@ class RunState {
     }
   }
 
-  /** Back from parked: the item lock is the turn's again, its waiter and booking spent. */
+  /** Back from parked: the item lock is the turn's again, its watch, waiter and booking spent. */
   resume(item: string, slot: string, phase: string): void {
     this.locks.update(`item-${item}`, {
       slot,
       phase,
       phase_at: this.now(),
       parked_at: "-",
+      watched: "-",
       waiter: "-",
       waiter_boot: "-",
       wake_at: "-",
@@ -166,6 +170,15 @@ class RunState {
   }
 
   /**
+   * Whether the precheck watches this session's parked item, so nothing need
+   * run in its sandbox while it waits: the tick runs, and the session is not
+   * a person's — a script never messages a person's chat.
+   */
+  async precheckWatches(session: string): Promise<boolean> {
+    return this.kit.precheckWatches && !ATTENDED.has(await this.deps.runtime.sessionType(session));
+  }
+
+  /**
    * Every pull request on the item's record is merged or closed, and the
    * branch the run starts on holds nothing the default branch lacks; one
    * unread is not. An issue planned as several pull requests keeps its later
@@ -173,11 +186,17 @@ class RunState {
    * work is not done because the earlier ones merged.
    */
   async allDone(item: string, branch: string): Promise<boolean> {
-    const refs = this.prsOf(item).flatMap((a) => parsePrRef(a, this.kit.slug) ?? []);
-    if (refs.length === 0) return false;
+    if (this.prsOf(item).length === 0) return false;
     const co = this.kit.checkout;
     for (const ref of [this.kit.git.defaultBranch(co), branch]) this.kit.git.run(co, ["fetch", "-q", "origin", ref]);
     if (this.kit.git.remoteAhead(co, branch)) return false;
+    return this.prsClosed(item);
+  }
+
+  /** Every pull request on the item's record is merged or closed; one unread is not. The precheck's check: no fetch. */
+  async prsClosed(item: string): Promise<boolean> {
+    const refs = this.prsOf(item).flatMap((a) => parsePrRef(a, this.kit.slug) ?? []);
+    if (refs.length === 0) return false;
     for (const ref of refs) {
       const view = (await this.deps.github.prView(this.kit.host, ref.slug, ref.number, "state")) as
         | { state?: string }
@@ -262,13 +281,19 @@ class RunState {
       }
     }
     if (!k) {
-      // a parked item stays parked, its waiter and booking untouched: dropping
-      // its lock here would hand it to whichever run comes next
+      // a parked item stays parked, its watch, waiter and booking untouched:
+      // dropping its lock here would hand it to whichever run comes next. One
+      // the precheck messaged is watched again, and messaged again once a
+      // slot is free: the precheck lets nothing through while every one is held
       if (!parked) this.locks.drop(`item-${item}`);
+      const watched = held?.owner.watched === "precheck";
+      if (watched) this.locks.update(`item-${item}`, { messaged_at: "-", woke: "-" });
       this.say(
-        parked
-          ? `all ${open.length} open slots of ${n} are in use — #${item} stays parked; start it again once a slot is free (its waiter, started again, wakes you).`
-          : `all ${open.length} open slots of ${n} are in use — nothing can start now.`,
+        !parked
+          ? `all ${open.length} open slots of ${n} are in use — nothing can start now.`
+          : watched
+            ? `all ${open.length} open slots of ${n} are in use — #${item} stays parked, and the precheck wakes this session again once a slot is free. End the turn.`
+            : `all ${open.length} open slots of ${n} are in use — #${item} stays parked; start it again once a slot is free (its waiter, started again, wakes you).`,
       );
       return 1;
     }
@@ -708,7 +733,14 @@ class RunState {
     }
     const now = this.now();
     const state = approved ? "awaiting-merge" : "in-review";
-    this.locks.update(`item-${item}`, { slot: "-", parked_at: now, phase: `parked: ${state}`, phase_at: now });
+    const watched = await this.precheckWatches(this.kit.me);
+    this.locks.update(`item-${item}`, {
+      slot: "-",
+      parked_at: now,
+      phase: `parked: ${state}`,
+      phase_at: now,
+      watched: watched ? "precheck" : "-",
+    });
     this.writeItem(item, { state, pr: prs, session: this.kit.me, round_at: now, updated_at: now });
     this.logLine("parked", this.kit.me, item, slot, prs.split(" ").join(","), since, `state=${state}`);
     const labels = refs.map((x) => labelRef(x, this.kit.slug)).join(" ");
@@ -731,6 +763,13 @@ class RunState {
       this.writeItem(item, { ui_notified: uiPrs });
     }
     this.out(`parked #${item} (${state}): the slot and the exclusive lock are free; the item stays yours.`);
+    if (watched) {
+      this.out("Now end the turn, with nothing left running: the precheck watches it.");
+      this.out(
+        `It messages this session for a review, a comment, a red check or a conflict on ${labels}, and when it merges.`,
+      );
+      return 0;
+    }
     this.out(
       `Now start its waiter as a background task — bash "$HOME/scripts/run-state.sh" wait --park — and end the turn.`,
     );
@@ -741,12 +780,16 @@ class RunState {
   }
 
   /**
-   * The parked item's waiter: what wakes the session. Started as a harness
+   * The parked item's waiter, where the precheck does not watch it — a
+   * person's session, or no tick: what wakes the session. Started as a harness
    * background task, it records its pid on the item lock — the lock's holder
    * while the turn is over — then looks at the pull requests once a minute,
    * an unchanged one at no cost, for up to PARK_FOR_SECONDS. It exits when
    * one needs the run, and the harness hands the session its output as a new
-   * turn; or with 3 when nothing came, and the session starts it again.
+   * turn; or with 3 when nothing came, and the session starts it again. One
+   * the precheck may watch instead — an item parked before it did — is handed
+   * to it, at once or when the waiter runs out, so nothing wakes the session
+   * every two hours for nothing.
    */
   async waitParked(): Promise<number> {
     this.needSession();
@@ -763,6 +806,15 @@ class RunState {
     if (refs.length === 0) {
       this.say(`#${item} is parked with no pull request on record: start it again and park <pr>`);
       return 1;
+    }
+    const watch = await this.precheckWatches(this.kit.me);
+    if (
+      watch &&
+      (lock.owner.watched === "precheck" || !waiterAlive(lock.owner, this.locks.boot, this.locks.livePids))
+    ) {
+      this.watchParked(lock.name);
+      this.out(`#${item}: the precheck watches it, and messages this session when something lands. End the turn.`);
+      return 5;
     }
     const pid = this.deps.env.SD_WAITER_PID || String(process.pid);
     if (
@@ -820,6 +872,11 @@ class RunState {
       const o = this.locks.read(lock.name)?.owner;
       if (o?.waiter === pid && o.parked_at !== "") this.locks.update(lock.name, { waiter: "-", waiter_boot: "-" });
     }
+    if (watch) {
+      this.watchParked(lock.name);
+      this.out(`nothing yet on ${labels.join(" ")} — ${last}. The precheck watches it from now on: end the turn.`);
+      return 3;
+    }
     this.out(
       `nothing yet on ${labels.join(" ")} — ${last}. Start the waiter again: bash "$HOME/scripts/run-state.sh" wait --park`,
     );
@@ -859,8 +916,13 @@ class RunState {
     const item = mine.find((h) => h.name.startsWith("item-"));
     const holds = mine.filter((h) => !h.name.startsWith("item-")).map((h) => h.name);
     if (item && item.owner.parked_at !== "" && holds.length === 0) {
-      // a message asking for its waiter is no reason to stop: it is what woke this turn
+      // a message is no reason to stop: it is what woke this turn
       if (!["", "message"].includes(this.locks.parkedHolder(item.owner))) return 0;
+      if (item.owner.watched === "precheck") {
+        this.say(`#${item.owner.item} is parked, and the precheck woke this session for what landed on it:`);
+        this.say(`take it back — bash "$HOME/scripts/run-state.sh" start ${item.owner.item} — and handle it.`);
+        return 1;
+      }
       this.say(`#${item.owner.item} is parked, but nothing will wake this session:`);
       this.say(
         'start its waiter as a background task — bash "$HOME/scripts/run-state.sh" wait --park — then end the turn.',
@@ -1215,6 +1277,10 @@ class RunState {
         // most likely: its session is asked back once, so the context that
         // wrote the change answers it; asked already, or not reachable, the
         // next tick picks it up as a run that stopped
+        if (item && h.owner.messaged_at === "" && (await this.precheckWatches(h.owner.session))) {
+          this.watchParked(h.name);
+          continue;
+        }
         if (item && h.owner.messaged_at === "" && (await this.callBack(h))) continue;
         if (item) {
           this.writeItem(item, { state: "abandoned", updated_at: this.now() });
@@ -1255,6 +1321,51 @@ class RunState {
     }
     if (print) for (const a of abandoned) this.out(a);
     return abandoned;
+  }
+
+  /** The precheck watches a parked item from now on: its waiter and booking are spent. */
+  watchParked(name: string): void {
+    this.locks.update(name, { watched: "precheck", waiter: "-", waiter_boot: "-", messaged_at: "-" });
+  }
+
+  /**
+   * Something landed on a parked item the precheck watches: its session is
+   * messaged to take it back, a turn there, and the lock is held for it
+   * MESSAGE_GRACE_MIN; not taken back by then, it is dead, and a fresh run
+   * takes the item over. False when the platform did not queue the message:
+   * the item is handed on at once.
+   */
+  async wakeParked(item: string, what: string): Promise<boolean> {
+    const name = `item-${item}`;
+    const h = this.locks.read(name);
+    if (!h || h.owner.parked_at === "" || this.locks.parkedHolder(h.owner) !== "precheck") return true;
+    const { session, parked_at } = h.owner;
+    const prs = this.prsOf(item).join(",");
+    const said = what.replaceAll('"', "'");
+    const text = [
+      `#${item} is parked in this session, and something landed on it: ${what}.`,
+      `Take it back — bash "$HOME/scripts/run-state.sh" start ${item} — and handle it (docs/babysit.md).`,
+      `Sent by the precheck. Not taken back within ${MESSAGE_GRACE_MIN} minutes, and a fresh run takes the item over.`,
+    ].join("\n\n");
+    // stamped first, so a precheck beside this one does not send it twice
+    const now = this.now();
+    this.locks.update(name, { messaged_at: now, woke: "precheck", phase: `woken: ${said}`, phase_at: now });
+    if (await this.deps.runtime.message(session, text)) {
+      this.logLine("messaged", session, item, "-", prs, parked_at, `reason="landed: ${said}"`);
+      return true;
+    }
+    this.writeItem(item, { state: "abandoned", updated_at: now });
+    this.logLine(
+      "abandoned",
+      session,
+      item,
+      "-",
+      prs,
+      parked_at,
+      `reason="parked, its session not reached for what landed"`,
+    );
+    this.locks.drop(name);
+    return false;
   }
 
   /** Asks a parked item's session to take it back: true once the platform queued the message, and the lock is held for it. */

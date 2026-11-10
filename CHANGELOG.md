@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.17.0 — 2026-11-10
+
+**The precheck watches a parked item; nothing waits in the sandbox.** `park`
+ends the turn with nothing running: the tick's precheck, which reads the pull
+requests anyway, messages the parked session when a review, a person's comment,
+a failed check, a conflict or the merge lands after its last round — and
+nothing else wakes it. The two-hour waiter, and its wake every two hours to
+start it again, is left only where no tick runs: a person's session, or
+`schedules` without `tick`. A session not back within fifteen minutes is handed
+to a fresh run, as before.
+
+**Upgrade:** nothing. An item parked before this version moves over by itself:
+its running waiter hands it to the precheck when it next ends, and one lost to a
+restart is watched instead of messaged.
+
 ## 6.16.2 — 2026-11-10
 
 **An item with work pushed past its merged pull requests is not done.** `start`

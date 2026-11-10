@@ -9,10 +9,12 @@
 // messages, so its lock goes stale only `attendedStaleMin` after it was taken.
 //
 // A parked lock (`parked_at`) has outlived its turn on purpose: the session
-// ended it to wait for a person, and its holder is now whatever wakes it — a
-// waiter process on this boot, or a wake-up booked on the platform. Neither
-// left, the sweep messages the session once to come back (`messaged_at`), and
-// the lock is held for that a while; it is dead once nothing is left. A runtime that does not answer frees nothing: a guess
+// ended it to wait for a person, and its holder is now whatever wakes it — the
+// precheck (`watched`), which messages the session when something lands on its
+// pull requests; in a person's session a waiter process on this boot, or a
+// wake-up booked on the platform. A session messaged to come back
+// (`messaged_at`) has a while to take it; then, and with nothing else left,
+// the lock is dead. A runtime that does not answer frees nothing: a guess
 // could hand a live run's work to another.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -28,8 +30,9 @@ export const OWNER_KEYS = [
   "slot",
   "phase",
   "phase_at",
-  // a parked item lock: when it was parked, its waiter, its booked wake-up, and what woke it last
+  // a parked item lock: when it was parked, who watches it, its waiter, its booked wake-up, and what woke it last
   "parked_at",
+  "watched",
   "waiter",
   "waiter_boot",
   "wake_at",
@@ -47,6 +50,7 @@ export interface Owner {
   readonly phase: string;
   readonly phase_at: string;
   readonly parked_at: string;
+  readonly watched: string;
   readonly waiter: string;
   readonly waiter_boot: string;
   readonly wake_at: string;
@@ -60,6 +64,9 @@ export const BOOKING_GRACE_MIN = 30;
 
 /** How long a session messaged to come back to its parked item has to take it before the lock reads dead. */
 export const MESSAGE_GRACE_MIN = 15;
+
+/** What keeps a parked lock alive, "" when nothing does. */
+export type ParkedHolder = "waiter" | "booking" | "message" | "precheck" | "";
 
 export interface Held {
   readonly name: string;
@@ -94,6 +101,7 @@ function owner(file: string): Owner {
     phase: g("phase"),
     phase_at: g("phase_at"),
     parked_at: g("parked_at"),
+    watched: g("watched"),
     waiter: g("waiter"),
     waiter_boot: g("waiter_boot"),
     wake_at: g("wake_at"),
@@ -217,16 +225,18 @@ export class Locks {
 
   /**
    * What keeps a parked lock alive: its waiter, a wake-up booked and not yet
-   * overdue, or a message asking its session back, sent a moment ago. "" when
-   * nothing does.
+   * overdue, a message asking its session back, sent a moment ago, or the
+   * precheck watching it. "" when nothing does — a message whose grace ran
+   * out included: the session did not come, and the item goes to a fresh run.
    */
-  parkedHolder(o: Owner): "waiter" | "booking" | "message" | "" {
+  parkedHolder(o: Owner): ParkedHolder {
     if (waiterAlive(o, this.opts.boot, this.opts.livePids)) return "waiter";
     const now = nowSeconds(this.opts.clock);
     const t = epoch(o.wake_at);
     if (t !== undefined && now < t + BOOKING_GRACE_MIN * 60) return "booking";
     const m = epoch(o.messaged_at);
-    if (m !== undefined && now < m + MESSAGE_GRACE_MIN * 60) return "message";
+    if (m !== undefined) return now < m + MESSAGE_GRACE_MIN * 60 ? "message" : "";
+    if (o.watched === "precheck") return "precheck";
     return "";
   }
 

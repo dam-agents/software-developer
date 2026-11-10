@@ -60,7 +60,8 @@ so to the operator.
   `work/.claude/skills` links. The one exception is
   `work-backup.sh`, which commits and pushes `work/`'s files to `work_repo`
   and touches nothing else. Its one message is to a session of this agent:
-  the sweep asks a parked item's session to start its lost waiter again
+  the precheck asks a parked item's session to take it back when something
+  landed on it, and the sweep one whose waiter was lost
   ([babysit.md](babysit.md) → **Held, then parked**), never a person's.
 - `CLAUDE.md` stays slim: run types, contracts, configuration, the trust
   boundary, invariants. Procedures live in `docs/`, each with its row in

@@ -319,6 +319,141 @@ test("a parked item is its session's: the precheck leaves it while something wil
     );
   }));
 
+/** #4 parked by sess-a, its last round `roundMin` ago, the precheck watching it. */
+function watched(s: Sandbox, roundMin = 60, state = "in-review"): void {
+  s.item("4", { state, pr: "40", session: "sess-a", round_at: s.clock.ago(roundMin), seen_at: s.clock.ago(roundMin) });
+  s.lock("item-4", {
+    session: "sess-a",
+    item: "4",
+    since: s.clock.ago(roundMin + 10),
+    parked_at: s.clock.ago(roundMin),
+    watched: "precheck",
+  });
+}
+const pr40 = (s: Sandbox, extra: Record<string, unknown> = {}) => ({
+  number: 40,
+  title: "Forty",
+  url: "https://gh/pr/40",
+  reviewDecision: "REVIEW_REQUIRED",
+  mergeable: "MERGEABLE",
+  body: "Fixes #4",
+  latestReviews: [],
+  statusCheckRollup: [{ name: "test", conclusion: "SUCCESS", completedAt: s.clock.ago(90) }],
+  ...extra,
+});
+
+test("a parked item the precheck watches: quiet costs nothing, what lands messages its session", () =>
+  inSandbox(async (s) => {
+    watched(s);
+    gql(s, [pr40(s)]);
+    assert.equal((await pc(s)).rc, 1, "nothing landed: no run, no message");
+    assert.equal(s.runtime.messages.length, 0);
+    for (const [why, extra, said] of [
+      [
+        "a review",
+        { latestReviews: [{ author: { login: "guardian" }, state: "CHANGES_REQUESTED", submittedAt: s.clock.ago(2) }] },
+        /PR #40 reviewed; resolve every finding/,
+      ],
+      [
+        "a person's comment",
+        {
+          comments: {
+            nodes: [
+              {
+                author: { __typename: "User", login: "alice" },
+                authorAssociation: "NONE",
+                body: "why?",
+                updatedAt: s.clock.ago(2),
+              },
+            ],
+          },
+        },
+        /PR #40 commented; answer every comment/,
+      ],
+      [
+        "a red check",
+        { statusCheckRollup: [{ name: "test", conclusion: "FAILURE", completedAt: s.clock.ago(2) }] },
+        /PR #40 checks failed: test/,
+      ],
+      ["a conflict in review", { mergeable: "CONFLICTING" }, /PR #40 conflicting: rebase/],
+    ] as const) {
+      s.runtime.messages.length = 0;
+      rmSync(join(s.locks, "item-4"), { recursive: true, force: true });
+      watched(s);
+      gql(s, [pr40(s, extra)]);
+      const r = await pc(s);
+      assert.equal(r.rc, 1, `${why}: a message, no run here`);
+      assert.equal(s.runtime.messages.length, 1, why);
+      assert.equal(s.runtime.messages[0]?.id, "sess-a");
+      assert.match(s.runtime.messages[0]?.text ?? "", said);
+      assert.match(s.runtime.messages[0]?.text ?? "", /run-state\.sh" start 4/);
+      assert.match(s.read("locks/item-4/owner"), /^- messaged_at: /m);
+      // asked once: the next tick, still in its grace, sends nothing
+      assert.equal((await pc(s)).rc, 1);
+      assert.equal(s.runtime.messages.length, 1, `${why}: asked once`);
+    }
+    assert.match(s.read("work/TICK.log"), /messaged session=sess-a issue=4 slot=- pr=40 .*reason="landed: PR #40/);
+  }));
+
+test("what landed before the last round wakes nothing", () =>
+  inSandbox(async (s) => {
+    watched(s, 30);
+    gql(s, [
+      pr40(s, {
+        latestReviews: [{ author: { login: "guardian" }, state: "CHANGES_REQUESTED", submittedAt: s.clock.ago(40) }],
+      }),
+    ]);
+    assert.equal((await pc(s)).rc, 1);
+    assert.equal(s.runtime.messages.length, 0, "the round that parked it answered that review");
+  }));
+
+test("a watched session that does not come back in time is handed to a fresh run", () =>
+  inSandbox(async (s) => {
+    watched(s);
+    gql(s, [
+      pr40(s, { latestReviews: [{ author: { login: "guardian" }, state: "COMMENTED", submittedAt: s.clock.ago(2) }] }),
+    ]);
+    assert.equal((await pc(s)).rc, 1);
+    assert.equal(s.runtime.messages.length, 1);
+    s.clock.advance(16 * 60);
+    const r = await pc(s);
+    assert.equal(r.rc, 0, "its grace is over: a fresh run takes the review");
+    assert.match(r.out, /stopped without finishing/);
+    assert.match(r.out, /#4 — PR #40 Forty — reviewed/);
+    assert.equal(s.runtime.messages.length, 1, "not asked twice");
+  }));
+
+test("a message the platform does not queue hands the watched item to a fresh run at once", () =>
+  inSandbox(async (s) => {
+    watched(s);
+    s.runtime.queues = false;
+    gql(s, [pr40(s, { statusCheckRollup: [{ name: "test", conclusion: "FAILURE", completedAt: s.clock.ago(2) }] })]);
+    const r = await pc(s);
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /#4 parked, and its session could not be reached/);
+    assert.match(r.out, /#4 — PR #40 Forty — checks failed: test/);
+    assert.ok(!existsSync(join(s.locks, "item-4")), "handed on");
+    assert.match(s.read("work/TICK.log"), /abandoned session=sess-a issue=4 .*its session not reached/);
+  }));
+
+test("a watched item whose pull request merged wakes its session to release it", () =>
+  inSandbox(async (s) => {
+    watched(s, 60, "awaiting-merge");
+    gql(s, []);
+    s.github.prViews = [{ state: "OPEN" }];
+    assert.equal((await pc(s)).rc, 1, "the search lags, the pull request is still open: nothing");
+    assert.equal(s.runtime.messages.length, 0);
+    s.github.prViews = [{ state: "MERGED" }];
+    assert.equal((await pc(s)).rc, 1);
+    assert.match(s.runtime.messages[0]?.text ?? "", /merged or closed: release the issue/);
+    s.runtime.queues = false;
+    rmSync(join(s.locks, "item-4"), { recursive: true, force: true });
+    watched(s, 60, "awaiting-merge");
+    const r = await pc(s);
+    assert.equal(r.rc, 0, "not reached: listed to release");
+    assert.match(r.out, /Merged or closed while parked — release:\n- #4 — its pull request is merged or closed/);
+  }));
+
 test("merged while parked with nothing to see it: the precheck lists it to release", () =>
   inSandbox(async (s) => {
     s.item("4", { state: "awaiting-merge", pr: "40" });

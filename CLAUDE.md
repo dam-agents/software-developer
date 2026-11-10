@@ -126,15 +126,15 @@ requests, comments. Every step below goes through `scripts/run-state.sh`:
   <check> pass|fail|skipped [cause]`. A check that did not pass is never only a
   line in a pull request body: `checked` says what to post, and park and finish
   hold a change on `verify_required_paths` back from review until it passes.
-- **Waiting on a person** — a review, a merge: `park` it, with its waiter
-  running ([`docs/babysit.md`](docs/babysit.md) → **Held, then parked**).
+- **Waiting on a person** — a review, a merge: `park` it, and end the turn as
+  it says ([`docs/babysit.md`](docs/babysit.md) → **Held, then parked**).
 - **Last, on every way out:** push everything, report on GitHub, then
   `run-state.sh finish <outcome> [pr]` — `nothing`, `pr-opened`, `pr-updated`,
   `released`, `blocked`, `waiting-lock`, `waiting-env` or `needs-info`. It refuses until the
   slot is pushed and this run's report is on the issue or its pull request
   ([`docs/runs.md`](docs/runs.md) → **Reports**); then it frees the item and the
   slot, and backs `work/` up. A `Stop` hook keeps an unattended run's turn
-  from ending before it, or before it is parked with its waiter running. A run that ends without it anyway is found dead by the next precheck, and
+  from ending before it, or before it is parked. A run that ends without it anyway is found dead by the next precheck, and
   its item handed on as half-done — say so in your report when you resume one.
 - **Resumed after a restart** (`<turn-interrupted>`): `start` your item again.
 
@@ -161,7 +161,7 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   Never end a turn asking, summarizing or promising to continue.
 - **Never leave work running behind you**: a build detached with `nohup`, `setsid` or `&` outlives its locks.
 - **Long commands run in the background, and you work meanwhile**: `verify`,
-  `verify_exclusive`, a build, a test suite, `run-state.sh wait`, its waiter — start each as
+  `verify_exclusive`, a build, a test suite, `run-state.sh wait` — start each as
   the harness's own background task (Claude Code: `run_in_background`), then
   review the diff, draft the pull request body, read what comes next, and act on
   its result when it arrives. Never change what it is testing while it runs,

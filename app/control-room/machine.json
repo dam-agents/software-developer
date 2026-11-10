@@ -49,7 +49,7 @@
    "id": "in-review",
    "label": "In review",
    "zone": "outflow",
-   "holds": "item · waiter",
+   "holds": "item · watched",
    "stages": [
     "in-review"
    ]
@@ -58,7 +58,7 @@
    "id": "awaiting-merge",
    "label": "Awaiting merge",
    "zone": "outflow",
-   "holds": "item · waiter",
+   "holds": "item · watched",
    "stages": [
     "awaiting-merge"
    ]
@@ -147,7 +147,7 @@
    "from": "in-review",
    "to": "working",
    "by": "start · review or failed check",
-   "who": "waiter · booking · tick"
+   "who": "precheck · waiter · tick"
   },
   {
    "from": "in-review",
@@ -159,7 +159,7 @@
    "from": "awaiting-merge",
    "to": "working",
    "by": "start · maintainer comment or red",
-   "who": "waiter · booking · tick"
+   "who": "precheck · waiter · tick"
   },
   {
    "from": "awaiting-merge",

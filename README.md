@@ -28,8 +28,7 @@ through review.
   - `work-backup.sh` backs `work/` up to a private repository of its own, and
     restores it on a fresh volume;
   - `harness/claude-code/` holds the `Stop` hook that keeps an unattended run
-    from ending its turn until it is at rest — finished, or parked with its
-    waiter running — and the installer that registers it and links the skills;
+    from ending its turn until it is at rest — finished, or parked — and the installer that registers it and links the skills;
   - `verify-onboarding.sh` checks an instance has the shape onboarding
     promises, and every failure names its fix;
   - `audit.sh` is the deterministic half of the weekly audit;
@@ -58,8 +57,8 @@ run the weekly audit.
 One session carries an issue from its claim to the merge. While it works, it
 holds the issue and a slot, and the Stop hook keeps its turn going. While a
 person moves — a review, a merge — it **parks**: the slot and the exclusive
-lock go back, the issue stays its own, and a waiter wakes that same session
-when a review, a comment, a red check or the merge lands
+lock go back, the issue stays its own, nothing runs, and the precheck wakes
+that same session when a review, a comment, a red check or the merge lands
 ([`docs/babysit.md`](docs/babysit.md)).
 
 ```mermaid
@@ -71,13 +70,13 @@ stateDiagram-v2
         Working --> Verifying: lock · takes exclusive
         Verifying --> Working: unlock
     }
-    state "PARKED · the turn ends, a waiter watches" as Parked {
+    state "PARKED · the turn ends, the precheck watches" as Parked {
         InReview --> AwaitingMerge: approved
         AwaitingMerge --> InReview: approval dismissed
     }
     Held --> Parked: park · frees slot + exclusive
     Parked --> Held: a review, a comment, a red check · same session
-    Parked --> Held: waiter lost to a restart · a fresh run
+    Parked --> Held: session not back in time · a fresh run
     Parked --> Released: merged or closed · frees item
     Released --> [*]
     Held --> Aside: finish · frees item + slot
