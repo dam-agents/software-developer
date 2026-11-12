@@ -9,6 +9,18 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.17.1 — 2026-11-12
+
+**The kit declares no compute size and no disk.** `kit.yaml` no longer carries
+`backend`, or a `resources` block. The platform has neither: the sandbox is a
+VM, and a machine draws CPU and memory from its owner's pools, so a kit cannot
+size one; its disk is sparse and a new machine is created at the owner's
+storage pool, so a `storage` a kit declared reserved nothing. The platform's
+schema had already dropped the fields, and read them only to discard them.
+
+**Upgrade:** nothing. An agent created from an earlier version keeps the spec
+it was created with, and nothing reads the kit's fields again.
+
 ## 6.17.0 — 2026-11-10
 
 **The precheck watches a parked item; nothing waits in the sandbox.** `park`
