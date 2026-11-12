@@ -15,29 +15,12 @@ icon: code
 docsUrl: https://github.com/dam-agents/software-developer
 harnesses: [claude-code]
 
-# A repository's checks may need containers, or a local cluster, which a pod
-# cannot host. An install without virtualization leaves this kit out of the
-# catalog entirely rather than offering something it cannot run.
-backend: vm
-
 # `self` is this repository, at the commit the kit was resolved at, so an
 # agent always runs the definition this file shipped with. Into $HOME, because
 # the repository the agent works on belongs in work/.
 seed:
   self: true
   into: home
-
-resources:
-  cpu: "12"
-  memory: 16Gi
-  storage: 80Gi
-  note: >-
-    Up to three builds side by side, and whatever services the repository's
-    checks start, on one host. The disk is deliberately under the 100Gi a vm
-    runner claims per owner by default, so the image cache it shares that
-    claim with still has room. Disk is fixed at create — raise it here before
-    installing for a repository that needs more, and raise the runner claim
-    with it.
 
 # Whatever the repository's checks start — a container runtime, a cluster — is
 # a process in the sandbox and stops when it does. This agent stays up so they

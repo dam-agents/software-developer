@@ -6,7 +6,7 @@ runs the repository's own checks in its sandbox, and drives the pull request
 through review.
 
 - [`kit.yaml`](kit.yaml) — what the platform creates: the connection it needs,
-  its size, its schedule, and the sandbox it runs in.
+  its schedule, and the sandbox it runs in.
 - [`CLAUDE.md`](CLAUDE.md) — what the agent does on every run, and what it
   never does.
 - [`docs/`](docs/) — the procedures `CLAUDE.md` sends it to when they apply.
