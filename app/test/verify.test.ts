@@ -195,6 +195,20 @@ test("slack_automerge is off when missing, and off, people or user ids when set"
     assert.match(r.out, /ok {3}config\.slack_automerge — U0123ABCD U0456EFGH may ask for auto-merge/);
   }));
 
+test("slack_people is unset when missing, and login=Slack user id pairs when set", () =>
+  inSandbox(async (s) => {
+    assert.match((await v(s, "--config")).out, /ok {3}config\.slack_people — unset — nobody hears/);
+    s.config("- slack_people: alice=U0123ABCD bob");
+    assert.match(
+      (await v(s, "--config")).out,
+      /FAIL config\.slack_people — 'alice=U0123ABCD bob' is not all login=Slack user id pairs/,
+    );
+    s.setConfig("slack_people", "alice=U0123ABCD, Bob=W0456EFGH");
+    const r = await v(s, "--config");
+    assert.equal(r.rc, 0);
+    assert.match(r.out, /ok {3}config\.slack_people — alice bob hear of an issue they handed off/);
+  }));
+
 test("a grill skill is the repository's when named, the default otherwise", () =>
   inSandbox(async (s) => {
     s.onboarded();

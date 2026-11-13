@@ -148,6 +148,10 @@ confirming or correcting rather than composing from nothing.
   — the default is no: `off`, `people`, or the Slack user ids of who may,
   from `describe_channel_users`; whoever it names may in effect merge.
   Record it as `slack_automerge`, and say so in **Bounds**.
+  Offer, too, to tell whoever hands an issue off on GitHub of its moments in
+  a direct message: for each person who may, their GitHub login and their
+  Slack user id from `describe_channel_users`, as `slack_people` pairs. A
+  hand-off from Slack needs none: its thread reaches who asked.
   Look in the repository's skills for one that grills a plan and one that
   files issues; offer them as `skill_grill` and `skill_file_issue`, or the
   definition's defaults when there are none. Not connected: skip it, and say a Slack channel can be bound in the agent's
@@ -218,6 +222,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - slack_handoff: anyone
 - slack_ui_review: C0123ABCD
 - slack_automerge: off
+- slack_people: alice=U0123ABCD bob=U0456EFGH
 - skill_grill: grill-me
 - skill_file_issue: file-issue
 - repos_also: owner/*
@@ -234,7 +239,7 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 no demo, `demo_environment`; with
 neither check, or no path that needs one, `verify_required_paths`; with no
 Environment at all, `label_ui_review`; with no
-review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_ui_review` and `slack_automerge`;
+review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_ui_review`, `slack_automerge` and `slack_people`; with nobody to tell directly, `slack_people`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`; leave `prune` and
 `prune_below_gb` out when builds leave little behind.

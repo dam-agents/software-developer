@@ -44,8 +44,8 @@
 //                             park and finish read it (app/src/developer/checks.ts)
 //   finish <outcome> [pr]...  the run's last act, on every way out: refused
 //                             until the work is pushed and reported on GitHub;
-//                             then backs work/ up, and with slack_channel set
-//                             says what to post (notify:)
+//                             then backs work/ up, and with slack_channel or
+//                             slack_people set says what to post (notify:)
 //   sweep                     free the locks of dead holders (the precheck)
 //   held                      the items live runs hold, one per line
 //   live                      how many slots are held
@@ -77,7 +77,7 @@ import {
   toComment,
   verdict,
 } from "./pulls.ts";
-import { ours, reported, slackThread } from "./reports.ts";
+import { ours, reported, requester, slackThread } from "./reports.ts";
 import { alsoDirs, prepare } from "./slots.ts";
 
 const USAGE =
@@ -746,12 +746,16 @@ class RunState {
     const labels = refs.map((x) => labelRef(x, this.kit.slug)).join(" ");
     // a moment a person acts on: approved, it waits for whoever merges — said once
     const chat = this.kit.cfg.get("slack_channel");
-    if (chat && state === "awaiting-merge" && this.itemKey(item, "notified") !== prs) {
-      const ts = await slackThread(this.kit, item, prs, chat);
-      const where = ts
-        ? `as a reply in thread ${ts} of slack_channel ${chat}`
-        : `to slack_channel ${chat}, and record its thread`;
-      this.say(`notify: post that ${labels} is ready to merge ${where} (docs/notify.md)`);
+    const dm = this.kit.cfg.get("slack_people");
+    if ((chat || dm) && state === "awaiting-merge" && this.itemKey(item, "notified") !== prs) {
+      if (chat) {
+        const ts = await slackThread(this.kit, item, prs, chat);
+        const where = ts
+          ? `as a reply in thread ${ts} of slack_channel ${chat}`
+          : `to slack_channel ${chat}, and record its thread`;
+        this.say(`notify: post that ${labels} is ready to merge ${where} (docs/notify.md)`);
+      }
+      await this.tellRequester(item, `that ${labels} is ready to merge`);
       this.writeItem(item, { notified: prs });
     }
     const uiChat = this.kit.cfg.get("slack_ui_review");
@@ -1255,7 +1259,17 @@ class RunState {
         : `to slack_channel ${chat}, and record its thread`;
       if (outcome !== "released") this.say(`notify: post this ${outcome} ${where} (docs/notify.md)`);
     }
+    if (outcome === "needs-info" || outcome === "blocked") await this.tellRequester(item, `this ${outcome}`);
     return 0;
+  }
+
+  /** With `slack_people` pairing who handed the issue off, the line that tells them too (docs/notify.md). */
+  private async tellRequester(item: string, what: string): Promise<void> {
+    const to = await requester(this.kit, item);
+    if (to)
+      this.say(
+        `notify: tell ${to.login}, who handed #${item} off, ${what} in a direct message to Slack user ${to.slack} (docs/notify.md → A direct message)`,
+      );
   }
 
   /**

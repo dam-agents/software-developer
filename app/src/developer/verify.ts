@@ -22,6 +22,7 @@ import { bulletKeys, readText } from "../factory/kv.ts";
 import { hookInstalled } from "./harness.ts";
 import { GATE_KEYS, ITEM_KEYS, Kit } from "./kit.ts";
 import { precheck } from "./precheck.ts";
+import { slackPeople } from "./reports.ts";
 
 /** Every key CONFIG.md may hold. `docs/self-modification.md` §2: CLAUDE.md, ONBOARDING and this list name the same keys. */
 export const KNOWN = [
@@ -55,6 +56,7 @@ export const KNOWN = [
   "slack_handoff",
   "slack_ui_review",
   "slack_automerge",
+  "slack_people",
   "schedules",
   "skill_grill",
   "skill_file_issue",
@@ -179,6 +181,21 @@ function configChecks(kit: Kit, r: Report): void {
       "config.slack_automerge",
       `'${automerge}' is not off, people or Slack user ids`,
       "write one of them, e.g. U0123ABCD, or leave it out for off",
+    );
+  const people = cfg.get("slack_people");
+  const pairs = slackPeople(people);
+  const words = people.split(/[\s,]+/).filter(Boolean);
+  if (!people) r.ok("config.slack_people", "unset — nobody hears of an issue they handed off in a direct message");
+  else if (pairs.size !== words.length)
+    r.fail(
+      "config.slack_people",
+      `'${people}' is not all login=Slack user id pairs`,
+      "write e.g. alice=U0123ABCD bob=U0456EFGH, the ids from describe_channel_users",
+    );
+  else
+    r.ok(
+      "config.slack_people",
+      `${[...pairs.keys()].join(" ")} hear of an issue they handed off in a direct message (docs/notify.md → A direct message)`,
     );
   const app = cfg.get("app_url");
   if (app && !/^https?:\/\/\S+$/.test(app))
