@@ -83,7 +83,9 @@ a line in any other shape is invisible, not wrong.
   `off`; missing: anyone. `slack_ui_review` — the chat told, once, of each
   `label_ui_review` pull request out of draft; missing: none. `slack_automerge`
   — who there may ask for auto-merge on a pull request of yours: `off`,
-  `people`, or Slack user ids; missing: off.
+  `people`, or Slack user ids; missing: off. `slack_people` — `login=<Slack
+  user id>` pairs: who handed an issue off on GitHub hears of its ✅ ❓ 🛑 in a
+  direct message; missing: nobody.
 - `repos_also` — `owner/name` or `owner/*`, by spaces or commas: the other
   repositories an issue of `repo` may need changed too, in any run
   ([`docs/runs.md`](docs/runs.md) → **Other repositories**). Missing: `repo` alone.

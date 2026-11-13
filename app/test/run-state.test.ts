@@ -118,6 +118,46 @@ test("with slack_channel set, park and finish say what to post, and only for a m
     assert.doesNotMatch(r.err, /notify:/, "nothing for a person to do");
   }));
 
+test("with slack_people set, who handed the issue off on GitHub hears of its moments in a direct message", () =>
+  inSandbox(async (s) => {
+    world(s);
+    s.originCheckout();
+    s.github.on(PULL, PULL21);
+    s.github.prViews = [view("OPEN", "APPROVED", "MERGEABLE", GREEN)];
+    s.config("- slack_people: alice=U0123ABCD dev-bot=U0999ZZZZ");
+    const labeled = (by: string) => ({ event: "labeled", label: { name: "agent/implement" }, actor: { login: by } });
+    s.github.on(/\/issues\/7\/events/, [
+      labeled("Alice"),
+      { event: "labeled", label: { name: "bug" }, actor: { login: "mallory" } },
+    ]);
+    await as(s, "sess-a", "start", "7", "feat/7");
+    let r = await as(s, "sess-a", "park", "21");
+    assert.match(
+      r.err,
+      /notify: tell alice, who handed #7 off, that #21 is ready to merge in a direct message to Slack user U0123ABCD/,
+    );
+    assert.doesNotMatch(r.err, /notify: post/, "no slack_channel: no channel post");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    r = await as(s, "sess-a", "park", "21");
+    assert.doesNotMatch(r.err, /notify:/, "said once for the same pull request");
+    await as(s, "sess-a", "start", "7", "feat/7");
+    s.github.on(ISSUE, { labels: [{ name: "agent/needs-info" }] });
+    r = await as(s, "sess-a", "finish", "needs-info");
+    assert.match(
+      r.err,
+      /notify: tell alice, who handed #7 off, this needs-info in a direct message to Slack user U0123ABCD/,
+    );
+    s.github.on(/\/issues\/7\/events/, [labeled("alice"), labeled("dev-bot")]);
+    await as(s, "sess-a", "start", "7", "feat/7");
+    s.github.on(ISSUE, { labels: [{ name: "agent/failed" }] });
+    r = await as(s, "sess-a", "finish", "blocked");
+    assert.doesNotMatch(r.err, /notify:/, "handed off from Slack: its thread reaches who asked");
+    s.github.on(/\/issues\/7\/events/, [labeled("carol")]);
+    await as(s, "sess-a", "start", "7", "feat/7");
+    r = await as(s, "sess-a", "finish", "blocked");
+    assert.doesNotMatch(r.err, /notify:/, "no pair for carol: nobody to tell");
+  }));
+
 test("with slack_ui_review set, park says to post a label_ui_review pull request out of draft, once", () =>
   inSandbox(async (s) => {
     world(s);

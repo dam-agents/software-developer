@@ -1,10 +1,11 @@
 # Slack posts
 
-Read this when `finish` prints a `notify:` line, and in the weekly audit.
+Read this when `park` or `finish` prints a `notify:` line, and in the weekly audit.
 
 GitHub is the record; Slack is a nudge for the moments a person has to act. Off
 unless `slack_channel` names a chat — a channel id from `describe_channel`.
-Missing, or Slack not connected to this agent: post nothing, say nothing.
+Missing, or Slack not connected to this agent: post nothing, say nothing — a
+direct message has a key of its own (below).
 
 ## When
 
@@ -17,6 +18,17 @@ Missing, or Slack not connected to this agent: post nothing, say nothing.
 | A pull request labelled `label_ui_review`, out of draft | `park`, once per set of pull requests | 🎨 `<repo>#<pr>` waits for a review in its Environment — `<title>`, its Environment's URL — to `slack_ui_review` |
 | Every Environment held, none to take back, with `verify_environment` | `room`, once a day per set of pull requests | 🧱 `<repo>#<n>` waits for an Environment — then each pull request holding one: review it, or merge it |
 | Weekly audit | the audit's report | the report's header and its **Action needed** lines; a 🚨 first when it has a red line |
+
+## A direct message
+
+Off unless `slack_people` pairs GitHub logins with Slack user ids; it does not
+need `slack_channel`. When the ✅, ❓ or 🛑 of an issue is due, `park` or
+`finish` also prints `notify: tell <login> … in a direct message to Slack user
+<id>` for the account that last put the hand-off label on it — never for
+`author`, whose hand-off came from Slack and whose thread already reaches who
+asked. Send the same line, its link included, with
+`send_channel_message(channel: "slack", chatId: <id>, text: …, unfurlLinks: false)`,
+and record nothing on GitHub.
 
 ## A required check that did not pass
 

@@ -182,3 +182,37 @@ export async function slackThread(kit: Kit, itemIn: string, prsIn: string, chat:
   }
   return ts;
 }
+
+const PAIR = /^([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)=([UW][A-Z0-9]+)$/;
+
+/** `slack_people`'s pairs, GitHub login → Slack user id; a word not shaped `login=U…` is left out. */
+export function slackPeople(value: string): Map<string, string> {
+  const people = new Map<string, string>();
+  for (const word of value.split(/[\s,]+/)) {
+    const m = PAIR.exec(word);
+    if (m) people.set(login(m[1]), m[2] as string);
+  }
+  return people;
+}
+
+/**
+ * Who hears of an issue's moments in a Slack direct message (docs/notify.md →
+ * A direct message): the account that last put `label_handoff` on it, when
+ * `slack_people` pairs it with a Slack id. `author` itself put it there for a
+ * hand-off from Slack, whose thread already reaches who asked: none. A pull
+ * request alone, no pair, or GitHub unreadable: none. Reads GitHub only with
+ * `slack_people` set.
+ */
+export async function requester(kit: Kit, item: string): Promise<{ login: string; slack: string } | undefined> {
+  const people = slackPeople(kit.cfg.get("slack_people"));
+  if (people.size === 0 || !/^\d+$/.test(item)) return undefined;
+  const events = await kit.deps.github.getAll(kit.host, `repos/${kit.slug}/issues/${item}/events?per_page=100`);
+  const by = (events ?? [])
+    .map(obj)
+    .filter((e) => str(e.event) === "labeled" && str(obj(e.label).name) === kit.labelHandoff)
+    .map((e) => login(str(obj(e.actor).login)))
+    .at(-1);
+  if (!by || (kit.author && by === login(kit.author))) return undefined;
+  const slack = people.get(by);
+  return slack ? { login: by, slack } : undefined;
+}

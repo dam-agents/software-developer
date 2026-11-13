@@ -9,6 +9,21 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.18.0 — 2026-11-13
+
+**Who hands an issue off on GitHub can hear of it in a Slack direct message.**
+With the new key `slack_people` — `login=<Slack user id>` pairs — `park` and
+`finish` also print a `notify:` line for a direct message to the person who
+last put the hand-off label on the issue, when it is ready to merge, needs
+info or is blocked ([`docs/notify.md`](docs/notify.md) → **A direct message**).
+A hand-off from Slack is left out: its thread reaches who asked. Off by
+default.
+
+**Upgrade (operator only):** to turn it on, add `slack_people` to
+`work/CONFIG.md`, a pair for each person, their Slack user id from
+`describe_channel_users`, e.g. `- slack_people: alice=U0123ABCD`. Without it,
+nothing changes.
+
 ## 6.17.1 — 2026-11-12
 
 **The kit declares no compute size and no disk.** `kit.yaml` no longer carries
