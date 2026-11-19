@@ -28,7 +28,7 @@ export const ITEM_KEYS = [
   "babysat_out",
   // the pull request a Slack "ready to merge" post was asked for, so it is asked once
   "notified",
-  // the pull requests a Slack "review it in its Environment" post was asked for, so it is asked once
+  // retired: nothing writes it; kept so an older item file still reads clean
   "ui_notified",
   // the last required check recorded for the item: "<check> <pass|fail|skipped> <commit>"
   "checked",

@@ -158,33 +158,6 @@ test("with slack_people set, who handed the issue off on GitHub hears of its mom
     assert.doesNotMatch(r.err, /notify:/, "no pair for carol: nobody to tell");
   }));
 
-test("with slack_ui_review set, park says to post a label_ui_review pull request out of draft, once", () =>
-  inSandbox(async (s) => {
-    world(s);
-    s.originCheckout();
-    s.github.on(PULL, PULL21);
-    s.config("- label_ui_review: qa:design\n- slack_ui_review: C0456EFGH");
-    s.github.prViews = [{ state: "OPEN", reviewDecision: "", isDraft: true, labels: [{ name: "qa:design" }] }];
-    await as(s, "sess-a", "start", "7", "feat/7");
-    let r = await as(s, "sess-a", "park", "21");
-    assert.equal(r.rc, 0, r.err);
-    assert.doesNotMatch(r.err, /notify:/, "a draft waits for nobody");
-    s.github.prViews = [{ state: "OPEN", reviewDecision: "", isDraft: false, labels: [{ name: "other" }] }];
-    await as(s, "sess-a", "start", "7", "feat/7");
-    r = await as(s, "sess-a", "park", "21");
-    assert.doesNotMatch(r.err, /notify:/, "not labelled: not reviewed in its Environment");
-    s.github.prViews = [{ state: "OPEN", reviewDecision: "", isDraft: false, labels: [{ name: "qa:design" }] }];
-    await as(s, "sess-a", "start", "7", "feat/7");
-    r = await as(s, "sess-a", "park", "21");
-    assert.match(
-      r.err,
-      /notify: post 🎨 that #21 waits for a review in its Environment, top-level to slack_ui_review C0456EFGH/,
-    );
-    await as(s, "sess-a", "start", "7", "feat/7");
-    r = await as(s, "sess-a", "park", "21");
-    assert.doesNotMatch(r.err, /notify:/, "said once for the same pull request");
-  }));
-
 test("a thread the item already has in Slack takes its posts, and only one the author left in that chat", () =>
   inSandbox(async (s) => {
     world(s);

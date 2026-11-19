@@ -54,7 +54,6 @@ export const KNOWN = [
   "work_account",
   "slack_channel",
   "slack_handoff",
-  "slack_ui_review",
   "slack_automerge",
   "slack_people",
   "schedules",
@@ -149,20 +148,6 @@ function configChecks(kit: Kit, r: Report): void {
       `'${handoff}' is not anyone, people or off`,
       "write one of them, or leave it out for anyone",
     );
-  const uiChat = cfg.get("slack_ui_review");
-  if (!uiChat)
-    r.ok("config.slack_ui_review", "unset — no post when a pull request waits for a review in its Environment");
-  else if (!/^[A-Z0-9]+$/.test(uiChat))
-    r.fail(
-      "config.slack_ui_review",
-      `'${uiChat}' is not a chat id`,
-      "the id describe_channel lists for it, e.g. C0123ABCD, not #name",
-    );
-  else if (!cfg.get("label_ui_review"))
-    r.warn("config.slack_ui_review", "set, but label_ui_review is not — nothing marks a pull request to post");
-  else
-    r.ok("config.slack_ui_review", `${uiChat} hears of each ${cfg.get("label_ui_review")} pull request out of draft`);
-
   const automerge = cfg.get("slack_automerge");
   const ids = automerge.split(/[\s,]+/).filter(Boolean);
   if (["", "off", "people"].includes(automerge) || ids.every((id) => /^[UW][A-Z0-9]+$/.test(id))) {

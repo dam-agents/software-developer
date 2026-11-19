@@ -705,20 +705,13 @@ class RunState {
     // where the pull requests stand decides the state: approved, every open one, is a wait for the merge
     let approved = true;
     let open = 0;
-    // out of draft and labelled label_ui_review: a person reviews it in its Environment
-    const ui: PrRef[] = [];
-    const uiLabel = this.kit.labelUiReview;
     for (const ref of refs) {
-      const view = (await this.deps.github.prView(
-        this.kit.host,
-        ref.slug,
-        ref.number,
-        "state,reviewDecision,isDraft,labels",
-      )) as { state?: string; reviewDecision?: string; isDraft?: boolean; labels?: { name?: string }[] } | undefined;
+      const view = (await this.deps.github.prView(this.kit.host, ref.slug, ref.number, "state,reviewDecision")) as
+        | { state?: string; reviewDecision?: string }
+        | undefined;
       if (view?.state === "MERGED" || view?.state === "CLOSED") continue;
       open++;
       if (view?.reviewDecision !== "APPROVED") approved = false;
-      if (uiLabel && view?.isDraft === false && (view.labels ?? []).some((l) => l.name === uiLabel)) ui.push(ref);
     }
     if (open === 0) {
       this.say(
@@ -757,14 +750,6 @@ class RunState {
       }
       await this.tellRequester(item, `that ${labels} is ready to merge`);
       this.writeItem(item, { notified: prs });
-    }
-    const uiChat = this.kit.cfg.get("slack_ui_review");
-    const uiPrs = ui.map((x) => recordRef(x, this.kit.slug)).join(" ");
-    if (uiChat && uiPrs && this.itemKey(item, "ui_notified") !== uiPrs) {
-      this.say(
-        `notify: post 🎨 that ${ui.map((x) => labelRef(x, this.kit.slug)).join(" ")} waits for a review in its Environment, top-level to slack_ui_review ${uiChat} (docs/notify.md → A review in the Environment)`,
-      );
-      this.writeItem(item, { ui_notified: uiPrs });
     }
     this.out(`parked #${item} (${state}): the slot and the exclusive lock are free; the item stays yours.`);
     if (watched) {
