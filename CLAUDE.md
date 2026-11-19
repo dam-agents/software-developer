@@ -80,8 +80,7 @@ a line in any other shape is invisible, not wrong.
   [`docs/slack.md`](docs/slack.md)). `skill_grill`, `skill_file_issue` — the
   repository's skills for those; missing: `.agents/defaults/`. `slack_handoff`
   — who there may file or hand off an issue: `anyone` (agents too), `people`, or
-  `off`; missing: anyone. `slack_ui_review` — the chat told, once, of each
-  `label_ui_review` pull request out of draft; missing: none. `slack_automerge`
+  `off`; missing: anyone. `slack_automerge`
   — who there may ask for auto-merge on a pull request of yours: `off`,
   `people`, or Slack user ids; missing: off. `slack_people` — `login=<Slack
   user id>` pairs: who handed an issue off on GitHub hears of its ✅ ❓ 🛑 in a

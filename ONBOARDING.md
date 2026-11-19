@@ -141,9 +141,7 @@ confirming or correcting rather than composing from nothing.
   sub-issues it files with the hand-off label ([`docs/slack.md`](docs/slack.md)).
   And hand-offs: asked there to implement an issue, it adds the hand-off label
   itself, and asked to file an issue, it files it — ask who may, `anyone` in the channel (bots too, the default),
-  `people` or `off`, and record it as `slack_handoff`. With `label_ui_review`
-  set, offer a chat told of each such pull request once it is out of draft,
-  for whoever reviews it in its Environment: `slack_ui_review`.
+  `people` or `off`, and record it as `slack_handoff`.
   Ask, too, whether anyone there may ask for auto-merge on your pull requests
   — the default is no: `off`, `people`, or the Slack user ids of who may,
   from `describe_channel_users`; whoever it names may in effect merge.
@@ -220,7 +218,6 @@ that is not one of them fails verification, because nothing would ever read it:
 - work_account: <the GitHub account that reaches work_repo, when not the active one>
 - slack_channel: C0123ABCD
 - slack_handoff: anyone
-- slack_ui_review: C0123ABCD
 - slack_automerge: off
 - slack_people: alice=U0123ABCD bob=U0456EFGH
 - skill_grill: grill-me
@@ -239,7 +236,7 @@ Interactive, leave out `label_handoff`, `label_failed`, `label_needs_info`,
 no demo, `demo_environment`; with
 neither check, or no path that needs one, `verify_required_paths`; with no
 Environment at all, `label_ui_review`; with no
-review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_ui_review`, `slack_automerge` and `slack_people`; with nobody to tell directly, `slack_people`;
+review label, `label_review`; with no backup, leave out `work_repo` and `work_account`; when the active account reaches it, `work_account`; with no Slack, leave out `slack_channel`, `slack_handoff`, `slack_automerge` and `slack_people`; with nobody to tell directly, `slack_people`;
 with every slot open, `slots_closed`; for the default grill skills, `skill_grill` and `skill_file_issue`; leave
 `repos_also` out when the work never leaves `repo`; leave `prune` and
 `prune_below_gb` out when builds leave little behind.

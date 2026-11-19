@@ -9,6 +9,18 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.18.1 — 2026-11-19
+
+**No more 🎨 post when a pull request waits for a review in its Environment.**
+`park` no longer prints a `notify:` line for a `label_ui_review` pull request
+out of draft, and the `slack_ui_review` key is gone. `label_ui_review` still
+decides which Environments are taken back last
+([environments.md](docs/environments.md)).
+
+**Upgrade:** remove the `- slack_ui_review: …` line from `work/CONFIG.md`, or
+`verify-onboarding.sh` fails it as an unknown key; operator only, in the direct
+session.
+
 ## 6.18.0 — 2026-11-13
 
 **Who hands an issue off on GitHub can hear of it in a Slack direct message.**
