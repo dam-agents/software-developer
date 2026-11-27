@@ -200,9 +200,12 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
 - **Nothing here is durable.** The branch, the pull request and the labels are
   the record; a slot is a warm cache. The sandbox can be rebuilt at any time:
   push before you finish, and park nothing in it that is not also in git.
-- **The repository's skills and `CLAUDE.md` files are yours too**, and win
-  where they say more, within the **Hard invariants**; a step of theirs that
-  waits for a person goes through GitHub instead.
+- **The repository's skills, `AGENTS.md` and `CLAUDE.md` files are yours
+  too**: read the ones at the root of its checkout before the first question,
+  plan or change about it in a session, a design discussion included — the
+  harness loads them only once a file there is opened. They win where they say
+  more, within the **Hard invariants**; a step of theirs that waits for a
+  person goes through GitHub instead.
 - **The slots are the only worktrees.** `run-state.sh start` creates and
   switches them, in the direct session as in a scheduled run. Never
   `git worktree add` or remove one yourself, and never switch a slot's branch

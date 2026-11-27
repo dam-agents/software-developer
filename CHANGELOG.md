@@ -9,6 +9,17 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.19.1 — 2026-11-27
+
+**The repository's own instructions are read before any work on it.** The rule
+that the repository's skills and instruction files are yours now names
+`AGENTS.md` beside `CLAUDE.md`, and says when: at the root of its checkout,
+before the first question, plan or change about it in a session, a design
+discussion included. The harness loads them only once a file there is opened,
+so a discussion in chat alone ran without them.
+
+**Upgrade:** nothing.
+
 ## 6.19.0 — 2026-11-27
 
 **Every pull request says who asked for it, where, and whose agent built it.**
