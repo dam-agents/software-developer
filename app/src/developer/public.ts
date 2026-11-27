@@ -9,7 +9,8 @@
 // one `app_url` names, and its siblings. The session link and the
 // `<!-- slack-thread: … -->` marker are the two the rules ask for, and are
 // read past, as is a line `Environment: <address>` with its
-// `<!-- environment: issue-<n> -->` marker (docs/environments.md). Exit 1 names each hit by line, a credential never by its value;
+// `<!-- environment: issue-<n> -->` marker (docs/environments.md), and the
+// Slack thread's link on a pull request's `Requested by` line (implement-issue → 6). Exit 1 names each hit by line, a credential never by its value;
 // any other URL is listed as a note, for the run to judge, and leaves exit 0.
 // What a shape cannot see — a paraphrase, a name, a quote — stays judgment.
 import type { Command } from "../factory/context.ts";
@@ -41,6 +42,10 @@ const PUBLIC_HOST = /(^|\.)(github\.com|githubusercontent\.com|slack\.com)$/i;
 const MARKER = /<!-- slack-thread: [A-Z0-9]+ [0-9]+\.[0-9]+ -->|<!-- environment: issue-[0-9]+ -->/g;
 /** The pull request's link to its Environment (docs/environments.md), on a line of its own. */
 const ENVIRONMENT_LINE = /^Environment: https:\/\/\S+$/;
+/** The pull request's first line, who asked and where; its Slack thread's link alone is read past on it. */
+const REQUESTED_LINE = /^Requested by /;
+const THREAD_LINK =
+  /https:\/\/[a-z0-9-]+\.slack\.com\/archives\/[A-Z0-9]+\/p[0-9]+(\?thread_ts=[0-9]+\.[0-9]+(&cid=[A-Z0-9]+)?)?/g;
 
 export interface Hit {
   readonly line: number;
@@ -73,6 +78,7 @@ export function scan(text: string, appUrl: string): { hits: Hit[]; notes: Hit[] 
   text.split("\n").forEach((raw, i) => {
     let line = (link ? raw.replace(link, " ") : raw).replace(MARKER, " ");
     if (ENVIRONMENT_LINE.test(line.trim())) return;
+    if (REQUESTED_LINE.test(line.trim())) line = line.replace(THREAD_LINK, " ");
     if (SECRET.test(line)) hits.push({ line: i + 1, kind: "credential", text: "" });
     // each match is cut out as it is found: an id inside a Slack link is the link's hit alone
     for (const [kind, re] of SHAPES)

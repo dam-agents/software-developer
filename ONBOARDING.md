@@ -131,6 +131,10 @@ confirming or correcting rather than composing from nothing.
   on this very conversation. A link with no `?s=` means the harness does not
   hand its session id to the shell, and pull requests will link to the agent
   rather than to the run that wrote them — say so, it is worth knowing.
+- **Operator** — ask the user for their name as people should see it, and
+  record it as `operator`: every pull request opens with who asked for it and
+  whose agent built it, so a reader knows whom to ask. No name: leave it out,
+  and the line names the agent alone.
 - **Slack** — optional, and off unless they say yes. Run `describe_channel`
   for `slack`: when it lists chats, offer to post the moments a person acts on
   — ready to merge, needs info, blocked, the weekly audit
@@ -194,6 +198,7 @@ that is not one of them fails verification, because nothing would ever read it:
 - repo: owner/name
 - author: the-login-you-push-as
 - app_url: https://platform.example.com
+- operator: Alice Example
 - mode: autonomous
 - label_handoff: agent/implement
 - label_claimed: agent/in-progress

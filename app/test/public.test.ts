@@ -67,6 +67,19 @@ test("a hit names its file, line and match", () =>
     assert.match(r.err, /rewrite each with a placeholder/);
   }));
 
+test("a pull request's Requested by line may link its Slack thread, nothing else and nowhere else", () => {
+  const thread =
+    "https://acme.slack.com/archives/C0123ABCD9/p1700000000000100?thread_ts=1700000000.000100&cid=C0123ABCD9";
+  assert.deepEqual(kinds(`Requested by Alice in [Slack](${thread}) — implemented by Karel, Bob's agent`), []);
+  assert.deepEqual(
+    kinds("Requested by Alice in [Slack](https://acme.slack.com/archives/C0123ABCD9/p1700000000000100)"),
+    [],
+  );
+  assert.deepEqual(kinds(`see ${thread}`), ["Slack link"], "only on its own line");
+  assert.deepEqual(kinds("Requested by Alice <@U0123ABCD9>"), ["Slack id"]);
+  assert.deepEqual(kinds("Requested by alice@acme.io"), ["e-mail address"]);
+});
+
 test("a pull request's Environment line and its marker are read past, the same address elsewhere is not", () => {
   const env = "https://app-issue-7-44dcc8.env-dev.apps.cl.acme.example";
   assert.deepEqual(kinds(`Environment: ${env}`), []);

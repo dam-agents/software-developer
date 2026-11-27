@@ -9,6 +9,19 @@ Applying the kit never touches an agent already created from it, so an instance
 crosses a version only when its operator walks it through these steps, in the
 direct session.
 
+## 6.19.0 — 2026-11-27
+
+**Every pull request says who asked for it, where, and whose agent built it.**
+Its body opens with `Requested by <who> <where> — implemented by <agent>,
+<operator>'s agent`: the person who asked in Slack, with a link to the thread,
+or the account that put the hand-off label on the issue
+([`implement-issue`](.agents/skills/implement-issue/SKILL.md) → **6**).
+`public-check.sh` lets the Slack thread's link through on that line alone. The
+new key `operator` is the name of the person whose agent this is.
+
+**Upgrade (operator only):** add `- operator: <your name>` to
+`work/CONFIG.md`. Without it, the line names the agent alone.
+
 ## 6.18.0 — 2026-11-13
 
 **Who hands an issue off on GitHub can hear of it in a Slack direct message.**
