@@ -29,6 +29,7 @@ export const KNOWN = [
   "repo",
   "author",
   "app_url",
+  "operator",
   "mode",
   "label_handoff",
   "label_claimed",

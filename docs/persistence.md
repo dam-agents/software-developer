@@ -109,10 +109,11 @@ git -C "$d" checkout -b "<type>/<short-slug>"
 git -C "$d" add -- kit.yaml CLAUDE.md AGENTS.md ONBOARDING.md README.md VERSION CHANGELOG.md .gitignore docs scripts bin app .github .agents/skills/implement-issue .agents/defaults
 git -C "$d" commit -m "<type>: <what changed>"
 git -C "$d" push -u origin "<type>/<short-slug>"
-(cd "$d" && gh pr create --title "<title>" --body "<what and why>")
+(cd "$d" && gh pr create --title "<title>" --body "<its Requested by line, then what and why>")
 ```
 
-Your part ends at the pull request; a person merges, and `$HOME` takes it at
+The body opens with the `Requested by` line of
+[`implement-issue`](../.agents/skills/implement-issue/SKILL.md) → **6**. Your part ends at the pull request; a person merges, and `$HOME` takes it at
 the next **Update**. When the connection refuses the push, write the change to
 `/tmp/definition.patch` with `git -C "$d" diff`, show it, and hand it to the
 operator instead.

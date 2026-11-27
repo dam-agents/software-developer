@@ -42,6 +42,8 @@ a line in any other shape is invisible, not wrong.
 - `author` — the login you push as; yours carry `label_mine` too, when set.
 - `app_url` — the platform's address, for the session link on every pull
   request. Missing: pull requests carry none, and say why.
+- `operator` — the name of the person whose agent this is, on every pull
+  request's `Requested by` line. Missing: the line names the agent alone.
 - `mode` — `autonomous`, or `interactive`: nothing is watched, and work
   starts in the direct session alone. Missing: interactive.
 - `label_handoff`, `label_claimed`, `label_needs_info` — missing means
@@ -170,7 +172,9 @@ Nothing to do is a normal outcome. Say so, finish `nothing`, end the turn.
   and hold any lock it needs until it returns. **Watch it, do not just await
   it:** read its log every few minutes; a failure in its setup stops it at
   once, and its cause is fixed before it runs again — never the same run twice.
-- **Every pull request body carries two lines.** `Fixes #<n>`, on its own line
+- **Every pull request body carries three lines.** First, `Requested by …`:
+  who asked for the change, where, and whose agent built it — its format in
+  [`implement-issue`](.agents/skills/implement-issue/SKILL.md) → **6**. Then `Fixes #<n>`, on its own line
   (in another repository `Fixes <repo>#<n>`, or `Part of <repo>#<n>` when
   another of the issue's pull requests closes it):
   the precheck pairs an issue with its pull request through it, so one that

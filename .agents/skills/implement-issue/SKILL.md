@@ -133,7 +133,27 @@ gh pr edit <pr> -R <repo> --add-label <label_ui_review>   # when set, and a pers
 $RS park <pr>...               # every pull request of the issue; then end the turn as it says
 ```
 
-The body: what changed and why, how it was verified (the commands, and what
+The body opens with one line, who asked for the change, where, and whose
+agent built it, so a reader knows whom to ask:
+
+```text
+Requested by <who> <where> — implemented by <agent>, <operator>'s agent
+```
+
+- `<who>` `<where>`: the latest of the issue's `Filed from Slack at the
+  request of <name>` or `Handed off from Slack by <name>` lines of yours
+  ([`docs/slack.md`](../../../docs/slack.md)): `<name> in [Slack](<link>)`, the
+  link `get_message_link` gives for the `<!-- slack-thread: <chat> <ts> -->`
+  beside it (`chatId` `<chat>`, `messageTs` `<ts>`); none: `in Slack`. Else the
+  account that last put `label_handoff` on it, from
+  `gh api repos/<repo>/issues/<n>/events`: `@<login> on GitHub`. Asked in the
+  direct session: `<operator> in the direct session`.
+- `<agent>` is `$PLATFORM_AGENT_NAME`; `operator` missing: `— implemented by
+  <agent>` alone.
+
+`scripts/public-check.sh` reads past the Slack link on this line alone.
+
+Then: what changed and why, how it was verified (the commands, and what
 `verify_exclusive` or `verify_environment` covered or why it did not run), its Environment's link when it
 has one ([`docs/environments.md`](../../../docs/environments.md)), anything a reviewer should
 look at first.
